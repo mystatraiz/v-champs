@@ -218,6 +218,14 @@
   .score-btn.plus:hover { background: #0d3320; border-color: var(--success); color: #2ecc71; }
   .score-sep { color: var(--muted); font-size: 20px; font-weight: 700; padding: 0 4px; }
   .match-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
+  /* ─── Set scoring ─── */
+  .sets-score { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .set-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .set-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--text-secondary); width: 24px; text-align: center; }
+  .set-row.set-disabled { opacity: 0.35; pointer-events: none; }
+  .sets-summary { text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-secondary); letter-spacing: 1px; }
+  .sets-summary .sw { font-size: 22px; font-weight: 800; color: var(--white); }
+  .sets-summary .sw.winner { color: var(--accent); }
   /* ─── Winner badge ─── */
   .winner-badge {
     font-size: 11px; font-weight: 700; letter-spacing: 1px;
@@ -736,15 +744,20 @@ function buildAllPlayerStats(includeCurrent = true) {
       const t1 = session.teams.find(t => t.id === m.team1Id);
       const t2 = session.teams.find(t => t.id === m.team2Id);
       if (!t1 || !t2) return;
-      [[t1, m.score1, m.score2], [t2, m.score2, m.score1]].forEach(([team, sf, sa]) => {
+      let sf1 = m.score1, sa1 = m.score2;
+    if (m.scoreType === 'sets' && m.sets) {
+      sf1 = m.sets.reduce((s,r) => s+r[0], 0);
+      sa1 = m.sets.reduce((s,r) => s+r[1], 0);
+    }
+    [[t1, m.score1, m.score2, sf1, sa1], [t2, m.score2, m.score1, sa1, sf1]].forEach(([team, sw, sl, sf, sa]) => {
         team.players.filter(p => p && p.trim()).forEach(p => {
           if (!stats[p]) stats[p] = { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0, teamNames:[] };
           const ps = stats[p];
           ps.played++;
           ps.jFor   += sf;
           ps.jAgainst += sa;
-          if (sf > sa) ps.wins++;
-          else if (sa > sf) ps.losses++;
+          if (sw > sl) ps.wins++;      // match won (by sets or games)
+          else if (sl > sw) ps.losses++;
           else ps.draws++;
           if (!ps.teamNames.includes(team.name)) ps.teamNames.push(team.name);
         });
@@ -1078,13 +1091,16 @@ function launchNextRound() {
   state.roundNum++;
   const matchups = proposeBestMatchups(state.courts);
   state.activeMatches = [];
+  const useSets = state.courts === 1;
   matchups.forEach((m, idx) => {
     const match = {
       id: state.matchCounter++,
       team1Id: m.t1,
       team2Id: m.t2,
       court: idx + 1,
-      score1: 0,
+      scoreType: useSets ? 'sets' : 'games',
+      sets: [[0,0],[0,0],[0,0]], // set scores [[t1,t2], ...]
+      score1: 0, // sets won (sets mode) or games (games mode)
       score2: 0,
       status: 'active',
       roundNum: state.roundNum
@@ -1114,7 +1130,9 @@ function renderMatchPhase() {
   const endAllBtn  = document.getElementById('end-all-btn');
   if (endAllWrap) endAllWrap.style.display = activeMatches.length >= 1 ? 'block' : 'none';
   if (endAllBtn) {
-    const allScored = activeMatches.length > 0 && activeMatches.every(m => m.score1 > 0 || m.score2 > 0);
+    const allScored = activeMatches.length > 0 && activeMatches.every(m =>
+      m.scoreType === 'sets' ? (m.score1 === 2 || m.score2 === 2) : (m.score1 > 0 || m.score2 > 0)
+    );
     endAllBtn.disabled = !allScored;
     endAllBtn.className = 'btn btn-lg ' + (allScored ? 'btn-end-all-on' : 'btn-end-all-off');
   }
@@ -1159,7 +1177,17 @@ function buildMatchCard(m) {
         ${w2 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
       </div>
     </div>
-    ${!finished ? `
+    ${!finished
+      ? (m.scoreType === 'sets' ? buildSetScoreUI(m) : buildGamesScoreUI(m))
+      : buildFinishedScoreUI(m)
+    }
+  `;
+  return div;
+}
+
+// ─── Score UI helpers ───
+function buildGamesScoreUI(m) {
+  return `
     <div class="score-control">
       <div class="score-box">
         <button class="score-btn minus" onclick="changeScore(${m.id},1,-1)">−</button>
@@ -1172,16 +1200,92 @@ function buildMatchCard(m) {
         <div class="score-num" id="s2-${m.id}">${m.score2}</div>
         <button class="score-btn plus" onclick="changeScore(${m.id},2,1)">+</button>
       </div>
-    </div>
-    ` : `
+    </div>`;
+}
+
+function buildSetScoreUI(m) {
+  const sets = m.sets || [[0,0],[0,0],[0,0]];
+  const sw1 = sets.filter(s => s[0] > s[1]).length;
+  const sw2 = sets.filter(s => s[1] > s[0]).length;
+  // Set 3 visible only if each team won 1 set
+  const set3Needed = sw1 >= 1 && sw2 >= 1;
+  const rows = sets.map((s, i) => {
+    const disabled = i === 2 && !set3Needed ? 'set-disabled' : '';
+    return `
+      <div class="set-row ${disabled}" id="set-row-${m.id}-${i}">
+        <span class="set-label">S${i+1}</span>
+        <div class="score-box">
+          <button class="score-btn minus" onclick="changeSetScore(${m.id},${i},1,-1)">−</button>
+          <div class="score-num" style="width:44px;font-size:24px;" id="ss-${m.id}-${i}-1">${s[0]}</div>
+          <button class="score-btn plus" onclick="changeSetScore(${m.id},${i},1,1)">+</button>
+        </div>
+        <div class="score-sep">:</div>
+        <div class="score-box">
+          <button class="score-btn minus" onclick="changeSetScore(${m.id},${i},2,-1)">−</button>
+          <div class="score-num" style="width:44px;font-size:24px;" id="ss-${m.id}-${i}-2">${s[1]}</div>
+          <button class="score-btn plus" onclick="changeSetScore(${m.id},${i},2,1)">+</button>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="sets-score">${rows}</div>
+    <div class="sets-summary">
+      <span class="sw ${sw1>sw2?'winner':''}" id="sw1-${m.id}">${sw1}</span>
+      <span style="color:var(--muted);font-size:14px;margin:0 8px;">SETS</span>
+      <span class="sw ${sw2>sw1?'winner':''}" id="sw2-${m.id}">${sw2}</span>
+    </div>`;
+}
+
+function buildFinishedScoreUI(m) {
+  if (m.scoreType === 'sets' && m.sets) {
+    const setsStr = m.sets.filter(s => s[0]+s[1] > 0).map(s => `${s[0]}-${s[1]}`).join(' / ');
+    return `
+      <div style="text-align:center;margin-top:12px;color:var(--text-secondary);font-size:13px;">${setsStr}</div>
+      <div class="sets-summary">
+        <span class="sw ${m.score1>m.score2?'winner':''}">${m.score1}</span>
+        <span style="color:var(--muted);font-size:14px;margin:0 8px;">SETS</span>
+        <span class="sw ${m.score2>m.score1?'winner':''}">${m.score2}</span>
+      </div>`;
+  }
+  return `
     <div class="score-control">
       <div class="score-num" style="opacity:0.7;">${m.score1}</div>
       <div class="score-sep">:</div>
       <div class="score-num" style="opacity:0.7;">${m.score2}</div>
-    </div>
-    `}
-  `;
-  return div;
+    </div>`;
+}
+
+// ─── Set score change ───
+function changeSetScore(matchId, setIdx, team, delta) {
+  const m = state.matches.find(x => x.id === matchId);
+  if (!m || m.status !== 'active') return;
+  if (!m.sets) m.sets = [[0,0],[0,0],[0,0]];
+  if (team === 1) m.sets[setIdx][0] = Math.max(0, m.sets[setIdx][0] + delta);
+  else           m.sets[setIdx][1] = Math.max(0, m.sets[setIdx][1] + delta);
+  // Recompute sets won
+  m.score1 = m.sets.filter(s => s[0] > s[1]).length;
+  m.score2 = m.sets.filter(s => s[1] > s[0]).length;
+  saveState();
+  // Update DOM
+  document.getElementById(`ss-${matchId}-${setIdx}-1`).textContent = m.sets[setIdx][0];
+  document.getElementById(`ss-${matchId}-${setIdx}-2`).textContent = m.sets[setIdx][1];
+  const sw1El = document.getElementById(`sw1-${matchId}`);
+  const sw2El = document.getElementById(`sw2-${matchId}`);
+  if (sw1El) { sw1El.textContent = m.score1; sw1El.className = 'sw' + (m.score1>m.score2?' winner':''); }
+  if (sw2El) { sw2El.textContent = m.score2; sw2El.className = 'sw' + (m.score2>m.score1?' winner':''); }
+  // Show/hide set 3
+  const set3Row = document.getElementById(`set-row-${matchId}-2`);
+  if (set3Row) {
+    const set3Needed = m.score1 >= 1 && m.score2 >= 1;
+    set3Row.classList.toggle('set-disabled', !set3Needed);
+  }
+  // Refresh end-all button
+  const activeMatches = state.matches.filter(x => x.status === 'active');
+  const allScored = activeMatches.every(x =>
+    x.scoreType === 'sets' ? (x.score1 === 2 || x.score2 === 2) : (x.score1 > 0 || x.score2 > 0)
+  );
+  const btn = document.getElementById('end-all-btn');
+  if (btn) { btn.disabled = !allScored; btn.className = 'btn btn-lg ' + (allScored ? 'btn-end-all-on' : 'btn-end-all-off'); }
 }
 
 function renderProposedMatch() {
@@ -1231,11 +1335,14 @@ function renderMatchHistory() {
   container.innerHTML = finished.map(m => {
     const t1 = state.teams[m.team1Id], t2 = state.teams[m.team2Id];
     const w1 = m.score1 > m.score2, w2 = m.score2 > m.score1;
+    const scoreStr = m.scoreType === 'sets' && m.sets
+      ? m.sets.filter(s=>s[0]+s[1]>0).map(s=>`${s[0]}-${s[1]}`).join(' / ')
+      : `${m.score1} : ${m.score2}`;
     return `
       <div class="history-item">
         <span style="color:var(--text-secondary);font-size:11px;width:60px;">T${m.court} R${m.roundNum}</span>
         <span style="${w1?'color:var(--accent);font-weight:700;':''}">${t1.name}</span>
-        <span style="color:var(--muted);margin:0 8px;">${m.score1} : ${m.score2}</span>
+        <span style="color:var(--muted);margin:0 8px;font-size:12px;">${scoreStr}</span>
         <span style="${w2?'color:var(--accent);font-weight:700;':''}">${t2.name}</span>
       </div>
     `;
@@ -1255,7 +1362,9 @@ function changeScore(matchId, team, delta) {
   document.getElementById(`s2-${matchId}`).textContent = m.score2;
   // Refresh end-all button state
   const activeMatches = state.matches.filter(x => x.status === 'active');
-  const allScored = activeMatches.every(x => x.score1 > 0 || x.score2 > 0);
+  const allScored = activeMatches.every(x =>
+    x.scoreType === 'sets' ? (x.score1 === 2 || x.score2 === 2) : (x.score1 > 0 || x.score2 > 0)
+  );
   const btn = document.getElementById('end-all-btn');
   if (btn) {
     btn.disabled = !allScored;
@@ -1270,8 +1379,15 @@ function endMatch(matchId, skipRender) {
 
   const t1 = state.teams[m.team1Id], t2 = state.teams[m.team2Id];
   t1.matchesPlayed++; t2.matchesPlayed++;
-  t1.pointsFor += m.score1; t1.pointsAgainst += m.score2;
-  t2.pointsFor += m.score2; t2.pointsAgainst += m.score1;
+
+  // For set mode: jeux = total games across all sets
+  let jFor1 = m.score1, jAgainst1 = m.score2;
+  if (m.scoreType === 'sets' && m.sets) {
+    jFor1     = m.sets.reduce((s, r) => s + r[0], 0);
+    jAgainst1 = m.sets.reduce((s, r) => s + r[1], 0);
+  }
+  t1.pointsFor += jFor1;     t1.pointsAgainst += jAgainst1;
+  t2.pointsFor += jAgainst1; t2.pointsAgainst += jFor1;
 
   if (m.score1 > m.score2) { t1.wins++; t2.losses++; }
   else if (m.score2 > m.score1) { t2.wins++; t1.losses++; }
