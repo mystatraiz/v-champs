@@ -1511,20 +1511,26 @@ function showPlayerModal(playerName) {
   const sessions = [...getHistory()];
   if (state.sessionStarted) sessions.push({ date: null, teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
 
-  const partners = new Set();
+  // Stats par partenaire : wins/played par duo
+  const partnerStats = {}; // partnerName → {wins, losses, draws, played}
   const matchRows = [];
   sessions.forEach(session => {
     session.matches.forEach(m => {
       const t1 = session.teams.find(t => t.id === m.team1Id);
       const t2 = session.teams.find(t => t.id === m.team2Id);
       if (!t1 || !t2) return;
-      const myTeam   = t1.players.includes(playerName) ? t1 : t2.players.includes(playerName) ? t2 : null;
+      const myTeam  = t1.players.includes(playerName) ? t1 : t2.players.includes(playerName) ? t2 : null;
       if (!myTeam) return;
       const oppTeam  = myTeam === t1 ? t2 : t1;
       const myScore  = myTeam === t1 ? m.score1 : m.score2;
       const oppScore = myTeam === t1 ? m.score2 : m.score1;
       const won = myScore > oppScore, draw = myScore === oppScore;
-      myTeam.players.forEach(p => { if (p !== playerName) partners.add(p); });
+      myTeam.players.filter(p => p !== playerName).forEach(partner => {
+        if (!partnerStats[partner]) partnerStats[partner] = { wins:0, losses:0, draws:0, played:0 };
+        const pp = partnerStats[partner];
+        pp.played++;
+        if (won) pp.wins++; else if (draw) pp.draws++; else pp.losses++;
+      });
       matchRows.unshift(`
         <div class="history-item">
           <span style="width:20px;font-size:12px;font-weight:700;color:${won?'var(--success)':draw?'var(--text-secondary)':'var(--danger)'}">${won?'V':draw?'N':'D'}</span>
@@ -1534,6 +1540,36 @@ function showPlayerModal(playerName) {
       `);
     });
   });
+
+  // Meilleur / pire partenaire (min 1 match ensemble)
+  const partnerEntries = Object.entries(partnerStats).filter(([,v]) => v.played >= 1);
+  partnerEntries.sort((a,b) => (b[1].wins/b[1].played) - (a[1].wins/a[1].played));
+  const bestPartner  = partnerEntries[0];
+  const worstPartner = partnerEntries[partnerEntries.length - 1];
+  const bestDiff     = bestPartner  && bestPartner  !== worstPartner;
+  const partnerHTML  = partnerEntries.length >= 2 ? `
+    <div class="stat-row">
+      <span class="stat-label">🏆 Meilleur partenaire</span>
+      <span class="stat-value" style="color:var(--success)">
+        ${bestPartner[0]}
+        <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">${bestPartner[1].wins}V/${bestPartner[1].played}M (${Math.round(bestPartner[1].wins/bestPartner[1].played*100)}%)</span>
+      </span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">💀 Pire partenaire</span>
+      <span class="stat-value" style="color:var(--danger)">
+        ${worstPartner[0]}
+        <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">${worstPartner[1].wins}V/${worstPartner[1].played}M (${Math.round(worstPartner[1].wins/worstPartner[1].played*100)}%)</span>
+      </span>
+    </div>
+  ` : partnerEntries.length === 1 ? `
+    <div class="stat-row">
+      <span class="stat-label">Partenaire</span>
+      <span class="stat-value">${partnerEntries[0][0]}
+        <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">${partnerEntries[0][1].wins}V/${partnerEntries[0][1].played}M</span>
+      </span>
+    </div>
+  ` : '';
 
   document.getElementById('modal-player-stats').innerHTML = `
     <div class="stat-row"><span class="stat-label">Matchs joués</span><span class="stat-value">${ps.played}</span></div>
@@ -1546,7 +1582,7 @@ function showPlayerModal(playerName) {
     <div class="stat-row"><span class="stat-label">Différence</span>
       <span class="stat-value" style="color:${diff>=0?'var(--success)':'var(--danger)'}">${diff>=0?'+':''}${diff}</span>
     </div>
-    ${partners.size ? `<div class="stat-row"><span class="stat-label">Partenaires</span><span class="stat-value" style="font-size:12px;">${[...partners].join(', ')}</span></div>` : ''}
+    ${partnerHTML}
     ${matchRows.length ? `
       <div style="margin-top:16px;">
         <div class="card-title">Historique complet</div>
