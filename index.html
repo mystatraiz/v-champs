@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>V-Champs — Indomitus Padel</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -21,6 +21,7 @@
     --radius: 8px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  button, input, a { touch-action: manipulation; }
   body {
     background: var(--black);
     color: var(--text);
