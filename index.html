@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>V-Champs — Indomitus Padel</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --black: #0a0a0a;
@@ -401,6 +402,18 @@
 </head>
 <body>
 
+<!-- Loading overlay -->
+<div id="app-loader" style="display:flex;position:fixed;inset:0;background:var(--black);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+  <img src="logo.png" style="height:80px;filter:invert(1);opacity:0.8;" onerror="this.style.display='none'">
+  <div id="loader-msg" style="color:var(--text-secondary);font-size:13px;letter-spacing:2px;text-transform:uppercase;">Chargement…</div>
+  <div style="width:40px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;position:relative;">
+    <div style="position:absolute;inset:0;background:var(--accent);animation:loaderBar 1.2s ease-in-out infinite;transform-origin:left;"></div>
+  </div>
+</div>
+<style>
+  @keyframes loaderBar { 0%{transform:scaleX(0) translateX(0)} 50%{transform:scaleX(1) translateX(0)} 100%{transform:scaleX(0) translateX(100%)} }
+</style>
+
 <header>
   <img id="logo" src="logo.png" alt="Indomitus Padel" onerror="this.style.display='none'">
   <div class="brand">
@@ -632,38 +645,81 @@ let state = {
 };
 
 // ═══════════════════════════════════════════════════
-//  PERSISTENCE
+//  SUPABASE
 // ═══════════════════════════════════════════════════
-function saveState() {
-  localStorage.setItem('vchamps_state', JSON.stringify(state));
+const SUPA_URL = 'https://shficsyskgqcmtinguum.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoZmljc3lza2dxY210aW5ndXVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDAxOTIsImV4cCI6MjA5NTkxNjE5Mn0.5YL_WesWzAIdpy4CUhIXzFB_YmvxfPpHNIAsMT-mznk';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// In-memory caches (Supabase = async persistence, state = sync source of truth)
+let _history = [];
+let _knownPlayers = [];
+
+function showLoader(msg) {
+  document.getElementById('loader-msg').textContent = msg || 'Chargement…';
+  document.getElementById('app-loader').style.display = 'flex';
 }
-function loadState() {
-  const s = localStorage.getItem('vchamps_state');
-  if (s) { try { state = JSON.parse(s); } catch(e) {} }
-  const pm = localStorage.getItem('vchamps_pairnames');
-  if (pm) { try { state.pairNameMap = JSON.parse(pm); } catch(e) {} }
+function hideLoader() {
+  document.getElementById('app-loader').style.display = 'none';
+}
+
+// ─── Save (fire & forget) ───
+function saveState() {
+  db.from('app_state').upsert({ key: 'current_session', value: state, updated_at: new Date().toISOString() }).then();
+}
+function savePairNames() {
+  const rows = Object.entries(state.pairNameMap).map(([pair_key, team_name]) => ({ pair_key, team_name }));
+  if (rows.length) db.from('pair_names').upsert(rows).then();
+}
+function addKnownPlayers(names) {
+  const newNames = names.filter(n => n.trim() && !_knownPlayers.includes(n.trim()));
+  if (!newNames.length) return;
+  newNames.forEach(n => _knownPlayers.push(n.trim()));
+  db.from('known_players').upsert(newNames.map(n => ({ name: n.trim() }))).then();
+}
+function getAllKnownPlayers() { return _knownPlayers; }
+
+// ─── Load on init ───
+async function loadFromSupabase() {
+  showLoader('Connexion à la base de données…');
+  try {
+    // Current session
+    const { data: sd } = await db.from('app_state').select('value').eq('key', 'current_session').maybeSingle();
+    if (sd?.value) state = sd.value;
+
+    // History
+    const { data: hd } = await db.from('app_state').select('value').eq('key', 'session_history').maybeSingle();
+    if (hd?.value) _history = hd.value;
+
+    // Pair names
+    const { data: pd } = await db.from('pair_names').select('pair_key,team_name');
+    if (pd) pd.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
+
+    // Known players
+    const { data: kd } = await db.from('known_players').select('name');
+    if (kd) _knownPlayers = kd.map(r => r.name);
+  } catch(e) {
+    console.error('Supabase load error', e);
+  }
+  hideLoader();
 }
 
 // ─── Session history ───
-function getHistory() {
-  const h = localStorage.getItem('vchamps_history');
-  if (h) { try { return JSON.parse(h); } catch(e) {} }
-  return [];
-}
+function getHistory() { return _history; }
+
 function archiveCurrentSession() {
   if (!state.sessionStarted || !state.matches.some(m => m.status === 'finished')) return;
-  const history = getHistory();
-  history.push({
+  _history.push({
     date: new Date().toISOString(),
     teams: JSON.parse(JSON.stringify(state.teams)),
     matches: state.matches.filter(m => m.status === 'finished')
   });
-  localStorage.setItem('vchamps_history', JSON.stringify(history));
+  db.from('app_state').upsert({ key: 'session_history', value: _history, updated_at: new Date().toISOString() }).then();
 }
 
 // Build aggregated player stats from all sessions (history + optional current)
 function buildAllPlayerStats(includeCurrent = true) {
-  const sessions = [...getHistory()];
+  const sessions = [..._history];
   if (includeCurrent && state.sessionStarted) {
     sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
   }
@@ -693,16 +749,7 @@ function buildAllPlayerStats(includeCurrent = true) {
 function savePairNames() {
   localStorage.setItem('vchamps_pairnames', JSON.stringify(state.pairNameMap));
 }
-function getAllKnownPlayers() {
-  const s = localStorage.getItem('vchamps_all_players');
-  if (s) { try { return JSON.parse(s); } catch(e) {} }
-  return [];
-}
-function addKnownPlayers(names) {
-  const existing = new Set(getAllKnownPlayers());
-  names.forEach(n => { if (n.trim()) existing.add(n.trim()); });
-  localStorage.setItem('vchamps_all_players', JSON.stringify([...existing]));
-}
+// getAllKnownPlayers / addKnownPlayers / savePairNames defined in SUPABASE section above
 
 // ═══════════════════════════════════════════════════
 //  SETUP
@@ -1543,8 +1590,8 @@ function updateHeaderActions() {
 // ═══════════════════════════════════════════════════
 function newTournament() {
   if (!confirm('Démarrer un nouveau tournoi ? La session actuelle sera archivée.')) return;
-  if (!state.sessionFinished) archiveCurrentSession(); // already archived on confirmEndSession
-  localStorage.removeItem('vchamps_state');
+  if (!state.sessionFinished) archiveCurrentSession();
+  db.from('app_state').delete().eq('key', 'current_session').then();
   state = {
     courts: 0, teams: [], matches: [], matchCounter: 0, roundNum: 0,
     activeMatches: [], sessionStarted: false, sessionFinished: false,
@@ -1563,8 +1610,8 @@ function newTournament() {
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
-function init() {
-  loadState();
+async function init() {
+  await loadFromSupabase();
   if (state.sessionStarted) {
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('main-tabs').style.display = 'flex';
