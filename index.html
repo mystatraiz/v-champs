@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V-Champs — Indomitus Padel</title>
+<style>
+  :root {
+    --black: #0a0a0a;
+    --dark: #1a1a1a;
+    --card: #242424;
+    --border: #333;
+    --muted: #555;
+    --text-secondary: #888;
+    --text: #e8e8e8;
+    --white: #f5f5f5;
+    --accent: #c8a96e;
+    --danger: #c0392b;
+    --success: #27ae60;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    font-size: 15px;
+  }
+  /* ─── Header ─── */
+  header {
+    background: var(--dark);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header img#logo { height: 52px; filter: invert(1) brightness(1.1); opacity: 1; }
+  header .brand { display: flex; flex-direction: column; }
+  header .brand-title { font-size: 22px; font-weight: 700; letter-spacing: 3px; color: var(--white); }
+  header .brand-sub { font-size: 11px; letter-spacing: 2px; color: var(--text-secondary); text-transform: uppercase; }
+  /* ─── Tabs ─── */
+  nav.tabs {
+    background: var(--dark);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 24px;
+  }
+  nav.tabs button {
+    background: none; border: none; color: var(--text-secondary);
+    padding: 12px 20px; font-size: 14px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  nav.tabs button.active { color: var(--white); border-bottom-color: var(--accent); }
+  nav.tabs button:hover:not(.active) { color: var(--text); }
+  /* ─── Main ─── */
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  section.tab-content { display: none; }
+  section.tab-content.active { display: block; }
+  /* ─── Cards ─── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--text-secondary); margin-bottom: 16px;
+  }
+  /* ─── Buttons ─── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: none; border-radius: var(--radius); cursor: pointer;
+    font-weight: 600; font-size: 14px; padding: 10px 18px;
+    transition: all 0.15s; letter-spacing: 0.5px;
+  }
+  .btn-primary { background: var(--white); color: var(--black); }
+  .btn-primary:hover { background: #fff; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn-secondary:hover { background: #444; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #e74c3c; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { background: #2ecc71; }
+  .btn-accent { background: var(--accent); color: var(--black); }
+  .btn-accent:hover { opacity: 0.9; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+  .btn-lg { padding: 14px 28px; font-size: 16px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-end-all-off { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .btn-end-all-on  { background: var(--success); color: #fff; }
+  .btn-end-all-on:hover { background: #2ecc71; }
+  /* ─── Forms ─── */
+  input[type=text], input[type=number] {
+    background: var(--dark); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius);
+    padding: 10px 14px; font-size: 15px; width: 100%;
+    outline: none; transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+  label { font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 6px; }
+  /* ─── Setup Screen ─── */
+  #setup-screen { text-align: center; padding-top: 32px; }
+  #setup-screen .hero-logo { height: 160px; filter: invert(1) brightness(1.1); margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto; }
+  #setup-screen h1 { font-size: 32px; font-weight: 800; letter-spacing: 5px; color: var(--white); margin-bottom: 6px; }
+  #setup-screen p { color: var(--text-secondary); margin-bottom: 36px; letter-spacing: 2px; font-size: 12px; text-transform: uppercase; }
+  .courts-selector { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+  .court-btn {
+    width: 72px; height: 72px; border-radius: var(--radius);
+    border: 2px solid var(--border); background: var(--card);
+    color: var(--text); font-size: 28px; font-weight: 800;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .court-btn:hover { border-color: var(--accent); color: var(--white); }
+  .court-btn.selected { border-color: var(--white); background: var(--white); color: var(--black); }
+  /* ─── Player Entry ─── */
+  .teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .team-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .team-card .team-name {
+    font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+    min-height: 20px;
+  }
+  .team-name-hidden {
+    color: var(--muted) !important;
+    letter-spacing: 6px !important;
+    font-size: 11px !important;
+  }
+  .team-name-reveal {
+    animation: revealName 0.4s ease forwards;
+  }
+  @keyframes revealName {
+    0%   { opacity: 0; transform: translateY(-4px); letter-spacing: 6px; }
+    100% { opacity: 1; transform: translateY(0);    letter-spacing: 1.5px; }
+  }
+  .player-input-wrap { position: relative; margin-bottom: 8px; }
+  .input-error { border-color: var(--danger) !important; }
+  .input-error-msg {
+    color: var(--danger); font-size: 11px; margin-top: 3px;
+    display: none; letter-spacing: 0.5px;
+  }
+  .input-error-msg.show { display: block; }
+  .autocomplete-list {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+    background: var(--dark); border: 1px solid var(--border);
+    border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+    max-height: 160px; overflow-y: auto;
+  }
+  .autocomplete-list div {
+    padding: 8px 14px; cursor: pointer; font-size: 14px;
+    transition: background 0.1s;
+  }
+  .autocomplete-list div:hover, .autocomplete-list div.highlighted { background: var(--border); }
+  /* ─── Match View ─── */
+  .matches-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+  .match-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .match-card.active { border-color: var(--accent); }
+  .match-card.finished { opacity: 0.6; }
+  .match-court {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px;
+  }
+  .match-teams { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .match-team { flex: 1; text-align: center; }
+  .match-team-name { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .match-team-players { font-size: 12px; color: var(--text-secondary); }
+  .match-vs { color: var(--muted); font-weight: 700; font-size: 14px; padding: 0 8px; }
+  .score-control {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 16px;
+  }
+  .score-box {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .score-num {
+    width: 48px; text-align: center;
+    font-size: 28px; font-weight: 800; color: var(--white);
+    background: var(--dark); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 0;
+  }
+  .score-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--dark);
+    color: var(--text); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; font-weight: 700; line-height: 1;
+  }
+  .score-btn:hover { background: var(--border); color: var(--white); }
+  .score-btn.minus:hover { background: #4a1010; border-color: var(--danger); color: #e74c3c; }
+  .score-btn.plus:hover { background: #0d3320; border-color: var(--success); color: #2ecc71; }
+  .score-sep { color: var(--muted); font-size: 20px; font-weight: 700; padding: 0 4px; }
+  .match-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
+  /* ─── Winner badge ─── */
+  .winner-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--accent); margin-top: 4px;
+  }
+  /* ─── Proposed match ─── */
+  .proposed-section { margin-top: 24px; }
+  .proposed-section .card { border-color: #444; }
+  /* ─── Stats Tab ─── */
+  .stats-table { width: 100%; border-collapse: collapse; }
+  .stats-table th {
+    text-align: left; padding: 10px 12px;
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+  .stats-table td {
+    padding: 12px; border-bottom: 1px solid #2a2a2a;
+    font-size: 14px;
+  }
+  .stats-table tr:hover td { background: #2a2a2a; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .rank-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 13px; font-weight: 800;
+  }
+  .rank-1 { background: #c8a96e; color: var(--black); }
+  .rank-2 { background: #aaa; color: var(--black); }
+  .rank-3 { background: #8B6914; color: var(--white); }
+  .rank-other { background: var(--border); color: var(--text-secondary); }
+  .player-link { color: var(--accent); cursor: pointer; font-weight: 600; }
+  .player-link:hover { text-decoration: underline; }
+  /* ─── Player Modal ─── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8); z-index: 500;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; width: 90%; max-width: 520px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px; }
+  .modal-title { font-size: 22px; font-weight: 800; color: var(--white); }
+  .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
+  .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2a2a2a; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--text-secondary); font-size: 14px; }
+  .stat-value { font-weight: 700; color: var(--white); font-size: 14px; }
+  /* ─── Session end ─── */
+  .session-end-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--dark); border-top: 1px solid var(--border);
+    padding: 12px 24px; display: flex; justify-content: flex-end;
+    gap: 12px; z-index: 99;
+  }
+  /* ─── Utils ─── */
+  .flex { display: flex; }
+  .gap-2 { gap: 8px; }
+  .gap-3 { gap: 12px; }
+  .mt-2 { margin-top: 8px; }
+  .mt-3 { margin-top: 12px; }
+  .mt-4 { margin-top: 16px; }
+  .mb-3 { margin-bottom: 12px; }
+  .text-center { text-align: center; }
+  .text-muted { color: var(--text-secondary); }
+  .text-accent { color: var(--accent); }
+  .text-success { color: var(--success); }
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  }
+  .badge-active { background: #0d3320; color: #2ecc71; border: 1px solid #27ae60; }
+  .badge-pending { background: #2a2200; color: var(--accent); border: 1px solid #8B6914; }
+  .badge-finished { background: var(--border); color: var(--text-secondary); }
+  .section-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--text-secondary);
+    margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .empty-state {
+    text-align: center; padding: 40px;
+    color: var(--text-secondary); font-size: 14px;
+  }
+  /* ─── History list ─── */
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid #2a2a2a; font-size: 13px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--dark); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ─── Responsive mobile ─── */
+  @media (max-width: 640px) {
+    body { font-size: 14px; padding-bottom: 72px; }
+
+    /* Header */
+    header { padding: 8px 12px; gap: 10px; }
+    header img#logo { height: 36px; }
+    header .brand-title { font-size: 16px; letter-spacing: 2px; }
+    header .brand-sub { display: none; }
+    #header-actions .btn-sm { padding: 6px 10px; font-size: 12px; }
+
+    /* Tabs */
+    nav.tabs { padding: 0 8px; }
+    nav.tabs button { padding: 12px 14px; font-size: 12px; flex: 1; text-align: center; }
+
+    /* Main */
+    main { padding: 12px; }
+
+    /* Setup */
+    #setup-screen { padding-top: 20px; }
+    #setup-screen .hero-logo { height: 110px; margin-bottom: 16px; }
+    .courts-selector { gap: 10px; margin-bottom: 24px; }
+    .court-btn { width: 80px; height: 80px; font-size: 32px; }
+
+    /* Teams grid */
+    .teams-grid { grid-template-columns: 1fr; gap: 12px; }
+    .team-card { padding: 14px; }
+    input[type=text], input[type=number] { padding: 13px 14px; font-size: 16px; }
+    .autocomplete-list div { padding: 12px 14px; font-size: 15px; }
+
+    /* Matches */
+    .matches-grid { grid-template-columns: 1fr; gap: 12px; }
+    .match-card { padding: 16px; }
+    .match-team-name { font-size: 14px; }
+    .match-team-players { font-size: 11px; }
+
+    /* Score controls — large touch targets */
+    .score-control { gap: 6px; margin-top: 18px; justify-content: center; }
+    .score-box { gap: 6px; }
+    .score-btn { width: 44px; height: 44px; font-size: 22px; flex-shrink: 0; }
+    .score-num { width: 50px; font-size: 28px; padding: 6px 0; flex-shrink: 0; }
+    .score-sep { font-size: 20px; padding: 0 2px; }
+    /* Badge overflow fix */
+    .match-card > div:first-child { flex-wrap: nowrap; min-width: 0; }
+    .match-court { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge { white-space: nowrap; flex-shrink: 0; }
+
+    /* End-all button */
+    #end-all-wrap { text-align: center; }
+    #end-all-btn { width: 100%; justify-content: center; font-size: 15px; padding: 16px; }
+
+    /* Launch / start buttons */
+    #launch-session-btn, #start-btn { width: 100%; justify-content: center; }
+
+    /* Stats tables — scrollable horizontally */
+    .stats-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .stats-table th, .stats-table td { padding: 8px 8px; font-size: 12px; white-space: nowrap; }
+    .stats-table th { font-size: 10px; }
+
+    /* Session bar */
+    .session-end-bar { padding: 10px 12px; }
+    .session-end-bar .btn { flex: 1; justify-content: center; }
+
+    /* Modal — plein écran */
+    .modal {
+      width: 100%; max-width: 100%; height: 100%;
+      max-height: 100%; border-radius: 0; padding: 20px 16px;
+    }
+    .modal-overlay { align-items: flex-end; }
+    .modal-overlay.open { display: flex; }
+    .modal { border-radius: 16px 16px 0 0; height: auto; max-height: 90vh; }
+
+    /* History items */
+    .history-item { font-size: 12px; gap: 4px; flex-wrap: wrap; }
+
+    /* Section title */
+    .section-title { font-size: 11px; }
+
+    /* Proposed match cards */
+    .proposed-section .matches-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Tablette */
+  @media (min-width: 641px) and (max-width: 900px) {
+    main { padding: 16px; }
+    .matches-grid { grid-template-columns: 1fr 1fr; }
+    .teams-grid { grid-template-columns: 1fr 1fr; }
+    .score-btn { width: 38px; height: 38px; font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img id="logo" src="logo.png" alt="Indomitus Padel" onerror="this.style.display='none'">
+  <div class="brand">
+    <div class="brand-title">V-CHAMPS</div>
+    <div class="brand-sub">Indomitus Padel · Tournoi</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;" id="header-actions"></div>
+</header>
+
+<nav class="tabs" id="main-tabs" style="display:none;">
+  <button class="active" onclick="switchTab('tournament')">Tournoi</button>
+  <button onclick="switchTab('stats')">Session</button>
+  <button onclick="switchTab('general')">Général</button>
+</nav>
+
+<main>
+  <!-- ═══ SETUP ═══ -->
+  <div id="setup-screen">
+    <img src="logo.png" alt="Indomitus Padel" class="hero-logo">
+
+    <div class="card" style="max-width:520px;margin:0 auto 24px;text-align:left;">
+      <div class="card-title" style="text-align:center;">Nombre de terrains</div>
+      <div class="courts-selector" id="courts-selector">
+        <button class="court-btn" onclick="selectCourts(1)">1</button>
+        <button class="court-btn" onclick="selectCourts(2)">2</button>
+      </div>
+      <div id="teams-preview" style="color:var(--text-secondary);font-size:13px;text-align:center;"></div>
+    </div>
+
+    <button class="btn btn-primary btn-lg" onclick="initTournament()" id="start-btn" disabled>
+      Créer le tournoi →
+    </button>
+  </div>
+
+  <!-- ═══ TOURNAMENT TAB ═══ -->
+  <section class="tab-content" id="tab-tournament">
+
+    <!-- Player Setup Phase -->
+    <div id="phase-players">
+      <div class="section-title">Entrée des joueurs</div>
+      <div class="teams-grid" id="teams-grid"></div>
+      <div style="margin-top:24px;">
+        <button class="btn btn-primary btn-lg" onclick="startSession()" id="launch-session-btn" disabled>
+          Lancer la session →
+        </button>
+      </div>
+    </div>
+
+    <!-- Match Phase -->
+    <div id="phase-matches" style="display:none;">
+      <div id="active-matches-section">
+        <div class="section-title" id="round-title">Matchs en cours</div>
+        <div class="matches-grid" id="active-matches-grid"></div>
+        <div style="margin-top:16px;" id="end-all-wrap" style="display:none;">
+          <button class="btn btn-lg" id="end-all-btn" onclick="endAllMatches()" disabled>
+            ✓ Terminer les matchs
+          </button>
+        </div>
+      </div>
+
+      <div id="proposed-section" class="proposed-section" style="display:none;">
+        <div class="section-title">Prochain match proposé</div>
+        <div id="proposed-match"></div>
+      </div>
+
+      <div style="margin-top:24px;">
+        <div class="section-title">Historique des matchs</div>
+        <div class="card">
+          <div id="match-history-list"><div class="empty-state">Aucun match terminé</div></div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ═══ STATS TAB (session actuelle) ═══ -->
+  <section class="tab-content" id="tab-stats">
+    <div id="stats-content">
+      <div class="empty-state">Lancez une session pour voir les statistiques.</div>
+    </div>
+  </section>
+
+  <!-- ═══ GENERAL TAB (cumulé toutes sessions) ═══ -->
+  <section class="tab-content" id="tab-general">
+    <div id="general-content">
+      <div class="empty-state">Aucune session terminée pour l'instant.</div>
+    </div>
+  </section>
+</main>
+
+<!-- Session end bar -->
+<div class="session-end-bar" id="session-end-bar" style="display:none;">
+  <button class="btn btn-danger" onclick="confirmEndSession()">Terminer la session</button>
+</div>
+
+<!-- Player Modal -->
+<div class="modal-overlay" id="player-modal" onclick="closePlayerModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-player-name"></div>
+        <div class="text-muted" id="modal-player-team" style="font-size:13px;margin-top:4px;"></div>
+      </div>
+      <button class="modal-close" onclick="closePlayerModal()">×</button>
+    </div>
+    <div id="modal-player-stats"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  TEAM NAMES — 150 noms fun
+// ═══════════════════════════════════════════════════
+const TEAM_NAMES = [
+  // Animaux féroces
+  "Les Tornados","Les Requins","Les Cobras","Les Panthères","Les Volcans",
+  "Les Pumas","Les Léopards","Les Faucons","Les Crocos","Les Rhinocéros",
+  "Les Buffles","Les Scorpions","Les Méduses","Les Piranhas","Les Cobras Royaux",
+  "Les Ours Polaires","Les Dragons Rouges","Les Loups Gris","Les Aigles Royaux","Les Ratons Laveurs",
+  "Les Poulpes","Les Blaireaux","Les Hippocampes","Les Manchots","Les Castors",
+  "Les Fourmis Géantes","Les Abeilles Killer","Les Frelons","Les Tarentules","Les Komodos",
+  "Les Jaguars","Les Guépards","Les Hyènes","Les Coyotes","Les Dingos",
+  "Les Piranhas Noirs","Les Requins Tigres","Les Cobras Cracheurs","Les Faucons Pèlerins","Les Vautours",
+  "Les Crocodiles","Les Anacondas","Les Pythons","Les Mambas","Les Raies Manta",
+  "Les Orques","Les Ours Grizzlys","Les Loups Arctiques","Les Lynx","Les Ocelots",
+  // Espace & Science
+  "Les Comètes","Les Électrons","Les Photons","Les Neutrons","Les Quarks",
+  "Les Astronautes","Les Lasers","Les Plasmas","Les Fusées","Les Météorites",
+  "Les Nébuleuses","Les Pulsars","Les Quasars","Les Supernovas","Les Astéroïdes",
+  "Les Galaxies","Les Trous Noirs","Les Étoiles Filantes","Les Novae","Les Cosmonautes",
+  "Les Ions","Les Protons","Les Neutrinos","Les Antimatières","Les Singularités",
+  "Les Orbiteurs","Les Satellites","Les Télescopes","Les Interstellaires","Les Voyageurs",
+  // Guerriers & Histoire
+  "Les Gladiateurs","Les Vikings","Les Spartans","Les Samouraïs","Les Ninjas",
+  "Les Corsaires","Les Pirates","Les Conquistadors","Les Mercenaires","Les Templiers",
+  "Les Bandits","Les Desperados","Les Outlaws","Les Renegades","Les Rebelles",
+  "Les Barbares","Les Légionnaires","Les Centurions","Les Prétoriens","Les Legions",
+  "Les Janissaires","Les Cosaques","Les Lanciers","Les Hallebardiers","Les Arbalétriers",
+  "Les Assassins","Les Ninjas Fantômes","Les Chevaliers Noirs","Les Templiers Fous","Les Croisés",
+  "Les Bérets Verts","Les Marines","Les Rangers","Les Parachutistes","Les Commandos",
+  "Les Zouaves","Les Hussards","Les Dragons","Les Uhlans","Les Grenadiers",
+  // Surnaturel & Fantasy
+  "Les Phénix","Les Sorciers","Les Vampires","Les Zombies","Les Fantômes",
+  "Les Démons","Les Anges","Les Goules","Les Wendigos","Les Poltergeists",
+  "Les Mutants","Les Aliens","Les Martiens","Les Clones","Les Cyborgs",
+  "Les Robots","Les Androïdes","Les Extraterrestres","Les Métamorphes","Les Hybrides",
+  "Les Trolls","Les Ogres","Les Géants","Les Nains Berserkers","Les Elfes Sombres",
+  "Les Sorcières Noires","Les Nécromanciens","Les Lich","Les Wraiths","Les Banshees",
+  "Les Gobelins Fous","Les Orques Sauvages","Les Minotaures","Les Centaures","Les Chimères",
+  // Pop Culture
+  "Les Jedi","Les Sith","Les Mandaloriens","Les Wookies","Les Padawans",
+  "Les Klingons","Les Vulcains","Les Borg","Les Romulans","Les Cardassiens",
+  "Les Avengers","Les Thunderbolts","Les Stormtroopers","Les Predators","Les Terminators",
+  "Les Transformers","Les Galactica","Les Rebels Galactiques","Les Clones Impériaux","Les Chasseurs de Primes",
+  "Les Shaolin","Les Ninjas Turtle","Les Power Rangers","Les Ghostbusters","Les Men in Black",
+  // Padel & Tennis
+  "Les Ace Makers","Les Match Points","Les Break Points","Les Set Closers","Les Game Changers",
+  "Les Lob Masters","Les Smash Bros","Les Drop Shots","Les Winners","Les Aces",
+  "Les Spinners","Les Slicers","Les Topspins","Les Court Kings","Les Net Busters",
+  "Les Wall Crushers","Les Bandeja Kings","Les Vibora Boys","Les Bajada Crew","Les Globo Masters",
+  "Les Chiquita Gang","Les Remate Kings","Les Rulo Players","Les Globo Boys","Les Pared Girls",
+  "Les Cristal Hunters","Les Side Glass","Les Back Glass","Les Volée Killers","Les Mi-Filet",
+  "Les Paraboles","Les Demi-Volées","Les Contre-Pieds","Les Faux-Rebonds","Les Amortis",
+  // Nature & Éléments
+  "Les Cyclones","Les Ouragans","Les Tsunamis","Les Séismes","Les Éruptions",
+  "Les Avalanches","Les Foudres","Les Tempêtes","Les Tourbillons","Les Tornades Rouges",
+  "Les Glaciers","Les Icebergs","Les Déserts","Les Jungles","Les Abysses",
+  "Les Marées Noires","Les Raz-de-Marée","Les Crues Soudaines","Les Sécheresses","Les Blizzards",
+  "Les Feux de Forêt","Les Coulées","Les Geysers","Les Failles","Les Crevasses",
+  // Vitesse & Technologie
+  "Les Turbo Jets","Les Speed Demons","Les Road Warriors","Les Night Riders","Les Sky Hunters",
+  "Les Sonic Boom","Les Hypersoniques","Les Supersoniques","Les Overdrive","Les Redlines",
+  "Les Nitro","Les Turbo","Les Full Throttle","Les Overdrive","Les Warpspeed",
+  "Les Hackers","Les Crackers","Les Glitches","Les Bugs","Les Exploits",
+  "Les Firewalls","Les Cyphers","Les Encoders","Les Rootkits","Les Botnets",
+  "Les Dark Nets","Les Deep Webs","Les Cryptos","Les Blockchains","Les NFT Killers",
+  // Couleurs & Style
+  "Les Black Hawks","Les Red Devils","Les Blue Storm","Les Golden Boys","Les Silver Bullets",
+  "Les Iron Bears","Les Steel Sharks","Les Fire Dragons","Les Ice Tigers","Les Dark Panthers",
+  "Les Shadow Wolves","Les Crimson Kings","Les Obsidian Blades","Les Ivory Towers","Les Scarlet Hawks",
+  "Les Midnight Blues","Les Neon Lights","Les Chrome Spirits","Les Titanium Fists","Les Cobalt Riders",
+  "Les Amber Flames","Les Jade Warriors","Les Onyx Shadows","Les Pearl Strikers","Les Ruby Smashers",
+  // Espagnol
+  "Los Galácticos","Los Diablos","Los Tigres","Los Leones","Los Toros",
+  "Los Halcones","Los Lobos","Los Demonios","Los Guerreros","Los Invencibles",
+  "Los Fenómenos","Los Intocables","Los Imparables","Los Imbatibles","Los Letales",
+  "Los Matadores","Los Conquistadores","Los Cazadores","Los Destructores","Los Campeones",
+  // Italien
+  "I Guerrieri","I Draghi","I Leoni","I Falchi","I Lupi",
+  "I Gladiatori","I Predatori","I Dominatori","I Campioni","I Furiosi",
+  // Allemand
+  "Die Blitze","Die Adler","Die Wölfe","Die Bären","Die Falken",
+  "Die Krieger","Die Jäger","Die Stürmer","Die Donner","Die Eisbrecher",
+  // Noms Épiques Français
+  "Les Indomptables","Les Implacables","Les Irréductibles","Les Indestructibles","Les Invincibles",
+  "Les Intouchables","Les Inégalables","Les Indétrônables","Les Insurmontables","Les Incomparables",
+  "Les Fous Furieux","Les Dingos","Les Barjots","Les Tarés","Les Allumés",
+  "Les Sauvages","Les Déchaînés","Les Enragés","Les Furieux","Les Insensés",
+  "Les Redoutables","Les Terribles","Les Formidables","Les Incroyables","Les Stupéfiants",
+  "Les Inarrêtables","Les Irrésistibles","Les Infernaux","Les Diaboliques","Les Sataniques",
+  "Les Légendaires","Les Mythiques","Les Épiques","Les Héroïques","Les Titanesques",
+  "Les Fabuleux","Les Prodigieux","Les Phénoménaux","Les Extraordinaires","Les Colossaux",
+  // Noms Fun & Décalés
+  "Les Briseurs de Filets","Les Rois du Fond","Les Maîtres du Lob","Les Tueurs de Pared","Les Rois du Smash",
+  "Les Dieux du Padel","Les Seigneurs du Court","Les Maîtres du Cristal","Les Princes du Fond","Les Rois du Verre",
+  "Les Indomitus Warriors","Les Padel Ninjas","Les Court Commandos","Les Glass Warriors","Les Net Assassins",
+  "Les Pared Phantoms","Les Wall Wizards","Les Smash Saints","Les Lob Lords","Les Drop Kings",
+  "Les Slice Sorcerers","Les Spin Doctors","Les Ace Hunters","Les Break Artists","Les Game Poets",
+  "Les Court Prophets","Les Match Makers","Les Set Breakers","Les Point Takers","Les Game Stealers",
+  "Les Ballistic Bros","Les Kinetic Kings","Les Dynamic Duo","Les Power Pair","Les Force Tandem",
+  "Les Unstoppables","Les Unbreakables","Les Untouchables","Les Undeniables","Les Unconquerables",
+];
+
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let state = {
+  courts: 0,
+  teams: [],          // {id, name, players:[str,str], wins, losses, pointsFor, pointsAgainst, matchesPlayed}
+  matches: [],        // {id, team1Id, team2Id, court, score1, score2, status, roundNum}
+  matchCounter: 0,
+  roundNum: 0,
+  activeMatches: [],  // ids of currently running matches
+  sessionStarted: false,
+  sessionFinished: false,
+  // pair→teamName map persisted across sessions
+  pairNameMap: {}     // "p1|p2" => teamName
+};
+
+// ═══════════════════════════════════════════════════
+//  PERSISTENCE
+// ═══════════════════════════════════════════════════
+function saveState() {
+  localStorage.setItem('vchamps_state', JSON.stringify(state));
+}
+function loadState() {
+  const s = localStorage.getItem('vchamps_state');
+  if (s) { try { state = JSON.parse(s); } catch(e) {} }
+  const pm = localStorage.getItem('vchamps_pairnames');
+  if (pm) { try { state.pairNameMap = JSON.parse(pm); } catch(e) {} }
+}
+
+// ─── Session history ───
+function getHistory() {
+  const h = localStorage.getItem('vchamps_history');
+  if (h) { try { return JSON.parse(h); } catch(e) {} }
+  return [];
+}
+function archiveCurrentSession() {
+  if (!state.sessionStarted || !state.matches.some(m => m.status === 'finished')) return;
+  const history = getHistory();
+  history.push({
+    date: new Date().toISOString(),
+    teams: JSON.parse(JSON.stringify(state.teams)),
+    matches: state.matches.filter(m => m.status === 'finished')
+  });
+  localStorage.setItem('vchamps_history', JSON.stringify(history));
+}
+
+// Build aggregated player stats from all sessions (history + optional current)
+function buildAllPlayerStats(includeCurrent = true) {
+  const sessions = [...getHistory()];
+  if (includeCurrent && state.sessionStarted) {
+    sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+  }
+  const stats = {}; // playerName → {wins, losses, draws, jFor, jAgainst, played, sessions:[{date,teamName}]}
+  sessions.forEach(session => {
+    session.matches.forEach(m => {
+      const t1 = session.teams.find(t => t.id === m.team1Id);
+      const t2 = session.teams.find(t => t.id === m.team2Id);
+      if (!t1 || !t2) return;
+      [[t1, m.score1, m.score2], [t2, m.score2, m.score1]].forEach(([team, sf, sa]) => {
+        team.players.filter(p => p && p.trim()).forEach(p => {
+          if (!stats[p]) stats[p] = { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0, teamNames:[] };
+          const ps = stats[p];
+          ps.played++;
+          ps.jFor   += sf;
+          ps.jAgainst += sa;
+          if (sf > sa) ps.wins++;
+          else if (sa > sf) ps.losses++;
+          else ps.draws++;
+          if (!ps.teamNames.includes(team.name)) ps.teamNames.push(team.name);
+        });
+      });
+    });
+  });
+  return stats;
+}
+function savePairNames() {
+  localStorage.setItem('vchamps_pairnames', JSON.stringify(state.pairNameMap));
+}
+function getAllKnownPlayers() {
+  const s = localStorage.getItem('vchamps_all_players');
+  if (s) { try { return JSON.parse(s); } catch(e) {} }
+  return [];
+}
+function addKnownPlayers(names) {
+  const existing = new Set(getAllKnownPlayers());
+  names.forEach(n => { if (n.trim()) existing.add(n.trim()); });
+  localStorage.setItem('vchamps_all_players', JSON.stringify([...existing]));
+}
+
+// ═══════════════════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════════════════
+function selectCourts(n) {
+  state.courts = n;
+  document.querySelectorAll('.court-btn').forEach((b,i) => {
+    b.classList.toggle('selected', i+1 === n);
+  });
+  const numTeams = n * 2;
+  document.getElementById('teams-preview').textContent =
+    `${n} terrain${n>1?'s':''} → ${numTeams} équipes, ${numTeams*2} joueurs`;
+  document.getElementById('start-btn').disabled = false;
+}
+
+function initTournament() {
+  if (!state.courts) return;
+  const numTeams = state.courts * 2;
+  state.teams = [];
+  state.matches = [];
+  state.activeMatches = [];
+  state.matchCounter = 0;
+  state.roundNum = 0;
+  state.sessionStarted = false;
+  state.sessionFinished = false;
+
+  // Assign fun names — shuffle pool
+  const pool = [...TEAM_NAMES].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < numTeams; i++) {
+    state.teams.push({
+      id: i,
+      name: pool[i % pool.length],
+      players: ['', ''],
+      wins: 0, losses: 0, draws: 0,
+      pointsFor: 0, pointsAgainst: 0, matchesPlayed: 0
+    });
+  }
+  saveState();
+  showPlayerSetup();
+}
+
+// ═══════════════════════════════════════════════════
+//  PLAYER SETUP
+// ═══════════════════════════════════════════════════
+function showPlayerSetup() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-tabs').style.display = 'flex';
+  document.getElementById('tab-tournament').classList.add('active');
+  document.getElementById('phase-players').style.display = 'block';
+  document.getElementById('phase-matches').style.display = 'none';
+  document.getElementById('session-end-bar').style.display = 'none';
+  renderTeamsGrid();
+  updateHeaderActions();
+}
+
+function renderTeamsGrid() {
+  const grid = document.getElementById('teams-grid');
+  grid.innerHTML = '';
+  state.teams.forEach((team, ti) => {
+    const div = document.createElement('div');
+    div.className = 'team-card';
+    const bothFilled = team.players[0].trim() && team.players[1].trim();
+    div.innerHTML = `
+      <div class="team-name ${bothFilled ? '' : 'team-name-hidden'}" id="team-name-${ti}">
+        ${bothFilled ? team.name : '· · · · ·'}
+      </div>
+      ${team.players.map((p, pi) => `
+        <div class="player-input-wrap" id="wrap-${ti}-${pi}">
+          <input type="text"
+            id="player-${ti}-${pi}"
+            placeholder="Joueur ${pi+1}"
+            value="${p}"
+            data-team="${ti}" data-player="${pi}"
+            oninput="onPlayerInput(this)"
+            onkeydown="onPlayerKeydown(event, ${ti}, ${pi})"
+            onfocus="showAutocomplete(this)"
+            onblur="hideAutocomplete(${ti},${pi})"
+            autocomplete="off"
+          >
+          <div class="autocomplete-list" id="ac-${ti}-${pi}" style="display:none;"></div>
+          <div class="input-error-msg" id="err-${ti}-${pi}">Joueur déjà dans une autre équipe</div>
+        </div>
+      `).join('')}
+    `;
+    grid.appendChild(div);
+  });
+  checkAllPlayersEntered();
+}
+
+function onPlayerInput(input) {
+  const ti = +input.dataset.team, pi = +input.dataset.player;
+  state.teams[ti].players[pi] = input.value;
+  saveState();
+  checkAllPlayersEntered();
+  updateTeamNameDisplay(ti);
+  showAutocomplete(input);
+}
+
+function updateTeamNameDisplay(ti) {
+  const team = state.teams[ti];
+  const el = document.getElementById(`team-name-${ti}`);
+  if (!el) return;
+  const bothFilled = team.players[0].trim() && team.players[1].trim();
+  if (bothFilled && el.classList.contains('team-name-hidden')) {
+    el.textContent = team.name;
+    el.classList.remove('team-name-hidden');
+    el.classList.add('team-name-reveal');
+  } else if (!bothFilled && !el.classList.contains('team-name-hidden')) {
+    el.textContent = '· · · · ·';
+    el.classList.add('team-name-hidden');
+    el.classList.remove('team-name-reveal');
+  }
+}
+
+function onPlayerKeydown(e, ti, pi) {
+  const acList = document.getElementById(`ac-${ti}-${pi}`);
+  const items = acList.querySelectorAll('div');
+  let highlighted = acList.querySelector('.highlighted');
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!highlighted && items.length) {
+      items[0].classList.add('highlighted');
+    } else if (highlighted) {
+      highlighted.classList.remove('highlighted');
+      const next = highlighted.nextElementSibling;
+      if (next) next.classList.add('highlighted');
+    }
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (highlighted) {
+      highlighted.classList.remove('highlighted');
+      const prev = highlighted.previousElementSibling;
+      if (prev) prev.classList.add('highlighted');
+    }
+    return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (highlighted) {
+      const input = document.getElementById(`player-${ti}-${pi}`);
+      input.value = highlighted.textContent;
+      state.teams[ti].players[pi] = highlighted.textContent;
+      saveState();
+      document.getElementById(`ac-${ti}-${pi}`).style.display = 'none';
+      checkAllPlayersEntered();
+    }
+    // Advance to next player
+    focusNextPlayer(ti, pi);
+    return;
+  }
+  if (e.key === 'Escape') {
+    document.getElementById(`ac-${ti}-${pi}`).style.display = 'none';
+  }
+}
+
+function focusNextPlayer(ti, pi) {
+  const total = state.teams.length;
+  let nti = ti, npi = pi + 1;
+  if (npi >= 2) { npi = 0; nti = ti + 1; }
+  if (nti >= total) return; // done
+  const next = document.getElementById(`player-${nti}-${npi}`);
+  if (next) { next.focus(); next.select(); }
+}
+
+function showAutocomplete(input) {
+  const ti = +input.dataset.team, pi = +input.dataset.player;
+  const val = input.value.toLowerCase().trim();
+  const ac = document.getElementById(`ac-${ti}-${pi}`);
+  const known = getAllKnownPlayers();
+  // Also include already-entered names in this session
+  const sessionNames = state.teams.flatMap(t => t.players).filter(p => p.trim());
+  const allNames = [...new Set([...known, ...sessionNames])];
+  const usedElsewhere = new Set(
+    state.teams.flatMap((t, ti2) => t.players.map((p, pi2) =>
+      (ti2 !== ti || pi2 !== pi) ? p.trim().toLowerCase() : null
+    )).filter(Boolean)
+  );
+  const filtered = (val
+    ? allNames.filter(n => n.toLowerCase().includes(val) && n !== input.value)
+    : allNames.filter(n => n !== input.value)
+  ).filter(n => !usedElsewhere.has(n.trim().toLowerCase()));
+  if (!filtered.length) { ac.style.display = 'none'; return; }
+  ac.innerHTML = filtered.slice(0, 8).map(n =>
+    `<div onmousedown="pickAutocomplete(${ti},${pi},'${n.replace(/'/g,"&#39;")}')">${n}</div>`
+  ).join('');
+  ac.style.display = 'block';
+}
+
+function pickAutocomplete(ti, pi, name) {
+  const input = document.getElementById(`player-${ti}-${pi}`);
+  input.value = name;
+  state.teams[ti].players[pi] = name;
+  saveState();
+  document.getElementById(`ac-${ti}-${pi}`).style.display = 'none';
+  checkAllPlayersEntered();
+  updateTeamNameDisplay(ti);
+  focusNextPlayer(ti, pi);
+}
+
+function hideAutocomplete(ti, pi) {
+  setTimeout(() => {
+    const ac = document.getElementById(`ac-${ti}-${pi}`);
+    if (ac) ac.style.display = 'none';
+  }, 150);
+}
+
+function isPlayerDuplicate(name, teamIdx, playerIdx) {
+  if (!name.trim()) return false;
+  const normalized = name.trim().toLowerCase();
+  return state.teams.some((t, ti) =>
+    t.players.some((p, pi) =>
+      (ti !== teamIdx || pi !== playerIdx) && p.trim().toLowerCase() === normalized
+    )
+  );
+}
+
+function validateAllInputs() {
+  let hasDuplicate = false;
+  state.teams.forEach((t, ti) => {
+    t.players.forEach((p, pi) => {
+      const input = document.getElementById(`player-${ti}-${pi}`);
+      const err   = document.getElementById(`err-${ti}-${pi}`);
+      if (!input || !err) return;
+      const dup = isPlayerDuplicate(p, ti, pi);
+      input.classList.toggle('input-error', dup);
+      err.classList.toggle('show', dup);
+      if (dup) hasDuplicate = true;
+    });
+  });
+  return hasDuplicate;
+}
+
+function checkAllPlayersEntered() {
+  const allFilled = state.teams.every(t => t.players[0].trim() && t.players[1].trim());
+  const hasDuplicate = validateAllInputs();
+  const btn = document.getElementById('launch-session-btn');
+  if (btn) btn.disabled = !allFilled || hasDuplicate;
+}
+
+// ═══════════════════════════════════════════════════
+//  TEAM NAME PERSISTENCE (pair → name)
+// ═══════════════════════════════════════════════════
+function getPairKey(p1, p2) {
+  return [p1.trim().toLowerCase(), p2.trim().toLowerCase()].sort().join('|||');
+}
+
+function resolveTeamName(team) {
+  const key = getPairKey(team.players[0], team.players[1]);
+  if (state.pairNameMap[key]) {
+    team.name = state.pairNameMap[key];
+  } else {
+    state.pairNameMap[key] = team.name;
+    savePairNames();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  SESSION START
+// ═══════════════════════════════════════════════════
+function startSession() {
+  // Resolve team names and save players
+  const allNames = state.teams.flatMap(t => t.players);
+  addKnownPlayers(allNames);
+  state.teams.forEach(t => resolveTeamName(t));
+  state.sessionStarted = true;
+  saveState();
+  savePairNames();
+  document.getElementById('phase-players').style.display = 'none';
+  document.getElementById('phase-matches').style.display = 'block';
+  document.getElementById('session-end-bar').style.display = 'flex';
+  launchNextRound();
+  updateHeaderActions();
+}
+
+// ═══════════════════════════════════════════════════
+//  MATCH SCHEDULING
+// ═══════════════════════════════════════════════════
+function getMatchupCount(t1id, t2id) {
+  return state.matches.filter(m =>
+    m.status === 'finished' &&
+    ((m.team1Id === t1id && m.team2Id === t2id) ||
+     (m.team1Id === t2id && m.team2Id === t1id))
+  ).length;
+}
+
+function proposeBestMatchups(numCourts) {
+  const n = state.teams.length;
+  const usedTeams = new Set();
+  const matchups = [];
+
+  // Build all possible pairs sorted by (times played, then random)
+  const pairs = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i+1; j < n; j++) {
+      pairs.push({ t1: i, t2: j, played: getMatchupCount(i, j) });
+    }
+  }
+  // Shuffle then sort by played count (least played first)
+  pairs.sort((a,b) => {
+    if (a.played !== b.played) return a.played - b.played;
+    return Math.random() - 0.5;
+  });
+
+  for (const p of pairs) {
+    if (matchups.length >= numCourts) break;
+    if (!usedTeams.has(p.t1) && !usedTeams.has(p.t2)) {
+      matchups.push(p);
+      usedTeams.add(p.t1);
+      usedTeams.add(p.t2);
+    }
+  }
+  return matchups;
+}
+
+function launchNextRound() {
+  state.roundNum++;
+  const matchups = proposeBestMatchups(state.courts);
+  state.activeMatches = [];
+  matchups.forEach((m, idx) => {
+    const match = {
+      id: state.matchCounter++,
+      team1Id: m.t1,
+      team2Id: m.t2,
+      court: idx + 1,
+      score1: 0,
+      score2: 0,
+      status: 'active',
+      roundNum: state.roundNum
+    };
+    state.matches.push(match);
+    state.activeMatches.push(match.id);
+  });
+  saveState();
+  renderMatchPhase();
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER MATCH PHASE
+// ═══════════════════════════════════════════════════
+function renderMatchPhase() {
+  const activeMatches = state.matches.filter(m => m.status === 'active');
+  const grid = document.getElementById('active-matches-grid');
+  grid.innerHTML = '';
+  activeMatches.forEach(m => {
+    grid.appendChild(buildMatchCard(m));
+  });
+
+  document.getElementById('active-matches-section').style.display =
+    activeMatches.length ? 'block' : 'none';
+
+  const endAllWrap = document.getElementById('end-all-wrap');
+  const endAllBtn  = document.getElementById('end-all-btn');
+  if (endAllWrap) endAllWrap.style.display = activeMatches.length >= 1 ? 'block' : 'none';
+  if (endAllBtn) {
+    const allScored = activeMatches.length > 0 && activeMatches.every(m => m.score1 > 0 || m.score2 > 0);
+    endAllBtn.disabled = !allScored;
+    endAllBtn.className = 'btn btn-lg ' + (allScored ? 'btn-end-all-on' : 'btn-end-all-off');
+  }
+
+  // Proposed section — only show if no active matches
+  const proposed = document.getElementById('proposed-section');
+  if (!activeMatches.length && !state.sessionFinished) {
+    proposed.style.display = 'block';
+    renderProposedMatch();
+  } else {
+    proposed.style.display = 'none';
+  }
+
+  renderMatchHistory();
+  renderStats();
+}
+
+function buildMatchCard(m) {
+  const t1 = state.teams[m.team1Id], t2 = state.teams[m.team2Id];
+  const div = document.createElement('div');
+  div.className = `match-card ${m.status}`;
+  div.id = `match-card-${m.id}`;
+  const finished = m.status === 'finished';
+  const w1 = finished && m.score1 > m.score2;
+  const w2 = finished && m.score2 > m.score1;
+
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span class="match-court">Terrain ${m.court}</span>
+      <span class="badge badge-${m.status}">${m.status === 'active' ? 'EN JEU' : m.status === 'finished' ? 'TERMINÉ' : 'EN ATTENTE'}</span>
+    </div>
+    <div class="match-teams">
+      <div class="match-team">
+        <div class="match-team-name" style="${w1?'color:var(--accent)':''}">${t1.name}</div>
+        <div class="match-team-players">${t1.players[0]} / ${t1.players[1]}</div>
+        ${w1 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
+      </div>
+      <div class="match-vs">VS</div>
+      <div class="match-team">
+        <div class="match-team-name" style="${w2?'color:var(--accent)':''}">${t2.name}</div>
+        <div class="match-team-players">${t2.players[0]} / ${t2.players[1]}</div>
+        ${w2 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
+      </div>
+    </div>
+    ${!finished ? `
+    <div class="score-control">
+      <div class="score-box">
+        <button class="score-btn minus" onclick="changeScore(${m.id},1,-1)">−</button>
+        <div class="score-num" id="s1-${m.id}">${m.score1}</div>
+        <button class="score-btn plus" onclick="changeScore(${m.id},1,1)">+</button>
+      </div>
+      <div class="score-sep">:</div>
+      <div class="score-box">
+        <button class="score-btn minus" onclick="changeScore(${m.id},2,-1)">−</button>
+        <div class="score-num" id="s2-${m.id}">${m.score2}</div>
+        <button class="score-btn plus" onclick="changeScore(${m.id},2,1)">+</button>
+      </div>
+    </div>
+    ` : `
+    <div class="score-control">
+      <div class="score-num" style="opacity:0.7;">${m.score1}</div>
+      <div class="score-sep">:</div>
+      <div class="score-num" style="opacity:0.7;">${m.score2}</div>
+    </div>
+    `}
+  `;
+  return div;
+}
+
+function renderProposedMatch() {
+  const container = document.getElementById('proposed-match');
+  const matchups = proposeBestMatchups(state.courts);
+  if (!matchups.length) {
+    container.innerHTML = '<div class="empty-state">Tous les matchs ont été joués !</div>';
+    return;
+  }
+
+  let html = `<div class="matches-grid">`;
+  matchups.forEach((m, idx) => {
+    const t1 = state.teams[m.t1], t2 = state.teams[m.t2];
+    const times = m.played;
+    html += `
+      <div class="card" style="border-color:#444;">
+        <div class="match-court">Terrain ${idx+1} · ${times===0?'Première rencontre':times+' fois déjà joué'}</div>
+        <div class="match-teams">
+          <div class="match-team">
+            <div class="match-team-name">${t1.name}</div>
+            <div class="match-team-players">${t1.players[0]} / ${t1.players[1]}</div>
+          </div>
+          <div class="match-vs">VS</div>
+          <div class="match-team">
+            <div class="match-team-name">${t2.name}</div>
+            <div class="match-team-players">${t2.players[0]} / ${t2.players[1]}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-primary" onclick="launchNextRound()">▶ Lancer ces matchs</button>
+    </div>
+  `;
+  container.innerHTML = html;
+}
+
+function renderMatchHistory() {
+  const finished = state.matches.filter(m => m.status === 'finished').reverse();
+  const container = document.getElementById('match-history-list');
+  if (!finished.length) {
+    container.innerHTML = '<div class="empty-state">Aucun match terminé</div>';
+    return;
+  }
+  container.innerHTML = finished.map(m => {
+    const t1 = state.teams[m.team1Id], t2 = state.teams[m.team2Id];
+    const w1 = m.score1 > m.score2, w2 = m.score2 > m.score1;
+    return `
+      <div class="history-item">
+        <span style="color:var(--text-secondary);font-size:11px;width:60px;">T${m.court} R${m.roundNum}</span>
+        <span style="${w1?'color:var(--accent);font-weight:700;':''}">${t1.name}</span>
+        <span style="color:var(--muted);margin:0 8px;">${m.score1} : ${m.score2}</span>
+        <span style="${w2?'color:var(--accent);font-weight:700;':''}">${t2.name}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  SCORE & MATCH ACTIONS
+// ═══════════════════════════════════════════════════
+function changeScore(matchId, team, delta) {
+  const m = state.matches.find(x => x.id === matchId);
+  if (!m || m.status !== 'active') return;
+  if (team === 1) m.score1 = Math.max(0, m.score1 + delta);
+  else m.score2 = Math.max(0, m.score2 + delta);
+  saveState();
+  document.getElementById(`s1-${matchId}`).textContent = m.score1;
+  document.getElementById(`s2-${matchId}`).textContent = m.score2;
+  // Refresh end-all button state
+  const activeMatches = state.matches.filter(x => x.status === 'active');
+  const allScored = activeMatches.every(x => x.score1 > 0 || x.score2 > 0);
+  const btn = document.getElementById('end-all-btn');
+  if (btn) {
+    btn.disabled = !allScored;
+    btn.className = 'btn btn-lg ' + (allScored ? 'btn-end-all-on' : 'btn-end-all-off');
+  }
+}
+
+function endMatch(matchId, skipRender) {
+  const m = state.matches.find(x => x.id === matchId);
+  if (!m || m.status !== 'active') return;
+  m.status = 'finished';
+
+  const t1 = state.teams[m.team1Id], t2 = state.teams[m.team2Id];
+  t1.matchesPlayed++; t2.matchesPlayed++;
+  t1.pointsFor += m.score1; t1.pointsAgainst += m.score2;
+  t2.pointsFor += m.score2; t2.pointsAgainst += m.score1;
+
+  if (m.score1 > m.score2) { t1.wins++; t2.losses++; }
+  else if (m.score2 > m.score1) { t2.wins++; t1.losses++; }
+  else { t1.draws = (t1.draws||0)+1; t2.draws = (t2.draws||0)+1; }
+
+  state.activeMatches = state.activeMatches.filter(id => id !== matchId);
+  if (!skipRender) { saveState(); renderMatchPhase(); }
+}
+
+function endAllMatches() {
+  const active = state.matches.filter(m => m.status === 'active');
+  if (!active.length) return;
+  active.forEach(m => endMatch(m.id, true));
+  saveState();
+  renderMatchPhase();
+}
+
+// ═══════════════════════════════════════════════════
+//  SESSION END
+// ═══════════════════════════════════════════════════
+function confirmEndSession() {
+  if (state.matches.some(m => m.status === 'active')) {
+    if (!confirm('Des matchs sont encore en cours. Terminer quand même ?')) return;
+    state.matches.filter(m => m.status === 'active').forEach(m => endMatch(m.id, true));
+  }
+  state.sessionFinished = true;
+  saveState();
+  archiveCurrentSession();
+  document.getElementById('session-end-bar').style.display = 'none';
+  document.getElementById('proposed-section').style.display = 'none';
+  updateHeaderActions();
+  renderMatchPhase();
+  switchTab('general');
+  renderGeneralStats();
+}
+
+// ═══════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════
+function getTeamPoints(t) {
+  return (t.wins * 3) + ((t.draws||0) * 1);
+}
+
+function getSortedTeams() {
+  return [...state.teams].sort((a,b) => {
+    const pa = getTeamPoints(a), pb = getTeamPoints(b);
+    if (pa !== pb) return pb - pa;
+    const da = a.pointsFor - a.pointsAgainst, db = b.pointsFor - b.pointsAgainst;
+    if (da !== db) return db - da;
+    return b.pointsFor - a.pointsFor;
+  });
+}
+
+// ─── helper: render an individual rankings table ───
+function individualTableHTML(statsObj) {
+  const entries = Object.entries(statsObj).sort((a,b) =>
+    (b[1].wins*3+(b[1].draws||0)) - (a[1].wins*3+(a[1].draws||0))
+  );
+  if (!entries.length) return '<div class="empty-state">Aucune donnée.</div>';
+  return `
+    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Joueur</th><th>M</th>
+            <th>V</th><th>D</th><th>N</th><th>J+</th><th>J-</th><th>+/-</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map(([name, ps], i) => {
+            const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+            const diff = ps.jFor - ps.jAgainst;
+            return `
+              <tr>
+                <td><span class="rank-badge ${rc}">${i+1}</span></td>
+                <td><span class="player-link" onclick="showPlayerModal('${esc(name)}')">${name}</span></td>
+                <td>${ps.played}</td>
+                <td style="color:var(--success)">${ps.wins}</td>
+                <td style="color:var(--danger)">${ps.losses}</td>
+                <td style="color:var(--text-secondary)">${ps.draws}</td>
+                <td>${ps.jFor}</td><td>${ps.jAgainst}</td>
+                <td style="${diff>0?'color:var(--success)':diff<0?'color:var(--danger)':'color:var(--text-secondary)'}">${diff>=0?'+':''}${diff}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ─── helper: render a team rankings table ───
+function teamTableHTML(teams) {
+  const sorted = [...teams].sort((a,b) => {
+    const pa = getTeamPoints(a), pb = getTeamPoints(b);
+    if (pa !== pb) return pb - pa;
+    const da = a.pointsFor - a.pointsAgainst, db = b.pointsFor - b.pointsAgainst;
+    if (da !== db) return db - da;
+    return b.pointsFor - a.pointsFor;
+  });
+  if (!sorted.length) return '<div class="empty-state">Aucune donnée.</div>';
+  return `
+    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
+      <table class="stats-table">
+        <thead>
+          <tr><th>#</th><th>Équipe</th><th>Joueurs</th><th>M</th><th>V</th><th>D</th><th>N</th><th>Pts</th><th>+/-</th></tr>
+        </thead>
+        <tbody>
+          ${sorted.map((t,i) => {
+            const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+            const diff = t.pointsFor - t.pointsAgainst;
+            return `
+              <tr>
+                <td><span class="rank-badge ${rc}">${i+1}</span></td>
+                <td style="font-weight:700;color:var(--accent);">${t.name}</td>
+                <td>
+                  <span class="player-link" onclick="showPlayerModal('${esc(t.players[0])}')">${t.players[0]||'—'}</span>
+                  &nbsp;/&nbsp;
+                  <span class="player-link" onclick="showPlayerModal('${esc(t.players[1])}')">${t.players[1]||'—'}</span>
+                </td>
+                <td>${t.matchesPlayed}</td>
+                <td style="color:var(--success)">${t.wins}</td>
+                <td style="color:var(--danger)">${t.losses}</td>
+                <td style="color:var(--text-secondary)">${t.draws||0}</td>
+                <td style="font-weight:800;font-size:16px;">${getTeamPoints(t)}</td>
+                <td style="${diff>0?'color:var(--success)':diff<0?'color:var(--danger)':'color:var(--text-secondary)'}">${diff>=0?'+':''}${diff}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ─── Session tab: stats de la session courante uniquement ───
+function renderSessionStats() {
+  const container = document.getElementById('stats-content');
+  if (!state.sessionStarted) {
+    container.innerHTML = '<div class="empty-state">Lancez une session pour voir les statistiques.</div>';
+    return;
+  }
+  const sessionStats = buildAllPlayerStats(false); // history=false → current session only
+  // Override: build current-session-only stats from scratch
+  const curStats = {};
+  const curSession = { teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') };
+  [curSession].forEach(session => {
+    session.matches.forEach(m => {
+      const t1 = session.teams.find(t => t.id === m.team1Id);
+      const t2 = session.teams.find(t => t.id === m.team2Id);
+      if (!t1 || !t2) return;
+      [[t1, m.score1, m.score2],[t2, m.score2, m.score1]].forEach(([team, sf, sa]) => {
+        team.players.filter(p => p && p.trim()).forEach(p => {
+          if (!curStats[p]) curStats[p] = {wins:0,losses:0,draws:0,jFor:0,jAgainst:0,played:0};
+          const ps = curStats[p];
+          ps.played++; ps.jFor += sf; ps.jAgainst += sa;
+          if (sf > sa) ps.wins++; else if (sa > sf) ps.losses++; else ps.draws++;
+        });
+      });
+    });
+  });
+
+  container.innerHTML = `
+    <div class="section-title">Équipes · session en cours</div>
+    ${teamTableHTML(state.teams)}
+    <div class="section-title" style="margin-top:24px;">Individuel · session en cours</div>
+    ${individualTableHTML(curStats)}
+  `;
+}
+
+// ─── General tab: stats cumulées toutes sessions ───
+function renderGeneralStats() {
+  const container = document.getElementById('general-content');
+  const history = getHistory();
+  const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
+  if (!hasData) {
+    container.innerHTML = '<div class="empty-state">Aucune session terminée pour l\'instant.</div>';
+    return;
+  }
+
+  // Aggregate team stats across all sessions
+  const allTeams = {};
+  const sessions = [...history];
+  if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+  sessions.forEach(session => {
+    session.matches.forEach(m => {
+      const t1 = session.teams.find(t => t.id === m.team1Id);
+      const t2 = session.teams.find(t => t.id === m.team2Id);
+      if (!t1 || !t2) return;
+      [[t1, m.score1, m.score2],[t2, m.score2, m.score1]].forEach(([team, sf, sa]) => {
+        const key = team.name;
+        if (!allTeams[key]) allTeams[key] = {name:key, players:team.players, wins:0, losses:0, draws:0, pointsFor:0, pointsAgainst:0, matchesPlayed:0};
+        const at = allTeams[key];
+        at.matchesPlayed++; at.pointsFor += sf; at.pointsAgainst += sa;
+        if (sf > sa) at.wins++; else if (sa > sf) at.losses++; else at.draws++;
+      });
+    });
+  });
+
+  const allPlayerStats = buildAllPlayerStats(true);
+  const totalSessions = history.length + (state.sessionStarted && !state.sessionFinished ? 1 : 0);
+
+  container.innerHTML = `
+    <div class="section-title">Équipes · classement général <span style="font-weight:400;color:var(--text-secondary);font-size:10px;margin-left:6px;">${totalSessions} session${totalSessions>1?'s':''}</span></div>
+    ${teamTableHTML(Object.values(allTeams))}
+    <div class="section-title" style="margin-top:24px;">Individuel · classement général</div>
+    ${individualTableHTML(allPlayerStats)}
+  `;
+}
+
+// keep for backward compat (called from renderMatchPhase)
+function renderStats() { renderSessionStats(); }
+
+function esc(s) {
+  return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════
+//  PLAYER MODAL
+// ═══════════════════════════════════════════════════
+function showPlayerModal(playerName) {
+  const modal = document.getElementById('player-modal');
+  document.getElementById('modal-player-name').textContent = playerName;
+
+  // Aggregate from all sessions
+  const allStats = buildAllPlayerStats(true);
+  const ps = allStats[playerName];
+  const team = state.teams.find(t => t.players.includes(playerName));
+  document.getElementById('modal-player-team').textContent = team ? `Session actuelle : ${team.name}` : '';
+
+  if (!ps) {
+    document.getElementById('modal-player-stats').innerHTML = '<div class="empty-state">Aucune donnée.</div>';
+    modal.classList.add('open');
+    return;
+  }
+
+  const winRate = ps.played ? Math.round(ps.wins / ps.played * 100) : 0;
+  const diff = ps.jFor - ps.jAgainst;
+
+  // Build match history across all sessions
+  const sessions = [...getHistory()];
+  if (state.sessionStarted) sessions.push({ date: null, teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+
+  const partners = new Set();
+  const matchRows = [];
+  sessions.forEach(session => {
+    session.matches.forEach(m => {
+      const t1 = session.teams.find(t => t.id === m.team1Id);
+      const t2 = session.teams.find(t => t.id === m.team2Id);
+      if (!t1 || !t2) return;
+      const myTeam   = t1.players.includes(playerName) ? t1 : t2.players.includes(playerName) ? t2 : null;
+      if (!myTeam) return;
+      const oppTeam  = myTeam === t1 ? t2 : t1;
+      const myScore  = myTeam === t1 ? m.score1 : m.score2;
+      const oppScore = myTeam === t1 ? m.score2 : m.score1;
+      const won = myScore > oppScore, draw = myScore === oppScore;
+      myTeam.players.forEach(p => { if (p !== playerName) partners.add(p); });
+      matchRows.unshift(`
+        <div class="history-item">
+          <span style="width:20px;font-size:12px;font-weight:700;color:${won?'var(--success)':draw?'var(--text-secondary)':'var(--danger)'}">${won?'V':draw?'N':'D'}</span>
+          <span style="flex:1;font-size:13px;">${myTeam.name} vs ${oppTeam.name}</span>
+          <span style="color:var(--text-secondary);font-size:13px;">${myScore} : ${oppScore}</span>
+        </div>
+      `);
+    });
+  });
+
+  document.getElementById('modal-player-stats').innerHTML = `
+    <div class="stat-row"><span class="stat-label">Matchs joués</span><span class="stat-value">${ps.played}</span></div>
+    <div class="stat-row"><span class="stat-label">Victoires</span><span class="stat-value" style="color:var(--success)">${ps.wins}</span></div>
+    <div class="stat-row"><span class="stat-label">Défaites</span><span class="stat-value" style="color:var(--danger)">${ps.losses}</span></div>
+    <div class="stat-row"><span class="stat-label">Nuls</span><span class="stat-value">${ps.draws}</span></div>
+    <div class="stat-row"><span class="stat-label">% Victoires</span><span class="stat-value">${winRate}%</span></div>
+    <div class="stat-row"><span class="stat-label">Jeux marqués</span><span class="stat-value">${ps.jFor}</span></div>
+    <div class="stat-row"><span class="stat-label">Jeux encaissés</span><span class="stat-value">${ps.jAgainst}</span></div>
+    <div class="stat-row"><span class="stat-label">Différence</span>
+      <span class="stat-value" style="color:${diff>=0?'var(--success)':'var(--danger)'}">${diff>=0?'+':''}${diff}</span>
+    </div>
+    ${partners.size ? `<div class="stat-row"><span class="stat-label">Partenaires</span><span class="stat-value" style="font-size:12px;">${[...partners].join(', ')}</span></div>` : ''}
+    ${matchRows.length ? `
+      <div style="margin-top:16px;">
+        <div class="card-title">Historique complet</div>
+        ${matchRows.join('')}
+      </div>
+    ` : ''}
+  `;
+
+  modal.classList.add('open');
+}
+
+function closePlayerModal(e) {
+  if (!e || e.target === document.getElementById('player-modal')) {
+    document.getElementById('player-modal').classList.remove('open');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach((b,i) => {
+    b.classList.toggle('active',
+      (i===0 && tab==='tournament') ||
+      (i===1 && tab==='stats') ||
+      (i===2 && tab==='general')
+    );
+  });
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  if (tab === 'stats')   renderSessionStats();
+  if (tab === 'general') renderGeneralStats();
+}
+
+function updateHeaderActions() {
+  const bar = document.getElementById('header-actions');
+  if (state.sessionFinished) {
+    bar.innerHTML = `<button class="btn btn-accent btn-sm" onclick="newTournament()">+ Nouveau tournoi</button>`;
+  } else if (state.sessionStarted) {
+    bar.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="newTournament()">+ Nouveau</button>`;
+  } else {
+    bar.innerHTML = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  NEW TOURNAMENT button
+// ═══════════════════════════════════════════════════
+function newTournament() {
+  if (!confirm('Démarrer un nouveau tournoi ? La session actuelle sera archivée.')) return;
+  if (!state.sessionFinished) archiveCurrentSession(); // already archived on confirmEndSession
+  localStorage.removeItem('vchamps_state');
+  state = {
+    courts: 0, teams: [], matches: [], matchCounter: 0, roundNum: 0,
+    activeMatches: [], sessionStarted: false, sessionFinished: false,
+    pairNameMap: state.pairNameMap // keep pair names
+  };
+  document.getElementById('main-tabs').style.display = 'none';
+  document.getElementById('session-end-bar').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('tab-tournament').classList.remove('active');
+  document.getElementById('tab-stats').classList.remove('active');
+  document.querySelectorAll('.court-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('teams-preview').textContent = '';
+  document.getElementById('start-btn').disabled = true;
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+function init() {
+  loadState();
+  if (state.sessionStarted) {
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('main-tabs').style.display = 'flex';
+    document.getElementById('tab-tournament').classList.add('active');
+    if (!state.sessionFinished) {
+      document.getElementById('session-end-bar').style.display = 'flex';
+    }
+    document.getElementById('phase-players').style.display = 'none';
+    document.getElementById('phase-matches').style.display = 'block';
+    renderMatchPhase();
+    updateHeaderActions();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
