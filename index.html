@@ -1645,43 +1645,67 @@ function rankingListHTML(entries, valFn, subFn, colorFn) {
 function renderGeneralStats() {
   const history = getHistory();
   const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
+  const empty = '<div class="empty-state">Aucune donnée pour l\'instant.</div>';
   if (!hasData) {
-    ['matches','jeux','teams'].forEach(s => {
-      document.getElementById(`sub-${s}`).innerHTML = '<div class="empty-state">Aucune donnée pour l\'instant.</div>';
-    });
+    ['matches','jeux','teams'].forEach(s => { document.getElementById(`sub-${s}`).innerHTML = empty; });
     return;
   }
 
-  const allPlayerStats = buildAllPlayerStats(true);
+  const ps = buildAllPlayerStats(true);
 
-  // ── Tab 1: Classement Matchs (wins/losses/diff) ──
-  const matchEntries = Object.entries(allPlayerStats)
-    .map(([name, ps]) => [name, ps.wins - ps.losses, null, `${ps.wins}V ${ps.losses}D ${ps.played}M`])
-    .sort((a,b) => b[1]-a[1]);
-  // [display, value, clickName, subtext]
-  const matchList = Object.entries(allPlayerStats)
-    .map(([name, ps]) => ({ name, wins: ps.wins, losses: ps.losses, played: ps.played, diff: ps.wins-ps.losses }))
-    .sort((a,b) => b.diff-a.diff || b.wins-a.wins);
+  // ── Tab 1: Matchs — M V D N +/- ──
+  const matchList = Object.entries(ps)
+    .map(([name, p]) => ({name, m:p.played, v:p.wins, d:p.losses, n:p.draws, diff:p.wins-p.losses}))
+    .sort((a,b) => b.diff-a.diff || b.v-a.v);
 
-  document.getElementById('sub-matches').innerHTML = rankingListHTML(
-    matchList.map(p => [p.name, p.diff, p.name, `${p.wins}V · ${p.losses}D · ${p.played}M`]),
-    e => e[1],
-    e => e[3],
-    v => v>0?'var(--success)':v<0?'var(--danger)':'var(--text-secondary)'
-  );
+  document.getElementById('sub-matches').innerHTML = `
+    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
+      <table class="stats-table">
+        <thead><tr>
+          <th>#</th><th>Joueur</th><th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th>
+        </tr></thead>
+        <tbody>${matchList.map((p,i) => {
+          const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+          const dc = p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
+          return `<tr>
+            <td><span class="rank-badge ${rc}">${i+1}</span></td>
+            <td><span class="player-link" onclick="showPlayerModal('${esc(p.name)}')">${p.name}</span></td>
+            <td>${p.m}</td>
+            <td style="color:var(--success)">${p.v}</td>
+            <td style="color:var(--danger)">${p.d}</td>
+            <td style="color:var(--text-secondary)">${p.n}</td>
+            <td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
 
-  // ── Tab 2: Classement Jeux (+/-) ──
-  const jeuxList = Object.entries(allPlayerStats)
-    .map(([name, ps]) => ({ name, diff: ps.jFor-ps.jAgainst, jFor: ps.jFor, jAgainst: ps.jAgainst }))
-    .sort((a,b) => b.diff-a.diff);
-  document.getElementById('sub-jeux').innerHTML = rankingListHTML(
-    jeuxList.map(p => [p.name, p.diff, p.name, `${p.jFor} marqués · ${p.jAgainst} encaissés`]),
-    e => e[1],
-    e => e[3],
-    v => v>0?'var(--success)':v<0?'var(--danger)':'var(--text-secondary)'
-  );
+  // ── Tab 2: Jeux — G P +/- ──
+  const jeuxList = Object.entries(ps)
+    .map(([name, p]) => ({name, g:p.jFor, pe:p.jAgainst, diff:p.jFor-p.jAgainst}))
+    .sort((a,b) => b.diff-a.diff || b.g-a.g);
 
-  // ── Tab 3: Classement Équipes ──
+  document.getElementById('sub-jeux').innerHTML = `
+    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
+      <table class="stats-table">
+        <thead><tr>
+          <th>#</th><th>Joueur</th><th>G</th><th>P</th><th>+/-</th>
+        </tr></thead>
+        <tbody>${jeuxList.map((p,i) => {
+          const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+          const dc = p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
+          return `<tr>
+            <td><span class="rank-badge ${rc}">${i+1}</span></td>
+            <td><span class="player-link" onclick="showPlayerModal('${esc(p.name)}')">${p.name}</span></td>
+            <td style="color:var(--success)">${p.g}</td>
+            <td style="color:var(--danger)">${p.pe}</td>
+            <td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+
+  // ── Tab 3: Équipes — M V D N J+ J- +/- ──
   const allTeams = {};
   const sessions = [...history];
   if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
@@ -1694,20 +1718,40 @@ function renderGeneralStats() {
       if (m.scoreType==='sets'&&m.sets){ sf1=m.sets.reduce((s,r)=>s+r[0],0); sa1=m.sets.reduce((s,r)=>s+r[1],0); }
       [[t1,m.score1,m.score2,sf1,sa1],[t2,m.score2,m.score1,sa1,sf1]].forEach(([team,sw,sl,sf,sa])=>{
         const key=team.name;
-        if(!allTeams[key]) allTeams[key]={name:key,players:team.players,wins:0,losses:0,draws:0,pFor:0,pAgainst:0,played:0};
+        if(!allTeams[key]) allTeams[key]={name:key,players:[...team.players],wins:0,losses:0,draws:0,jFor:0,jAgainst:0,played:0};
         const at=allTeams[key];
-        at.played++; at.pFor+=sf; at.pAgainst+=sa;
+        at.played++; at.jFor+=sf; at.jAgainst+=sa;
         if(sw>sl) at.wins++; else if(sl>sw) at.losses++; else at.draws++;
       });
     });
   });
-  const teamsList = Object.values(allTeams).sort((a,b)=>(b.wins*3+b.draws)-(a.wins*3+a.draws)||(b.pFor-b.pAgainst)-(a.pFor-a.pAgainst));
-  document.getElementById('sub-teams').innerHTML = rankingListHTML(
-    teamsList.map(t => [t.name, t.wins*3+t.draws, null, `${t.players.join(' / ')} · ${t.wins}V ${t.losses}D · ${t.pFor}-${t.pAgainst}`]),
-    e => e[1],
-    e => e[3],
-    v => v>0?'var(--accent)':'var(--text-secondary)'
-  );
+  const teamsList = Object.values(allTeams)
+    .sort((a,b)=>(b.wins*3+b.draws)-(a.wins*3+a.draws)||(b.jFor-b.jAgainst)-(a.jFor-a.jAgainst));
+
+  document.getElementById('sub-teams').innerHTML = `
+    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
+      <table class="stats-table">
+        <thead><tr>
+          <th>#</th><th>Équipe</th><th>M</th><th>V</th><th>D</th><th>N</th><th>J+</th><th>J-</th><th>+/-</th>
+        </tr></thead>
+        <tbody>${teamsList.map((t,i) => {
+          const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+          const diff = t.jFor-t.jAgainst;
+          const dc = diff>0?'var(--success)':diff<0?'var(--danger)':'var(--text-secondary)';
+          return `<tr>
+            <td><span class="rank-badge ${rc}">${i+1}</span></td>
+            <td style="color:var(--accent);font-weight:700;">${t.name}<br><span style="color:var(--text-secondary);font-size:11px;font-weight:400;">${t.players.join(' / ')}</span></td>
+            <td>${t.played}</td>
+            <td style="color:var(--success)">${t.wins}</td>
+            <td style="color:var(--danger)">${t.losses}</td>
+            <td style="color:var(--text-secondary)">${t.draws}</td>
+            <td>${t.jFor}</td>
+            <td>${t.jAgainst}</td>
+            <td style="font-weight:800;color:${dc}">${diff>0?'+':''}${diff}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
 }
 
 // keep for backward compat (called from renderMatchPhase)
