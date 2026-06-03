@@ -362,6 +362,26 @@
     text-align: center; padding: 40px;
     color: var(--text-secondary); font-size: 14px;
   }
+  /* ─── Sub-tabs (classement) ─── */
+  .sub-tabs { display: flex; gap: 0; margin-bottom: 16px; background: var(--dark); border-radius: 10px; padding: 4px; }
+  .sub-tab { flex: 1; text-align: center; padding: 8px 4px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-secondary); background: none; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+  .sub-tab.active { background: var(--border); color: var(--white); }
+  .sub-tab-content { display: none; }
+  .sub-tab-content.active { display: block; }
+  /* ─── Ranking list ─── */
+  .ranking-list { display: flex; flex-direction: column; gap: 0; }
+  .ranking-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #222; background: var(--card); transition: background 0.15s; }
+  .ranking-item:first-child { border-radius: 10px 10px 0 0; }
+  .ranking-item:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
+  .ranking-item:hover { background: #2a2a2a; }
+  .rank-num { font-size: 13px; font-weight: 800; color: var(--text-secondary); width: 24px; text-align: center; flex-shrink: 0; }
+  .rank-num.gold { color: #c8a96e; }
+  .rank-num.silver { color: #aaa; }
+  .rank-num.bronze { color: #8B6914; }
+  .ranking-name { flex: 1; font-size: 15px; font-weight: 700; color: var(--white); }
+  .ranking-sub { font-size: 11px; color: var(--text-secondary); }
+  .ranking-val { font-size: 18px; font-weight: 800; text-align: right; flex-shrink: 0; }
+  .ranking-bar-wrap { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: transparent; }
   /* ─── History list ─── */
   .history-item {
     display: flex; justify-content: space-between; align-items: center;
@@ -487,28 +507,18 @@
   <div style="margin-left:auto;display:flex;gap:8px;" id="header-actions"></div>
 </header>
 
-<nav class="tabs" id="main-tabs" style="display:none;">
+<nav class="tabs" id="main-tabs">
   <button class="active" onclick="switchTab('tournament')">Tournoi</button>
   <button onclick="switchTab('stats')">Session</button>
-  <button onclick="switchTab('general')">Général</button>
+  <button onclick="switchTab('general')">Classement</button>
 </nav>
 
 <main>
   <!-- ═══ SETUP ═══ -->
   <div id="setup-screen">
     <img src="logo.png" alt="Indomitus Padel" class="hero-logo">
-
-    <div class="card" style="max-width:520px;margin:0 auto 24px;text-align:left;">
-      <div class="card-title" style="text-align:center;">Nombre de terrains</div>
-      <div class="courts-selector" id="courts-selector">
-        <button class="court-btn" onclick="selectCourts(1)">1</button>
-        <button class="court-btn" onclick="selectCourts(2)">2</button>
-      </div>
-      <div id="teams-preview" style="color:var(--text-secondary);font-size:13px;text-align:center;"></div>
-    </div>
-
-    <button class="btn btn-primary btn-lg" onclick="initTournament()" id="start-btn" disabled>
-      Créer le tournoi →
+    <button class="btn btn-primary btn-lg" onclick="initTournament()" id="start-btn" style="width:100%;max-width:320px;justify-content:center;">
+      Créer un nouveau tournoi →
     </button>
   </div>
 
@@ -516,7 +526,7 @@
   <section class="tab-content" id="tab-tournament">
 
     <!-- Player Setup Phase -->
-    <div id="phase-players">
+    <div id="phase-players" style="display:none;">
       <div class="section-title">Entrée des joueurs</div>
       <div class="teams-grid" id="teams-grid"></div>
       <div style="margin-top:24px;">
@@ -560,11 +570,16 @@
     </div>
   </section>
 
-  <!-- ═══ GENERAL TAB (cumulé toutes sessions) ═══ -->
+  <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
-    <div id="general-content">
-      <div class="empty-state">Aucune session terminée pour l'instant.</div>
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="switchSubTab('matches')">Matchs</button>
+      <button class="sub-tab" onclick="switchSubTab('jeux')">Jeux</button>
+      <button class="sub-tab" onclick="switchSubTab('teams')">Équipes</button>
     </div>
+    <div class="sub-tab-content active" id="sub-matches"></div>
+    <div class="sub-tab-content" id="sub-jeux"></div>
+    <div class="sub-tab-content" id="sub-teams"></div>
   </section>
 </main>
 
@@ -826,7 +841,7 @@ function selectCourts(n) {
 }
 
 function initTournament() {
-  if (!state.courts) return;
+  state.courts = 2;
   const numTeams = state.courts * 2;
   state.teams = [];
   state.matches = [];
@@ -856,11 +871,10 @@ function initTournament() {
 // ═══════════════════════════════════════════════════
 function showPlayerSetup() {
   document.getElementById('setup-screen').style.display = 'none';
-  document.getElementById('main-tabs').style.display = 'flex';
-  document.getElementById('tab-tournament').classList.add('active');
   document.getElementById('phase-players').style.display = 'block';
   document.getElementById('phase-matches').style.display = 'none';
   document.getElementById('session-end-bar').style.display = 'none';
+  switchTab('tournament');
   renderTeamsGrid();
   updateHeaderActions();
 }
@@ -1594,17 +1608,80 @@ function renderSessionStats() {
   `;
 }
 
-// ─── General tab: stats cumulées toutes sessions ───
+// ─── Sub-tab switcher ───
+function switchSubTab(sub) {
+  document.querySelectorAll('.sub-tab').forEach((b,i) => {
+    const names = ['matches','jeux','teams'];
+    b.classList.toggle('active', names[i] === sub);
+  });
+  document.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`sub-${sub}`).classList.add('active');
+}
+
+// ─── Ranking list builder ───
+function rankingListHTML(entries, valFn, subFn, colorFn) {
+  if (!entries.length) return '<div class="empty-state">Pas encore de données.</div>';
+  const top = entries.slice(0, 10);
+  const maxVal = Math.abs(valFn(top[0])) || 1;
+  return `<div class="ranking-list">${top.map((e, i) => {
+    const val = valFn(e);
+    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const color = colorFn ? colorFn(val) : 'var(--white)';
+    const barW = Math.min(100, Math.abs(val)/maxVal*100);
+    return `
+      <div class="ranking-item" style="position:relative;cursor:pointer;" ${e[2]?`onclick="showPlayerModal('${esc(e[2])}')"`:''}>
+        <span class="rank-num ${rankClass}">${i+1}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="ranking-name">${e[0]}</div>
+          <div class="ranking-sub">${subFn(e)}</div>
+          <div style="height:2px;background:${color};opacity:0.4;width:${barW}%;margin-top:5px;border-radius:1px;"></div>
+        </div>
+        <div class="ranking-val" style="color:${color}">${val>0?'+':''}${val}</div>
+      </div>`;
+  }).join('')}${entries.length > 10 ? `<div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:12px;">+${entries.length-10} joueurs</div>` : ''}</div>`;
+}
+
+// ─── General tab: classement cumulé ───
 function renderGeneralStats() {
-  const container = document.getElementById('general-content');
   const history = getHistory();
   const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
   if (!hasData) {
-    container.innerHTML = '<div class="empty-state">Aucune session terminée pour l\'instant.</div>';
+    ['matches','jeux','teams'].forEach(s => {
+      document.getElementById(`sub-${s}`).innerHTML = '<div class="empty-state">Aucune donnée pour l\'instant.</div>';
+    });
     return;
   }
 
-  // Aggregate team stats across all sessions
+  const allPlayerStats = buildAllPlayerStats(true);
+
+  // ── Tab 1: Classement Matchs (wins/losses/diff) ──
+  const matchEntries = Object.entries(allPlayerStats)
+    .map(([name, ps]) => [name, ps.wins - ps.losses, null, `${ps.wins}V ${ps.losses}D ${ps.played}M`])
+    .sort((a,b) => b[1]-a[1]);
+  // [display, value, clickName, subtext]
+  const matchList = Object.entries(allPlayerStats)
+    .map(([name, ps]) => ({ name, wins: ps.wins, losses: ps.losses, played: ps.played, diff: ps.wins-ps.losses }))
+    .sort((a,b) => b.diff-a.diff || b.wins-a.wins);
+
+  document.getElementById('sub-matches').innerHTML = rankingListHTML(
+    matchList.map(p => [p.name, p.diff, p.name, `${p.wins}V · ${p.losses}D · ${p.played}M`]),
+    e => e[1],
+    e => e[3],
+    v => v>0?'var(--success)':v<0?'var(--danger)':'var(--text-secondary)'
+  );
+
+  // ── Tab 2: Classement Jeux (+/-) ──
+  const jeuxList = Object.entries(allPlayerStats)
+    .map(([name, ps]) => ({ name, diff: ps.jFor-ps.jAgainst, jFor: ps.jFor, jAgainst: ps.jAgainst }))
+    .sort((a,b) => b.diff-a.diff);
+  document.getElementById('sub-jeux').innerHTML = rankingListHTML(
+    jeuxList.map(p => [p.name, p.diff, p.name, `${p.jFor} marqués · ${p.jAgainst} encaissés`]),
+    e => e[1],
+    e => e[3],
+    v => v>0?'var(--success)':v<0?'var(--danger)':'var(--text-secondary)'
+  );
+
+  // ── Tab 3: Classement Équipes ──
   const allTeams = {};
   const sessions = [...history];
   if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
@@ -1613,25 +1690,24 @@ function renderGeneralStats() {
       const t1 = session.teams.find(t => t.id === m.team1Id);
       const t2 = session.teams.find(t => t.id === m.team2Id);
       if (!t1 || !t2) return;
-      [[t1, m.score1, m.score2],[t2, m.score2, m.score1]].forEach(([team, sf, sa]) => {
-        const key = team.name;
-        if (!allTeams[key]) allTeams[key] = {name:key, players:team.players, wins:0, losses:0, draws:0, pointsFor:0, pointsAgainst:0, matchesPlayed:0};
-        const at = allTeams[key];
-        at.matchesPlayed++; at.pointsFor += sf; at.pointsAgainst += sa;
-        if (sf > sa) at.wins++; else if (sa > sf) at.losses++; else at.draws++;
+      let sf1=m.score1, sa1=m.score2;
+      if (m.scoreType==='sets'&&m.sets){ sf1=m.sets.reduce((s,r)=>s+r[0],0); sa1=m.sets.reduce((s,r)=>s+r[1],0); }
+      [[t1,m.score1,m.score2,sf1,sa1],[t2,m.score2,m.score1,sa1,sf1]].forEach(([team,sw,sl,sf,sa])=>{
+        const key=team.name;
+        if(!allTeams[key]) allTeams[key]={name:key,players:team.players,wins:0,losses:0,draws:0,pFor:0,pAgainst:0,played:0};
+        const at=allTeams[key];
+        at.played++; at.pFor+=sf; at.pAgainst+=sa;
+        if(sw>sl) at.wins++; else if(sl>sw) at.losses++; else at.draws++;
       });
     });
   });
-
-  const allPlayerStats = buildAllPlayerStats(true);
-  const totalSessions = history.length + (state.sessionStarted && !state.sessionFinished ? 1 : 0);
-
-  container.innerHTML = `
-    <div class="section-title">Équipes · classement général <span style="font-weight:400;color:var(--text-secondary);font-size:10px;margin-left:6px;">${totalSessions} session${totalSessions>1?'s':''}</span></div>
-    ${teamTableHTML(Object.values(allTeams))}
-    <div class="section-title" style="margin-top:24px;">Individuel · classement général</div>
-    ${individualTableHTML(allPlayerStats)}
-  `;
+  const teamsList = Object.values(allTeams).sort((a,b)=>(b.wins*3+b.draws)-(a.wins*3+a.draws)||(b.pFor-b.pAgainst)-(a.pFor-a.pAgainst));
+  document.getElementById('sub-teams').innerHTML = rankingListHTML(
+    teamsList.map(t => [t.name, t.wins*3+t.draws, null, `${t.players.join(' / ')} · ${t.wins}V ${t.losses}D · ${t.pFor}-${t.pAgainst}`]),
+    e => e[1],
+    e => e[3],
+    v => v>0?'var(--accent)':'var(--text-secondary)'
+  );
 }
 
 // keep for backward compat (called from renderMatchPhase)
@@ -1904,18 +1980,19 @@ function newTournament() {
   if (!state.sessionFinished) archiveCurrentSession();
   db.from('app_state').delete().eq('key', 'current_session').then();
   state = {
-    courts: 0, teams: [], matches: [], matchCounter: 0, roundNum: 0,
+    courts: 2, teams: [], matches: [], matchCounter: 0, roundNum: 0,
     activeMatches: [], sessionStarted: false, sessionFinished: false,
-    pairNameMap: state.pairNameMap // keep pair names
+    pairNameMap: state.pairNameMap
   };
-  document.getElementById('main-tabs').style.display = 'none';
   document.getElementById('session-end-bar').style.display = 'none';
   document.getElementById('setup-screen').style.display = 'block';
-  document.getElementById('tab-tournament').classList.remove('active');
+  document.getElementById('tab-tournament').classList.add('active');
   document.getElementById('tab-stats').classList.remove('active');
-  document.querySelectorAll('.court-btn').forEach(b => b.classList.remove('selected'));
-  document.getElementById('teams-preview').textContent = '';
-  document.getElementById('start-btn').disabled = true;
+  document.getElementById('tab-general').classList.remove('active');
+  document.getElementById('phase-players').style.display = 'none';
+  document.getElementById('phase-matches').style.display = 'none';
+  switchTab('tournament');
+  updateHeaderActions();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1925,7 +2002,6 @@ async function init() {
   await loadFromSupabase();
   if (state.sessionStarted) {
     document.getElementById('setup-screen').style.display = 'none';
-    document.getElementById('main-tabs').style.display = 'flex';
     document.getElementById('tab-tournament').classList.add('active');
     if (!state.sessionFinished) {
       document.getElementById('session-end-bar').style.display = 'flex';
@@ -1934,6 +2010,9 @@ async function init() {
     document.getElementById('phase-matches').style.display = 'block';
     renderMatchPhase();
     updateHeaderActions();
+  } else {
+    // Always show Tournoi tab with setup screen
+    document.getElementById('tab-tournament').classList.add('active');
   }
 }
 
