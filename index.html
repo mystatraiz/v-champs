@@ -2002,18 +2002,15 @@ async function init() {
   await loadFromSupabase();
   if (state.sessionStarted) {
     document.getElementById('setup-screen').style.display = 'none';
-    document.getElementById('tab-tournament').classList.add('active');
+    document.getElementById('phase-players').style.display = 'none';
+    document.getElementById('phase-matches').style.display = 'block';
     if (!state.sessionFinished) {
       document.getElementById('session-end-bar').style.display = 'flex';
     }
-    document.getElementById('phase-players').style.display = 'none';
-    document.getElementById('phase-matches').style.display = 'block';
     renderMatchPhase();
     updateHeaderActions();
-  } else {
-    // Always show Tournoi tab with setup screen
-    document.getElementById('tab-tournament').classList.add('active');
   }
+  switchTab('tournament');
 }
 
 init();
