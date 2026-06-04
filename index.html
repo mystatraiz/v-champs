@@ -558,8 +558,10 @@
     <button class="auth-tab" onclick="showAuthTab('register')">S'inscrire</button>
   </div>
 
-  <!-- Google button (shared) -->
-  <div style="width:100%;max-width:360px;">
+  <!-- ÉTAPE 1 : Méthode d'auth -->
+  <div id="auth-step1" style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:0;">
+
+    <!-- Boutons OAuth (login + register) -->
     <button onclick="doGoogleLogin()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;background:#fff;color:#111;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;">
       <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
       Continuer avec Google
@@ -568,50 +570,43 @@
       <svg width="16" height="18" viewBox="0 0 22 27" fill="white"><path d="M21.257 20.087c-.411 1.019-.895 1.958-1.456 2.821-.766 1.163-1.393 1.968-1.877 2.414-.748.73-1.549 1.1-2.41 1.122-.616 0-1.361-.175-2.228-.528-.87-.354-1.668-.528-2.397-.528-.764 0-1.583.174-2.457.528-.876.353-1.58.536-2.118.554-.826.036-1.645-.344-2.46-1.139-.527-.49-1.18-1.319-1.96-2.487-.841-1.245-1.53-2.69-2.071-4.341C-.857 16.739-.857 15.064-.857 13.456c0-1.84.398-3.427 1.194-4.757.627-1.07 1.462-1.914 2.508-2.534 1.047-.62 2.177-.937 3.395-.96.667 0 1.543.207 2.633.614 1.086.408 1.783.615 2.09.615.228 0 1.003-.242 2.311-.725 1.236-.449 2.28-.635 3.138-.562 2.318.187 4.06 1.1 5.22 2.742-2.072 1.256-3.098 3.016-3.073 5.274.022 1.757.656 3.22 1.898 4.384a6.244 6.244 0 0 0 1.9 1.24c-.153.442-.313.866-.48 1.3ZM16.65.554c0 1.376-.502 2.66-1.502 3.847C14.009 5.737 12.756 6.43 11.4 6.32a3.906 3.906 0 0 1-.029-.485c0-1.32.575-2.733 1.594-3.888.509-.583 1.155-1.07 1.939-1.458C15.686.103 16.424-.09 17.115-.117c.019.224.029.45.029.671H16.65Z"/></svg>
       Continuer avec Apple
     </button>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <div style="flex:1;height:1px;background:var(--border);"></div>
-      <span style="color:var(--text-secondary);font-size:12px;">ou</span>
+      <span style="color:var(--text-secondary);font-size:12px;">ou avec email</span>
       <div style="flex:1;height:1px;background:var(--border);"></div>
     </div>
-  </div>
 
-  <!-- Login -->
-  <div id="auth-login" class="auth-form">
-    <input type="email" id="login-email" placeholder="Email" autocomplete="email">
-    <input type="password" id="login-password" placeholder="Mot de passe">
-    <div class="auth-error" id="login-error"></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doLogin()">Se connecter</button>
-  </div>
-
-  <!-- Register -->
-  <div id="auth-register" class="auth-form" style="display:none;">
-    <div class="auth-row">
-      <div class="auth-field"><label class="auth-label">Prénom</label><input type="text" id="reg-firstname" placeholder="Prénom"></div>
-      <div class="auth-field"><label class="auth-label">Nom</label><input type="text" id="reg-lastname" placeholder="Nom"></div>
+    <!-- Email/password — login -->
+    <div id="auth-login" class="auth-form" style="display:flex;">
+      <input type="email" id="login-email" placeholder="Email" autocomplete="email">
+      <input type="password" id="login-password" placeholder="Mot de passe">
+      <div class="auth-error" id="login-error"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doLogin()">Se connecter</button>
     </div>
-    <div class="auth-field"><label class="auth-label">Surnom (affiché dans les classements)</label>
-      <input type="text" id="reg-nickname" placeholder="Ex: Tornado, King, Flash…"></div>
-    <div class="auth-field"><label class="auth-label">Email</label>
-      <input type="email" id="reg-email" placeholder="votre@email.com" autocomplete="email"></div>
-    <div class="auth-field"><label class="auth-label">Mot de passe</label>
-      <input type="password" id="reg-password" placeholder="Minimum 6 caractères"></div>
-    <div class="auth-row">
-      <div class="auth-field"><label class="auth-label">Latéralité</label>
-        <select id="reg-hand"><option value="right">Droitier</option><option value="left">Gaucher</option></select>
-      </div>
-      <div class="auth-field"><label class="auth-label">Côté préféré</label>
-        <select id="reg-side"><option value="right">Droite</option><option value="left">Gauche</option><option value="any">Peu importe</option></select>
-      </div>
+
+    <!-- Email/password — register (juste email+mdp) -->
+    <div id="auth-register" class="auth-form" style="display:none;">
+      <div class="auth-field"><label class="auth-label">Email</label>
+        <input type="email" id="reg-email" placeholder="votre@email.com" autocomplete="email"></div>
+      <div class="auth-field"><label class="auth-label">Mot de passe</label>
+        <input type="password" id="reg-password" placeholder="Minimum 6 caractères"></div>
+      <div class="auth-error" id="reg-error"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doRegister()">Continuer →</button>
     </div>
-    <div class="auth-error" id="reg-error"></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doRegister()">Créer mon compte</button>
   </div>
 
-  <!-- Complete profile (after Google login, first time) -->
+  <!-- ÉTAPE 2 : Infos du profil (toutes méthodes) -->
   <div id="auth-complete" class="auth-form" style="display:none;">
-    <div style="text-align:center;margin-bottom:4px;">
-      <div style="font-size:16px;font-weight:800;color:var(--white);" id="google-welcome"></div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Complétez votre profil</div>
+    <div style="text-align:center;margin-bottom:8px;">
+      <div style="font-size:15px;font-weight:800;color:var(--white);" id="complete-welcome">Complétez votre profil</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">Ces infos seront visibles dans les classements</div>
+    </div>
+    <div class="auth-row">
+      <div class="auth-field"><label class="auth-label">Prénom</label>
+        <input type="text" id="complete-firstname" placeholder="Prénom"></div>
+      <div class="auth-field"><label class="auth-label">Nom</label>
+        <input type="text" id="complete-lastname" placeholder="Nom"></div>
     </div>
     <div class="auth-field"><label class="auth-label">Surnom (affiché dans les classements)</label>
       <input type="text" id="complete-nickname" placeholder="Ex: Tornado, King, Flash…"></div>
@@ -624,7 +619,7 @@
       </div>
     </div>
     <div class="auth-error" id="complete-error"></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="completeGoogleProfile()">Terminer l'inscription</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="completeProfile()">Créer mon compte</button>
   </div>
 </div>
 
@@ -922,6 +917,14 @@ function showAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
 }
 
+function showCompleteStep(prefillFn, welcomeMsg) {
+  document.getElementById('auth-step1').style.display  = 'none';
+  document.querySelectorAll('.auth-tabs').forEach(e => e.style.display = 'none');
+  document.getElementById('auth-complete').style.display = 'flex';
+  document.getElementById('complete-welcome').textContent = welcomeMsg || 'Complétez votre profil';
+  if (prefillFn) prefillFn();
+}
+
 async function doGoogleLogin() {
   const { error } = await db.auth.signInWithOAuth({
     provider: 'google',
@@ -938,28 +941,28 @@ async function doAppleLogin() {
   if (error) alert(error.message);
 }
 
-async function completeGoogleProfile() {
+async function completeProfile() {
+  const fn   = document.getElementById('complete-firstname').value.trim();
+  const ln   = document.getElementById('complete-lastname').value.trim();
   const nick = document.getElementById('complete-nickname').value.trim();
   const hand = document.getElementById('complete-hand').value;
   const side = document.getElementById('complete-side').value;
   const err  = document.getElementById('complete-error');
   err.textContent = '';
-  if (!nick) { err.textContent = 'Le surnom est requis.'; return; }
+  if (!fn || !ln) { err.textContent = 'Prénom et nom sont requis.'; return; }
+  if (!nick)      { err.textContent = 'Le surnom est requis.'; return; }
 
   showLoader('Enregistrement…');
-  const meta = currentUser.user_metadata;
-  const fn = meta.given_name || meta.full_name?.split(' ')[0] || '';
-  const ln = meta.family_name || meta.full_name?.split(' ').slice(1).join(' ') || '';
-
   const { count } = await db.from('profiles').select('*', { count: 'exact', head: true });
-  const isFirst = count === 0;
+  const isFirst = (count || 0) === 0;
   const role = isFirst ? 'admin' : 'pending';
 
-  await db.from('profiles').insert({
+  const { error } = await db.from('profiles').upsert({
     id: currentUser.id, first_name: fn, last_name: ln, nickname: nick,
     handedness: hand, preferred_side: side, role,
     linked_player_name: isFirst ? nick : null
   });
+  if (error) { hideLoader(); err.textContent = error.message; return; }
   if (!isFirst) {
     await db.from('notifications').insert({
       type: 'new_user',
@@ -979,41 +982,20 @@ async function doLogin() {
 }
 
 async function doRegister() {
-  const fn   = document.getElementById('reg-firstname').value.trim();
-  const ln   = document.getElementById('reg-lastname').value.trim();
-  const nick = document.getElementById('reg-nickname').value.trim();
-  const email= document.getElementById('reg-email').value.trim();
-  const pass = document.getElementById('reg-password').value;
-  const hand = document.getElementById('reg-hand').value;
-  const side = document.getElementById('reg-side').value;
-  const err  = document.getElementById('reg-error');
+  const email = document.getElementById('reg-email').value.trim();
+  const pass  = document.getElementById('reg-password').value;
+  const err   = document.getElementById('reg-error');
   err.textContent = '';
-  if (!fn || !ln || !nick || !email || !pass) { err.textContent = 'Tous les champs sont requis.'; return; }
+  if (!email || !pass) { err.textContent = 'Email et mot de passe requis.'; return; }
   if (pass.length < 6) { err.textContent = 'Mot de passe : minimum 6 caractères.'; return; }
 
   showLoader('Création du compte…');
   const { data, error } = await db.auth.signUp({ email, password: pass });
   if (error) { hideLoader(); err.textContent = error.message; return; }
-
-  // Check if this is the very first user → becomes admin
-  const { count } = await db.from('profiles').select('*', { count: 'exact', head: true });
-  const isFirstUser = count === 0;
-  const role = isFirstUser ? 'admin' : 'pending';
-
-  await db.from('profiles').insert({
-    id: data.user.id,
-    first_name: fn, last_name: ln, nickname: nick,
-    handedness: hand, preferred_side: side, role,
-    linked_player_name: isFirstUser ? nick : null
-  });
-
-  if (!isFirstUser) {
-    await db.from('notifications').insert({
-      type: 'new_user',
-      payload: { user_id: data.user.id, first_name: fn, last_name: ln, nickname: nick, email }
-    });
-  }
+  currentUser = data.user;
   hideLoader();
+  // Go to profile completion step — no pre-fill for email accounts
+  showCompleteStep(null, 'Complétez votre profil');
 }
 
 async function doLogout() {
@@ -1027,16 +1009,17 @@ async function loadProfileAndRoute() {
   currentProfile = data;
   hideLoader();
 
-  // Google user with no profile → complete profile step
+  // New user (any method) — no profile yet → complete profile step
   if (!currentProfile) {
-    const meta = currentUser.user_metadata;
-    const name = meta?.full_name || meta?.name || currentUser.email;
-    document.getElementById('google-welcome').textContent = `Bienvenue, ${name.split(' ')[0]} !`;
+    const meta = currentUser.user_metadata || {};
+    const fn = meta.given_name || meta.full_name?.split(' ')[0] || '';
+    const ln = meta.family_name || (meta.full_name?.split(' ').length > 1 ? meta.full_name.split(' ').slice(1).join(' ') : '') || '';
+    const welcome = fn ? `Bienvenue ${fn} !` : 'Complétez votre profil';
     document.getElementById('auth-screen').style.display = 'flex';
-    document.getElementById('auth-login').style.display = 'none';
-    document.getElementById('auth-register').style.display = 'none';
-    document.getElementById('auth-complete').style.display = 'flex';
-    document.querySelectorAll('.auth-tabs, #auth-screen > div:nth-child(3)').forEach(e => e.style.display='none');
+    showCompleteStep(() => {
+      document.getElementById('complete-firstname').value = fn;
+      document.getElementById('complete-lastname').value  = ln;
+    }, welcome);
     return;
   }
   if (currentProfile.role === 'pending') { showPendingScreen(); return; }
