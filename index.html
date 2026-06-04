@@ -2595,21 +2595,35 @@ function newTournament() {
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
+let _routing = false;
+
 async function init() {
   showLoader('Connexion…');
-  // Listen for auth changes
+
+  // Un seul point d'entrée : onAuthStateChange gère tout
   db.auth.onAuthStateChange(async (event, session) => {
+    if (_routing) return;
     currentUser = session?.user || null;
-    if (event === 'SIGNED_OUT') { showAuthScreen(); return; }
-    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-      if (currentUser) { showLoader('Chargement du profil…'); await loadProfileAndRoute(); }
-      else showAuthScreen();
+
+    if (event === 'SIGNED_OUT') {
+      _routing = false;
+      showAuthScreen();
+      return;
+    }
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+      if (currentUser) {
+        _routing = true;
+        try {
+          showLoader('Chargement…');
+          await loadProfileAndRoute();
+        } finally {
+          _routing = false;
+        }
+      } else {
+        showAuthScreen();
+      }
     }
   });
-  const { data: { session } } = await db.auth.getSession();
-  if (!session) { showAuthScreen(); return; }
-  currentUser = session.user;
-  await loadProfileAndRoute();
 }
 
 init();
