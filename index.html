@@ -499,7 +499,8 @@
   .auth-form select option { background: var(--dark); }
   .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .auth-error { color: var(--danger); font-size: 13px; text-align: center; min-height: 20px; }
-  .auth-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: -6px; }
+  .auth-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; display: block; }
+  .auth-field { display: flex; flex-direction: column; gap: 0; }
 
   /* ─── PENDING ─── */
   #pending-screen {
@@ -568,18 +569,20 @@
   <!-- Register -->
   <div id="auth-register" class="auth-form" style="display:none;">
     <div class="auth-row">
-      <div><div class="auth-label">Prénom</div><input type="text" id="reg-firstname" placeholder="Prénom"></div>
-      <div><div class="auth-label">Nom</div><input type="text" id="reg-lastname" placeholder="Nom"></div>
+      <div class="auth-field"><label class="auth-label">Prénom</label><input type="text" id="reg-firstname" placeholder="Prénom"></div>
+      <div class="auth-field"><label class="auth-label">Nom</label><input type="text" id="reg-lastname" placeholder="Nom"></div>
     </div>
-    <div><div class="auth-label">Surnom (affiché dans les classements)</div>
-    <input type="text" id="reg-nickname" placeholder="Ex: Tornado, King, Flash…"></div>
-    <input type="email" id="reg-email" placeholder="Email" autocomplete="email">
-    <input type="password" id="reg-password" placeholder="Mot de passe (min 6 caractères)">
+    <div class="auth-field"><label class="auth-label">Surnom (affiché dans les classements)</label>
+      <input type="text" id="reg-nickname" placeholder="Ex: Tornado, King, Flash…"></div>
+    <div class="auth-field"><label class="auth-label">Email</label>
+      <input type="email" id="reg-email" placeholder="votre@email.com" autocomplete="email"></div>
+    <div class="auth-field"><label class="auth-label">Mot de passe</label>
+      <input type="password" id="reg-password" placeholder="Minimum 6 caractères"></div>
     <div class="auth-row">
-      <div><div class="auth-label">Latéralité</div>
+      <div class="auth-field"><label class="auth-label">Latéralité</label>
         <select id="reg-hand"><option value="right">Droitier</option><option value="left">Gaucher</option></select>
       </div>
-      <div><div class="auth-label">Côté préféré</div>
+      <div class="auth-field"><label class="auth-label">Côté préféré</label>
         <select id="reg-side"><option value="right">Droite</option><option value="left">Gauche</option><option value="any">Peu importe</option></select>
       </div>
     </div>
