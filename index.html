@@ -482,9 +482,163 @@
     .teams-grid { grid-template-columns: 1fr 1fr; }
     .score-btn { width: 38px; height: 38px; font-size: 20px; }
   }
+
+  /* ─── AUTH ─── */
+  #auth-screen {
+    position: fixed; inset: 0; background: var(--black); z-index: 900;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  #auth-screen .auth-logo { height: 120px; filter: invert(1); margin-bottom: 28px; }
+  .auth-tabs { display: flex; background: var(--dark); border-radius: 10px; padding: 4px; margin-bottom: 20px; width: 100%; max-width: 360px; }
+  .auth-tab { flex: 1; padding: 9px; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; border: none; background: none; color: var(--text-secondary); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+  .auth-tab.active { background: var(--border); color: var(--white); }
+  .auth-form { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+  .auth-form input, .auth-form select { background: var(--dark); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius); padding: 12px 14px; font-size: 15px; width: 100%; outline: none; }
+  .auth-form input:focus, .auth-form select:focus { border-color: var(--accent); }
+  .auth-form select option { background: var(--dark); }
+  .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .auth-error { color: var(--danger); font-size: 13px; text-align: center; min-height: 20px; }
+  .auth-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: -6px; }
+
+  /* ─── PENDING ─── */
+  #pending-screen {
+    position: fixed; inset: 0; background: var(--black); z-index: 900;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; gap: 16px;
+  }
+  #pending-screen img { height: 80px; filter: invert(1); opacity: 0.6; }
+
+  /* ─── NOTIFICATION BELL ─── */
+  .notif-bell { position: relative; background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+  .notif-count { position: absolute; top: -2px; right: 0; background: var(--danger); color: #fff; font-size: 10px; font-weight: 800; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+
+  /* ─── ADMIN PANEL ─── */
+  #admin-panel {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 600;
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  #admin-panel.open { display: flex; }
+  #admin-panel-inner {
+    background: #1c1c1c; border-radius: 20px 20px 0 0; width: 100%; max-width: 560px;
+    max-height: 80vh; overflow-y: auto; padding: 0 0 32px;
+  }
+  .panel-drag { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
+
+  /* ─── PLAYER PROFILE ─── */
+  .player-profile-header {
+    text-align: center; padding: 28px 20px 16px;
+    border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .avatar-circle {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: var(--accent); color: var(--black);
+    font-size: 28px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px; letter-spacing: -1px;
+  }
+  .player-full-name { font-size: 20px; font-weight: 800; color: var(--white); line-height: 1.3; }
+  .player-full-name .nickname { color: var(--accent); font-style: italic; }
+  .player-badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+  .player-badge { background: var(--dark); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--text-secondary); }
+
+  /* ─── PLAYER APP TABS ─── */
+  #player-app { display: none; }
+  #player-app nav.tabs button { flex: 1; }
 </style>
 </head>
 <body>
+
+<!-- ═══ AUTH SCREEN ═══ -->
+<div id="auth-screen" style="display:none;">
+  <img src="logo.png" class="auth-logo" onerror="this.style.display='none'">
+  <div class="auth-tabs">
+    <button class="auth-tab active" onclick="showAuthTab('login')">Se connecter</button>
+    <button class="auth-tab" onclick="showAuthTab('register')">S'inscrire</button>
+  </div>
+
+  <!-- Login -->
+  <div id="auth-login" class="auth-form">
+    <input type="email" id="login-email" placeholder="Email" autocomplete="email">
+    <input type="password" id="login-password" placeholder="Mot de passe">
+    <div class="auth-error" id="login-error"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doLogin()">Se connecter</button>
+  </div>
+
+  <!-- Register -->
+  <div id="auth-register" class="auth-form" style="display:none;">
+    <div class="auth-row">
+      <div><div class="auth-label">Prénom</div><input type="text" id="reg-firstname" placeholder="Prénom"></div>
+      <div><div class="auth-label">Nom</div><input type="text" id="reg-lastname" placeholder="Nom"></div>
+    </div>
+    <div><div class="auth-label">Surnom (affiché dans les classements)</div>
+    <input type="text" id="reg-nickname" placeholder="Ex: Tornado, King, Flash…"></div>
+    <input type="email" id="reg-email" placeholder="Email" autocomplete="email">
+    <input type="password" id="reg-password" placeholder="Mot de passe (min 6 caractères)">
+    <div class="auth-row">
+      <div><div class="auth-label">Latéralité</div>
+        <select id="reg-hand"><option value="right">Droitier</option><option value="left">Gaucher</option></select>
+      </div>
+      <div><div class="auth-label">Côté préféré</div>
+        <select id="reg-side"><option value="right">Droite</option><option value="left">Gauche</option><option value="any">Peu importe</option></select>
+      </div>
+    </div>
+    <div class="auth-error" id="reg-error"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doRegister()">Créer mon compte</button>
+  </div>
+</div>
+
+<!-- ═══ PENDING SCREEN ═══ -->
+<div id="pending-screen">
+  <img src="logo.png" onerror="this.style.display='none'">
+  <div style="font-size:18px;font-weight:800;color:var(--white);">Compte en attente</div>
+  <div style="color:var(--text-secondary);font-size:14px;max-width:280px;line-height:1.6;">
+    Votre compte est en cours de validation par l'administrateur. Vous recevrez un accès dès qu'il aura lié votre profil.
+  </div>
+  <button class="btn btn-secondary" onclick="doLogout()" style="margin-top:8px;">Se déconnecter</button>
+</div>
+
+<!-- ═══ ADMIN NOTIF PANEL ═══ -->
+<div id="admin-panel" onclick="closeAdminPanel(event)">
+  <div id="admin-panel-inner">
+    <div class="panel-drag"></div>
+    <div style="padding:16px 20px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:16px;font-weight:800;color:var(--white);">Nouveaux comptes</div>
+      <button onclick="closeAdminPanel()" style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div id="admin-panel-content" style="padding:12px 16px 0;"></div>
+  </div>
+</div>
+
+<!-- ═══ PLAYER APP ═══ -->
+<div id="player-app">
+  <header style="background:var(--dark);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;">
+    <img src="logo.png" style="height:36px;filter:invert(1);" onerror="this.style.display='none'">
+    <span style="font-size:16px;font-weight:700;letter-spacing:2px;color:var(--white);">V-CHAMPS</span>
+    <div style="margin-left:auto;">
+      <button class="btn btn-secondary btn-sm" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </header>
+  <nav style="background:var(--dark);border-bottom:1px solid var(--border);display:flex;padding:0 24px;">
+    <button class="active" id="ptab-classement" onclick="switchPlayerTab('classement')" style="background:none;border:none;color:var(--text-secondary);padding:12px 20px;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--white);">Classement</button>
+    <button id="ptab-profil" onclick="switchPlayerTab('profil')" style="background:none;border:none;color:var(--text-secondary);padding:12px 20px;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;">Mon profil</button>
+  </nav>
+  <main style="max-width:600px;margin:0 auto;padding:16px;">
+    <!-- Classement tab -->
+    <div id="player-classement">
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchSubTab('p-matches')">Matchs</button>
+        <button class="sub-tab" onclick="switchSubTab('p-jeux')">Jeux</button>
+        <button class="sub-tab" onclick="switchSubTab('p-teams')">Équipes</button>
+      </div>
+      <div class="sub-tab-content active" id="sub-p-matches"></div>
+      <div class="sub-tab-content" id="sub-p-jeux"></div>
+      <div class="sub-tab-content" id="sub-p-teams"></div>
+    </div>
+    <!-- Profil tab -->
+    <div id="player-profil" style="display:none;"></div>
+  </main>
+</div>
 
 <!-- Loading overlay -->
 <div id="app-loader" style="display:flex;position:fixed;inset:0;background:var(--black);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
@@ -504,7 +658,9 @@
     <div class="brand-title">V-CHAMPS</div>
     <div class="brand-sub">Indomitus Padel · Tournoi</div>
   </div>
-  <div style="margin-left:auto;display:flex;gap:8px;" id="header-actions"></div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;" id="header-actions">
+    <button class="notif-bell" id="notif-bell" onclick="openAdminPanel()" style="display:none;">🔔<span class="notif-count" id="notif-count" style="display:none;">0</span></button>
+  </div>
 </header>
 
 <nav class="tabs" id="main-tabs">
@@ -713,6 +869,335 @@ let state = {
   // pair→teamName map persisted across sessions
   pairNameMap: {}     // "p1|p2" => teamName
 };
+
+// ═══════════════════════════════════════════════════
+//  AUTH STATE
+// ═══════════════════════════════════════════════════
+let currentUser   = null;
+let currentProfile = null;
+
+function showAuthTab(tab) {
+  document.getElementById('auth-login').style.display    = tab==='login'    ? 'flex' : 'none';
+  document.getElementById('auth-register').style.display = tab==='register' ? 'flex' : 'none';
+  document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const err   = document.getElementById('login-error');
+  err.textContent = '';
+  const { error } = await db.auth.signInWithPassword({ email, password: pass });
+  if (error) err.textContent = error.message;
+}
+
+async function doRegister() {
+  const fn   = document.getElementById('reg-firstname').value.trim();
+  const ln   = document.getElementById('reg-lastname').value.trim();
+  const nick = document.getElementById('reg-nickname').value.trim();
+  const email= document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-password').value;
+  const hand = document.getElementById('reg-hand').value;
+  const side = document.getElementById('reg-side').value;
+  const err  = document.getElementById('reg-error');
+  err.textContent = '';
+  if (!fn || !ln || !nick || !email || !pass) { err.textContent = 'Tous les champs sont requis.'; return; }
+  if (pass.length < 6) { err.textContent = 'Mot de passe : minimum 6 caractères.'; return; }
+
+  showLoader('Création du compte…');
+  const { data, error } = await db.auth.signUp({ email, password: pass });
+  if (error) { hideLoader(); err.textContent = error.message; return; }
+
+  // Check if this is the very first user → becomes admin
+  const { count } = await db.from('profiles').select('*', { count: 'exact', head: true });
+  const isFirstUser = count === 0;
+  const role = isFirstUser ? 'admin' : 'pending';
+
+  await db.from('profiles').insert({
+    id: data.user.id,
+    first_name: fn, last_name: ln, nickname: nick,
+    handedness: hand, preferred_side: side, role,
+    linked_player_name: isFirstUser ? nick : null
+  });
+
+  if (!isFirstUser) {
+    await db.from('notifications').insert({
+      type: 'new_user',
+      payload: { user_id: data.user.id, first_name: fn, last_name: ln, nickname: nick, email }
+    });
+  }
+  hideLoader();
+}
+
+async function doLogout() {
+  await db.auth.signOut();
+  currentUser = null; currentProfile = null;
+}
+
+async function loadProfileAndRoute() {
+  if (!currentUser) { showAuthScreen(); return; }
+  const { data } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = data;
+  hideLoader();
+  if (!currentProfile || currentProfile.role === 'pending') { showPendingScreen(); return; }
+  if (currentProfile.role === 'admin') { await loadFromSupabase(); showAdminApp(); }
+  else if (currentProfile.role === 'player') { await loadFromSupabase(); showPlayerApp(); }
+}
+
+function showAuthScreen() {
+  hideLoader();
+  document.getElementById('auth-screen').style.display    = 'flex';
+  document.getElementById('pending-screen').style.display  = 'none';
+  document.getElementById('player-app').style.display      = 'none';
+  document.querySelector('header').style.display           = 'none';
+  document.getElementById('main-tabs').style.display       = 'none';
+  document.querySelector('main').style.display             = 'none';
+  document.getElementById('session-end-bar').style.display = 'none';
+}
+
+function showPendingScreen() {
+  document.getElementById('auth-screen').style.display    = 'none';
+  document.getElementById('pending-screen').style.display  = 'flex';
+  document.getElementById('player-app').style.display      = 'none';
+  document.querySelector('header').style.display           = 'none';
+  document.getElementById('main-tabs').style.display       = 'none';
+  document.querySelector('main').style.display             = 'none';
+}
+
+function showAdminApp() {
+  document.getElementById('auth-screen').style.display    = 'none';
+  document.getElementById('pending-screen').style.display  = 'none';
+  document.getElementById('player-app').style.display      = 'none';
+  document.querySelector('header').style.display           = 'flex';
+  document.getElementById('main-tabs').style.display       = 'flex';
+  document.querySelector('main').style.display             = 'block';
+  document.getElementById('notif-bell').style.display      = 'flex';
+  if (!state.sessionStarted) {
+    document.getElementById('setup-screen').style.display  = 'block';
+    document.getElementById('phase-players').style.display = 'none';
+    document.getElementById('phase-matches').style.display = 'none';
+  } else {
+    document.getElementById('setup-screen').style.display  = 'none';
+    document.getElementById('phase-players').style.display = 'none';
+    document.getElementById('phase-matches').style.display = 'block';
+    if (!state.sessionFinished) document.getElementById('session-end-bar').style.display = 'flex';
+    renderMatchPhase();
+  }
+  switchTab('tournament');
+  updateHeaderActions();
+  loadAdminNotifications();
+}
+
+function showPlayerApp() {
+  document.getElementById('auth-screen').style.display   = 'none';
+  document.getElementById('pending-screen').style.display = 'none';
+  document.getElementById('player-app').style.display    = 'block';
+  document.querySelector('header').style.display         = 'none';
+  document.getElementById('main-tabs').style.display     = 'none';
+  document.querySelector('main').style.display           = 'none';
+  renderPlayerClassement();
+  renderPlayerProfile();
+}
+
+// ─── Player app ───
+function switchPlayerTab(tab) {
+  document.getElementById('player-classement').style.display = tab==='classement' ? 'block' : 'none';
+  document.getElementById('player-profil').style.display     = tab==='profil'     ? 'block' : 'none';
+  const tabs = document.querySelectorAll('#player-app nav button');
+  tabs[0].style.borderBottomColor = tab==='classement' ? 'var(--accent)' : 'transparent';
+  tabs[0].style.color = tab==='classement' ? 'var(--white)' : 'var(--text-secondary)';
+  tabs[1].style.borderBottomColor = tab==='profil' ? 'var(--accent)' : 'transparent';
+  tabs[1].style.color = tab==='profil' ? 'var(--white)' : 'var(--text-secondary)';
+}
+
+function renderPlayerClassement() {
+  // Reuse general stats but in player sub-tabs
+  const history = getHistory();
+  const hasData = history.length>0 || (state.sessionStarted&&state.matches.some(m=>m.status==='finished'));
+  const empty = '<div class="empty-state">Aucune donnée.</div>';
+  if (!hasData) { ['p-matches','p-jeux','p-teams'].forEach(s=>{ document.getElementById(`sub-${s}`).innerHTML=empty; }); return; }
+  const ps = buildAllPlayerStats(true);
+  // Matchs
+  const ml=Object.entries(ps).map(([n,p])=>({n,m:p.played,v:p.wins,d:p.losses,nul:p.draws,diff:p.wins-p.losses})).sort((a,b)=>b.diff-a.diff||b.v-a.v);
+  document.getElementById('sub-p-matches').innerHTML=playerRankTable(ml,'matches');
+  // Jeux
+  const jl=Object.entries(ps).map(([n,p])=>({n,g:p.jFor,p2:p.jAgainst,diff:p.jFor-p.jAgainst})).sort((a,b)=>b.diff-a.diff);
+  document.getElementById('sub-p-jeux').innerHTML=playerRankTable(jl,'jeux');
+  // Teams
+  const teams=buildTeamStats();
+  document.getElementById('sub-p-teams').innerHTML=playerRankTable(teams,'teams');
+}
+
+function playerRankTable(list, type) {
+  if(!list.length) return '<div class="empty-state">Aucune donnée.</div>';
+  let head='', rows='';
+  const me = currentProfile?.linked_player_name;
+  if(type==='matches'){
+    head=`<tr><th>#</th><th>Joueur</th><th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th></tr>`;
+    rows=list.map((p,i)=>{
+      const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+      const dc=p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
+      const hl=p.n===me?'style="background:#1e1a12;"':'';
+      return `<tr ${hl}><td><span class="rank-badge ${rc}">${i+1}</span></td><td><span class="player-link" onclick="showPlayerModal('${esc(p.n)}')">${p.n}</span></td><td>${p.m}</td><td style="color:var(--success)">${p.v}</td><td style="color:var(--danger)">${p.d}</td><td style="color:var(--text-secondary)">${p.nul}</td><td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td></tr>`;
+    }).join('');
+  } else if(type==='jeux'){
+    head=`<tr><th>#</th><th>Joueur</th><th>G</th><th>P</th><th>+/-</th></tr>`;
+    rows=list.map((p,i)=>{
+      const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+      const dc=p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
+      const hl=p.n===me?'style="background:#1e1a12;"':'';
+      return `<tr ${hl}><td><span class="rank-badge ${rc}">${i+1}</span></td><td><span class="player-link" onclick="showPlayerModal('${esc(p.n)}')">${p.n}</span></td><td style="color:var(--success)">${p.g}</td><td style="color:var(--danger)">${p.p2}</td><td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td></tr>`;
+    }).join('');
+  } else {
+    head=`<tr><th>#</th><th>Équipe</th><th>M</th><th>V</th><th>D</th><th>J+</th><th>J-</th><th>+/-</th></tr>`;
+    rows=list.map((t,i)=>{
+      const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+      const diff=t.jFor-t.jAgainst; const dc=diff>0?'var(--success)':diff<0?'var(--danger)':'var(--text-secondary)';
+      const hl=(t.players||[]).includes(me)?'style="background:#1e1a12;"':'';
+      return `<tr ${hl}><td><span class="rank-badge ${rc}">${i+1}</span></td><td style="color:var(--accent);font-weight:700;">${t.name}<br><span style="color:var(--text-secondary);font-size:11px;font-weight:400;">${(t.players||[]).join(' / ')}</span></td><td>${t.played}</td><td style="color:var(--success)">${t.wins}</td><td style="color:var(--danger)">${t.losses}</td><td>${t.jFor}</td><td>${t.jAgainst}</td><td style="font-weight:800;color:${dc}">${diff>0?'+':''}${diff}</td></tr>`;
+    }).join('');
+  }
+  return `<div class="card stats-table-wrap" style="padding:0;overflow:hidden;"><table class="stats-table"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function buildTeamStats() {
+  const allTeams={};
+  const sessions=[...getHistory()];
+  if(state.sessionStarted) sessions.push({teams:state.teams,matches:state.matches.filter(m=>m.status==='finished')});
+  sessions.forEach(session=>{
+    session.matches.forEach(m=>{
+      const t1=session.teams.find(t=>t.id===m.team1Id), t2=session.teams.find(t=>t.id===m.team2Id);
+      if(!t1||!t2) return;
+      let sf1=m.score1,sa1=m.score2;
+      if(m.scoreType==='sets'&&m.sets){sf1=m.sets.reduce((s,r)=>s+r[0],0);sa1=m.sets.reduce((s,r)=>s+r[1],0);}
+      [[t1,m.score1,m.score2,sf1,sa1],[t2,m.score2,m.score1,sa1,sf1]].forEach(([team,sw,sl,sf,sa])=>{
+        const key=team.name;
+        if(!allTeams[key]) allTeams[key]={name:key,players:[...team.players],wins:0,losses:0,draws:0,jFor:0,jAgainst:0,played:0};
+        allTeams[key].played++;allTeams[key].jFor+=sf;allTeams[key].jAgainst+=sa;
+        if(sw>sl)allTeams[key].wins++;else if(sl>sw)allTeams[key].losses++;else allTeams[key].draws++;
+      });
+    });
+  });
+  return Object.values(allTeams).sort((a,b)=>(b.wins*3+b.draws)-(a.wins*3+a.draws)||(b.jFor-b.jAgainst)-(a.jFor-a.jAgainst));
+}
+
+function renderPlayerProfile() {
+  const p = currentProfile;
+  if (!p) return;
+  const initials = (p.first_name[0]||'') + (p.last_name[0]||'');
+  const sideLabel = {left:'Gauche',right:'Droite',any:'Peu importe'}[p.preferred_side]||'';
+  const handLabel = p.handedness==='right'?'Droitier':'Gaucher';
+  const linkedName = p.linked_player_name;
+
+  let statsHTML = '';
+  if (linkedName) {
+    const allStats = buildAllPlayerStats(true);
+    const ps = allStats[linkedName];
+    if (ps) {
+      const wr = ps.played ? Math.round(ps.wins/ps.played*100) : 0;
+      const wrColor = wr>=60?'var(--success)':wr>=40?'var(--accent)':'var(--danger)';
+      const diff = ps.jFor - ps.jAgainst;
+      statsHTML = `
+        <div style="padding:0 16px;">
+          <div class="stats-hero" style="margin-bottom:16px;">
+            <div class="donut-wrap">
+              ${svgDonut(wr, wrColor, 100, 10)}
+              <div class="donut-label">
+                <span class="donut-pct" style="color:${wrColor}">${wr}%</span>
+                <span class="donut-sub">WIN</span>
+              </div>
+            </div>
+            <div class="stats-pills">
+              <div class="stat-pill"><span class="stat-pill-label">MATCHS</span><span class="stat-pill-val">${ps.played}</span></div>
+              <div class="stat-pill"><span class="stat-pill-label">VICTOIRES</span><span class="stat-pill-val" style="color:var(--success)">${ps.wins}</span></div>
+              <div class="stat-pill"><span class="stat-pill-label">DÉFAITES</span><span class="stat-pill-val" style="color:var(--danger)">${ps.losses}</span></div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:12px;">
+            <div class="stat-row"><span class="stat-label">Jeux marqués</span><span class="stat-value">${ps.jFor}</span></div>
+            <div class="stat-row"><span class="stat-label">Jeux encaissés</span><span class="stat-value">${ps.jAgainst}</span></div>
+            <div class="stat-row" style="border:none;"><span class="stat-label">Différence</span>
+              <span class="stat-value" style="color:${diff>=0?'var(--success)':'var(--danger)'}">${diff>=0?'+':''}${diff}</span></div>
+          </div>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="showPlayerModal('${esc(linkedName)}')">Voir la fiche détaillée →</button>
+        </div>`;
+    }
+  }
+
+  document.getElementById('player-profil').innerHTML = `
+    <div class="player-profile-header">
+      <div class="avatar-circle">${initials.toUpperCase()}</div>
+      <div class="player-full-name">
+        ${p.first_name} <span class="nickname">«${p.nickname}»</span> ${p.last_name.toUpperCase()}
+      </div>
+      <div class="player-badges">
+        <span class="player-badge">🎾 ${handLabel}</span>
+        <span class="player-badge">📍 ${sideLabel}</span>
+        ${linkedName ? `<span class="player-badge" style="border-color:var(--accent);color:var(--accent);">✓ Lié : ${linkedName}</span>` : '<span class="player-badge" style="border-color:var(--danger);color:var(--danger);">⏳ En attente de liaison</span>'}
+      </div>
+    </div>
+    ${statsHTML || '<div class="empty-state" style="padding:32px;">Vos statistiques apparaîtront ici une fois lié par l\'administrateur.</div>'}
+  `;
+}
+
+// ─── Admin notifications ───
+async function loadAdminNotifications() {
+  const { data } = await db.from('notifications').select('*').eq('read', false).order('created_at', {ascending:false});
+  const bell = document.getElementById('notif-bell');
+  const count = document.getElementById('notif-count');
+  if (!data?.length) { bell.style.display='none'; return; }
+  bell.style.display = 'flex';
+  count.style.display = 'flex';
+  count.textContent = data.length;
+}
+
+async function openAdminPanel() {
+  const { data: notifs } = await db.from('notifications').select('*').eq('type','new_user').eq('read',false).order('created_at',{ascending:false});
+  const { data: pending } = await db.from('profiles').select('*').eq('role','pending').order('created_at',{ascending:false});
+  const container = document.getElementById('admin-panel-content');
+  if (!pending?.length) {
+    container.innerHTML = '<div class="empty-state">Aucun compte en attente.</div>';
+  } else {
+    container.innerHTML = pending.map(p => `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div class="avatar-circle" style="width:44px;height:44px;font-size:16px;flex-shrink:0;">${p.first_name[0]}${p.last_name[0]}</div>
+          <div>
+            <div style="font-weight:700;color:var(--white);">${p.first_name} «${p.nickname}» ${p.last_name.toUpperCase()}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">${{right:'Droitier',left:'Gaucher'}[p.handedness]} · Côté ${{left:'gauche',right:'droit',any:'peu importe'}[p.preferred_side]}</div>
+          </div>
+        </div>
+        <div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary);">Lier au joueur :</div>
+        <div style="display:flex;gap:8px;">
+          <select id="link-select-${p.id}" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;">
+            <option value="">-- Nouveau joueur (surnom) --</option>
+            ${_knownPlayers.sort().map(n=>`<option value="${n}">${n}</option>`).join('')}
+          </select>
+          <button class="btn btn-success btn-sm" onclick="linkPlayer('${p.id}')">Valider</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('admin-panel').classList.add('open');
+}
+
+async function linkPlayer(profileId) {
+  const select = document.getElementById(`link-select-${profileId}`);
+  const { data: prof } = await db.from('profiles').select('nickname').eq('id', profileId).single();
+  const linkedName = select.value || prof.nickname;
+  await db.from('profiles').update({ role: 'player', linked_player_name: linkedName }).eq('id', profileId);
+  // Mark notifications as read
+  await db.from('notifications').update({ read: true }).eq('type', 'new_user').filter('payload->>user_id', 'eq', profileId);
+  closeAdminPanel();
+  loadAdminNotifications();
+  alert(`✓ Compte validé et lié à "${linkedName}"`);
+}
+
+function closeAdminPanel(e) {
+  if (!e || e.target === document.getElementById('admin-panel')) {
+    document.getElementById('admin-panel').classList.remove('open');
+  }
+}
 
 // ═══════════════════════════════════════════════════
 //  SUPABASE
@@ -1610,12 +2095,22 @@ function renderSessionStats() {
 
 // ─── Sub-tab switcher ───
 function switchSubTab(sub) {
-  document.querySelectorAll('.sub-tab').forEach((b,i) => {
-    const names = ['matches','jeux','teams'];
-    b.classList.toggle('active', names[i] === sub);
-  });
-  document.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById(`sub-${sub}`).classList.add('active');
+  // Find the parent container of sub-tabs to scope correctly
+  const subEl = document.getElementById(`sub-${sub}`);
+  if (!subEl) return;
+  const parent = subEl.closest('div');
+  // Toggle sub-tab buttons in same .sub-tabs sibling
+  const wrapper = subEl.parentElement;
+  const tabsBar = wrapper.previousElementSibling;
+  if (tabsBar?.classList.contains('sub-tabs')) {
+    const names = [...tabsBar.querySelectorAll('.sub-tab')].map((_,i)=>i);
+    tabsBar.querySelectorAll('.sub-tab').forEach((b,i) => {
+      const el = wrapper.querySelectorAll('.sub-tab-content')[i];
+      const match = el?.id === `sub-${sub}`;
+      b.classList.toggle('active', match);
+      if(el) el.classList.toggle('active', match);
+    });
+  }
 }
 
 // ─── Ranking list builder ───
@@ -1706,27 +2201,7 @@ function renderGeneralStats() {
     </div>`;
 
   // ── Tab 3: Équipes — M V D N J+ J- +/- ──
-  const allTeams = {};
-  const sessions = [...history];
-  if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
-  sessions.forEach(session => {
-    session.matches.forEach(m => {
-      const t1 = session.teams.find(t => t.id === m.team1Id);
-      const t2 = session.teams.find(t => t.id === m.team2Id);
-      if (!t1 || !t2) return;
-      let sf1=m.score1, sa1=m.score2;
-      if (m.scoreType==='sets'&&m.sets){ sf1=m.sets.reduce((s,r)=>s+r[0],0); sa1=m.sets.reduce((s,r)=>s+r[1],0); }
-      [[t1,m.score1,m.score2,sf1,sa1],[t2,m.score2,m.score1,sa1,sf1]].forEach(([team,sw,sl,sf,sa])=>{
-        const key=team.name;
-        if(!allTeams[key]) allTeams[key]={name:key,players:[...team.players],wins:0,losses:0,draws:0,jFor:0,jAgainst:0,played:0};
-        const at=allTeams[key];
-        at.played++; at.jFor+=sf; at.jAgainst+=sa;
-        if(sw>sl) at.wins++; else if(sl>sw) at.losses++; else at.draws++;
-      });
-    });
-  });
-  const teamsList = Object.values(allTeams)
-    .sort((a,b)=>(b.wins*3+b.draws)-(a.wins*3+a.draws)||(b.jFor-b.jAgainst)-(a.jFor-a.jAgainst));
+  const teamsList = buildTeamStats();
 
   document.getElementById('sub-teams').innerHTML = `
     <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
@@ -2007,13 +2482,17 @@ function switchTab(tab) {
 
 function updateHeaderActions() {
   const bar = document.getElementById('header-actions');
+  let html = '';
   if (state.sessionFinished) {
-    bar.innerHTML = `<button class="btn btn-accent btn-sm" onclick="newTournament()">+ Nouveau tournoi</button>`;
+    html = `<button class="btn btn-accent btn-sm" onclick="newTournament()">+ Nouveau tournoi</button>`;
   } else if (state.sessionStarted) {
-    bar.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="newTournament()">+ Nouveau</button>`;
-  } else {
-    bar.innerHTML = '';
+    html = `<button class="btn btn-secondary btn-sm" onclick="newTournament()">+ Nouveau</button>`;
   }
+  html += `<button class="btn btn-secondary btn-sm" onclick="doLogout()">⎋</button>`;
+  bar.innerHTML = html;
+  // Keep bell visible for admin
+  const bell = document.getElementById('notif-bell');
+  if (currentProfile?.role === 'admin') bell.style.display = 'flex';
 }
 
 // ═══════════════════════════════════════════════════
@@ -2043,18 +2522,20 @@ function newTournament() {
 //  INIT
 // ═══════════════════════════════════════════════════
 async function init() {
-  await loadFromSupabase();
-  if (state.sessionStarted) {
-    document.getElementById('setup-screen').style.display = 'none';
-    document.getElementById('phase-players').style.display = 'none';
-    document.getElementById('phase-matches').style.display = 'block';
-    if (!state.sessionFinished) {
-      document.getElementById('session-end-bar').style.display = 'flex';
+  showLoader('Connexion…');
+  // Listen for auth changes
+  db.auth.onAuthStateChange(async (event, session) => {
+    currentUser = session?.user || null;
+    if (event === 'SIGNED_OUT') { showAuthScreen(); return; }
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      if (currentUser) { showLoader('Chargement du profil…'); await loadProfileAndRoute(); }
+      else showAuthScreen();
     }
-    renderMatchPhase();
-    updateHeaderActions();
-  }
-  switchTab('tournament');
+  });
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { showAuthScreen(); return; }
+  currentUser = session.user;
+  await loadProfileAndRoute();
 }
 
 init();
