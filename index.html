@@ -996,8 +996,16 @@ async function doLogout() {
 
 async function loadProfileAndRoute() {
   if (!currentUser) { showAuthScreen(); return; }
-  const { data } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
-  currentProfile = data;
+
+  try {
+    const { data, error } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    currentProfile = data;
+  } catch(e) {
+    console.error('Profile load error:', e);
+    currentProfile = null;
+  }
+
   hideLoader();
 
   // New user (any method) — no profile yet → complete profile step
@@ -1013,9 +1021,33 @@ async function loadProfileAndRoute() {
     }, welcome);
     return;
   }
-  if (currentProfile.role === 'pending') { showPendingScreen(); return; }
-  if (currentProfile.role === 'admin') { await loadFromSupabase(); showAdminApp(); }
-  else if (currentProfile.role === 'player') { await loadFromSupabase(); showPlayerApp(); }
+
+  // User exists
+  if (currentProfile.role === 'pending') {
+    showPendingScreen();
+    return;
+  }
+
+  // Admin or Player — charge les données une seule fois ici
+  if (currentProfile.role === 'admin') {
+    showLoader('Chargement des données…');
+    try {
+      await loadFromSupabase();
+    } catch(e) {
+      console.error('Load data error:', e);
+    }
+    hideLoader();
+    showAdminApp();
+  } else if (currentProfile.role === 'player') {
+    showLoader('Chargement des données…');
+    try {
+      await loadFromSupabase();
+    } catch(e) {
+      console.error('Load data error:', e);
+    }
+    hideLoader();
+    showPlayerApp();
+  }
 }
 
 function showAuthScreen() {
@@ -2597,30 +2629,60 @@ function newTournament() {
 // ═══════════════════════════════════════════════════
 let _routing = false;
 
+async function routeUser(user) {
+  if (_routing) return;
+  _routing = true;
+  currentUser = user;
+  try {
+    showLoader('Chargement…');
+    await loadProfileAndRoute();
+  } catch(e) {
+    console.error('Route error', e);
+    showAuthScreen();
+  } finally {
+    _routing = false;
+  }
+}
+
 async function init() {
   showLoader('Connexion…');
 
-  // Un seul point d'entrée : onAuthStateChange gère tout
-  db.auth.onAuthStateChange(async (event, session) => {
-    if (_routing) return;
-    currentUser = session?.user || null;
+  // Timeout de sécurité : si rien ne se passe en 5s → écran auth
+  const safetyTimer = setTimeout(() => {
+    if (!_routing && !currentUser) {
+      hideLoader();
+      showAuthScreen();
+    }
+  }, 5000);
 
+  // 1. Vérifier immédiatement la session (couvre le redirect OAuth mobile)
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    clearTimeout(safetyTimer);
+    if (session?.user) {
+      await routeUser(session.user);
+    } else {
+      hideLoader();
+      showAuthScreen();
+    }
+  } catch(e) {
+    clearTimeout(safetyTimer);
+    console.error('Session check error:', e);
+    hideLoader();
+    showAuthScreen();
+  }
+
+  // 2. Écouter les changements ultérieurs (déconnexion, refresh token)
+  db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_OUT') {
       _routing = false;
+      currentUser = null;
+      currentProfile = null;
       showAuthScreen();
-      return;
-    }
-    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-      if (currentUser) {
-        _routing = true;
-        try {
-          showLoader('Chargement…');
-          await loadProfileAndRoute();
-        } finally {
-          _routing = false;
-        }
-      } else {
-        showAuthScreen();
+    } else if (event === 'SIGNED_IN' && !_routing) {
+      // Nouveau login (pas le chargement initial déjà géré par getSession)
+      if (session?.user && session.user.id !== currentUser?.id) {
+        await routeUser(session.user);
       }
     }
   });
