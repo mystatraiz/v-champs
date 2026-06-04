@@ -925,10 +925,12 @@ function showCompleteStep(prefillFn, welcomeMsg) {
   if (prefillFn) prefillFn();
 }
 
+const REDIRECT_URL = window.location.origin + window.location.pathname;
+
 async function doGoogleLogin() {
   const { error } = await db.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: { redirectTo: REDIRECT_URL }
   });
   if (error) alert(error.message);
 }
@@ -936,7 +938,7 @@ async function doGoogleLogin() {
 async function doAppleLogin() {
   const { error } = await db.auth.signInWithOAuth({
     provider: 'apple',
-    options: { redirectTo: window.location.href }
+    options: { redirectTo: REDIRECT_URL }
   });
   if (error) alert(error.message);
 }
