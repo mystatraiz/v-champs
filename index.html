@@ -998,8 +998,11 @@ async function loadProfileAndRoute() {
   if (!currentUser) { showAuthScreen(); return; }
 
   try {
-    const { data, error } = await db.from('profiles').select('*').eq('id', currentUser.id).single();
-    if (error && error.code !== 'PGRST116') throw error;
+    const profilePromise = db.from('profiles').select('*').eq('id', currentUser.id).single();
+    const timeoutPromise = new Promise(r => setTimeout(() => r({ data: null, error: { code: 'TIMEOUT' } }), 5000));
+    const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+    if (error && error.code !== 'PGRST116' && error.code !== 'TIMEOUT') throw error;
+    if (error?.code === 'TIMEOUT') console.warn('Profile query timeout');
     currentProfile = data;
   } catch(e) {
     console.error('Profile load error:', e);
@@ -2621,12 +2624,18 @@ function newTournament() {
 async function enterApp(user) {
   currentUser = user;
   showLoader('Chargement…');
+
+  // Sécurité absolue : si rien ne se passe en 8s → auth screen
+  const safety = setTimeout(() => { hideLoader(); showAuthScreen(); }, 8000);
+
   try {
     await loadProfileAndRoute();
   } catch(e) {
     console.error('enterApp error:', e);
     hideLoader();
     showAuthScreen();
+  } finally {
+    clearTimeout(safety);
   }
 }
 
