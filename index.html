@@ -1441,6 +1441,22 @@ function getPlayerRawScore(playerName, excludeSessionId) {
     .reduce((sum, r) => sum + r.points_earned, 0);
 }
 
+// Score utilisé pour le calcul du coefficient : 0 si le joueur a < 3 sessions valides
+// (le coefficient ne s'enclenche qu'à partir de 3 sessions jouées)
+function getPlayerScoreForCoeff(playerName, excludeSessionId) {
+  const cutoff = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  const valid = _playerSessionScores.filter(r =>
+    r.player_name === playerName &&
+    r.session_id !== excludeSessionId &&
+    new Date(r.created_at).getTime() >= cutoff
+  );
+  if (valid.length < 3) return 0;
+  return valid
+    .sort((a, b) => b.points_earned - a.points_earned)
+    .slice(0, 8)
+    .reduce((sum, r) => sum + r.points_earned, 0);
+}
+
 function rankTeamsInSession(teams) {
   return [...teams].sort((a, b) => {
     const pa = (a.wins || 0) * 3 + (a.draws || 0);
@@ -1461,7 +1477,7 @@ async function computeAndSaveSessionScores(session, sessionId) {
   const playerScore = {};
   sortedTeams.forEach(team => {
     (team.players || []).filter(p => p && p.trim()).forEach(name => {
-      if (!(name in playerScore)) playerScore[name] = getPlayerRawScore(name, sessionId);
+      if (!(name in playerScore)) playerScore[name] = getPlayerScoreForCoeff(name, sessionId);
     });
   });
 
