@@ -382,6 +382,12 @@
   .ranking-sub { font-size: 11px; color: var(--text-secondary); }
   .ranking-val { font-size: 18px; font-weight: 800; text-align: right; flex-shrink: 0; }
   .ranking-bar-wrap { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: transparent; }
+  /* ─── Match Timer ─── */
+  .timer-ok   { color: var(--success); }
+  .timer-warn { color: #e8a020; }
+  .timer-over { color: var(--danger); animation: timerPulse 1s ease-in-out infinite; }
+  @keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
   /* ─── History list ─── */
   .history-item {
     display: flex; justify-content: space-between; align-items: center;
@@ -1741,7 +1747,8 @@ function launchNextRound() {
       score1: 0, // sets won (sets mode) or games (games mode)
       score2: 0,
       status: 'active',
-      roundNum: state.roundNum
+      roundNum: state.roundNum,
+      startTime: Date.now()
     };
     state.matches.push(match);
     state.activeMatches.push(match.id);
@@ -1786,6 +1793,10 @@ function renderMatchPhase() {
 
   renderMatchHistory();
   renderStats();
+
+  // Démarrer les timers si des matchs sont en cours
+  if (activeMatches.length) startTimers();
+  else stopTimers();
 }
 
 function buildMatchCard(m) {
@@ -1819,6 +1830,9 @@ function buildMatchCard(m) {
       ? (m.scoreType === 'sets' ? buildSetScoreUI(m) : buildGamesScoreUI(m))
       : buildFinishedScoreUI(m)
     }
+    ${m.status === 'active' && m.startTime ? `
+    <div id="timer-${m.id}" style="text-align:center;margin-top:12px;font-size:22px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;"></div>
+    ` : ''}
   `;
   return div;
 }
@@ -2330,6 +2344,46 @@ function renderGeneralStats() {
 
 // keep for backward compat (called from renderMatchPhase)
 function renderStats() { renderSessionStats(); }
+
+// ═══════════════════════════════════════════════════
+//  MATCH TIMERS
+// ═══════════════════════════════════════════════════
+const MATCH_DURATION = 27 * 60; // 27 minutes en secondes
+let _timerInterval = null;
+
+function startTimers() {
+  if (_timerInterval) clearInterval(_timerInterval);
+  _timerInterval = setInterval(tickTimers, 1000);
+  tickTimers(); // afficher immédiatement
+}
+
+function stopTimers() {
+  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+}
+
+function tickTimers() {
+  const now = Date.now();
+  state.matches
+    .filter(m => m.status === 'active' && m.startTime)
+    .forEach(m => {
+      const el = document.getElementById(`timer-${m.id}`);
+      if (!el) return;
+      const elapsed = Math.floor((now - m.startTime) / 1000);
+      const remaining = MATCH_DURATION - elapsed;
+      if (remaining > 0) {
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        el.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        el.className = remaining > 5 * 60 ? 'timer-ok' : 'timer-warn';
+      } else {
+        const over = Math.abs(remaining);
+        const mins = Math.floor(over / 60);
+        const secs = over % 60;
+        el.textContent = `+${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        el.className = 'timer-over';
+      }
+    });
+}
 
 function esc(s) {
   return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
