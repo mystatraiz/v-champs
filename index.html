@@ -674,14 +674,7 @@
   <main style="max-width:600px;margin:0 auto;padding:16px;">
     <!-- Classement tab -->
     <div id="player-classement">
-      <div class="sub-tabs">
-        <button class="sub-tab active" onclick="switchSubTab('p-vchamps')">V-Champs</button>
-        <button class="sub-tab" onclick="switchSubTab('p-matches')">Matchs</button>
-      </div>
-      <div>
-        <div class="sub-tab-content active" id="sub-p-vchamps"></div>
-        <div class="sub-tab-content" id="sub-p-matches"></div>
-      </div>
+      <div id="sub-p-classement"></div>
     </div>
     <!-- Profil tab -->
     <div id="player-profil" style="display:none;"></div>
@@ -776,14 +769,7 @@
 
   <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
-    <div class="sub-tabs">
-      <button class="sub-tab active" onclick="switchSubTab('vchamps')">V-Champs</button>
-      <button class="sub-tab" onclick="switchSubTab('matches')">Matchs</button>
-    </div>
-    <div>
-      <div class="sub-tab-content active" id="sub-vchamps"></div>
-      <div class="sub-tab-content" id="sub-matches"></div>
-    </div>
+    <div id="sub-classement"></div>
   </section>
 </main>
 
@@ -1129,22 +1115,8 @@ function switchPlayerTab(tab) {
 
 function renderPlayerClassement() {
   const me = currentProfile?.linked_player_name;
-
-  // Sous-onglet V-Champs
-  const vcEl = document.getElementById('sub-p-vchamps');
-  if (vcEl) vcEl.innerHTML = renderVChampsTable(me);
-
-  // Sous-onglet Matchs
-  const matchEl = document.getElementById('sub-p-matches');
-  if (!matchEl) return;
-  const history = getHistory();
-  const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
-  if (!hasData) { matchEl.innerHTML = '<div class="empty-state">Aucune donnée.</div>'; return; }
-  const ps = buildAllPlayerStats(true);
-  const ml = Object.entries(ps)
-    .map(([n, p]) => ({ n, m:p.played, v:p.wins, d:p.losses, nul:p.draws, diff:p.wins-p.losses }))
-    .sort((a, b) => b.diff - a.diff || b.v - a.v);
-  matchEl.innerHTML = playerRankTable(ml, 'matches');
+  const el = document.getElementById('sub-p-classement');
+  if (el) el.innerHTML = renderCombinedRanking(me);
 }
 
 function playerRankTable(list, type) {
@@ -1415,10 +1387,10 @@ async function loadFromSupabase() {
 
   // Backfill V-Champs scores depuis l'historique si aucune donnée (fire & forget)
   backfillSessionScores().then(() => {
-    const el = document.getElementById('sub-vchamps');
-    if (el) el.innerHTML = renderVChampsTable();
-    const elP = document.getElementById('sub-p-vchamps');
-    if (elP) elP.innerHTML = renderVChampsTable(currentProfile?.linked_player_name);
+    const el = document.getElementById('sub-classement');
+    if (el) el.innerHTML = renderCombinedRanking();
+    const elP = document.getElementById('sub-p-classement');
+    if (elP) elP.innerHTML = renderCombinedRanking(currentProfile?.linked_player_name);
   });
 }
 
@@ -1438,6 +1410,8 @@ function archiveCurrentSession() {
   // Calcul et sauvegarde des scores V-Champs
   computeAndSaveSessionScores(sessionEntry, sessionId).then(() => {
     if (document.getElementById('tab-general')?.classList.contains('active')) renderGeneralStats();
+    const elP = document.getElementById('sub-p-classement');
+    if (elP) elP.innerHTML = renderCombinedRanking(currentProfile?.linked_player_name);
   });
 }
 
@@ -1595,29 +1569,52 @@ function computeGlobalRankings() {
 
 function positionLabel(pos) { return pos === 1 ? '1er' : `${pos}e`; }
 
-function renderVChampsTable(highlightPlayer) {
-  const rankings = computeGlobalRankings();
-  if (!rankings.length) {
-    return '<div class="empty-state">Le classement V-Champs apparaîtra après la première session terminée.<br><span style="font-size:12px;color:var(--muted);">Les scores sont calculés à chaque fin de session.</span></div>';
+function renderCombinedRanking(highlightPlayer) {
+  const rankings   = computeGlobalRankings();
+  const matchStats = buildAllPlayerStats(true);
+
+  // Fusionner les joueurs des deux sources
+  const allNames = new Set([...rankings.map(r => r.name), ...Object.keys(matchStats)]);
+  if (!allNames.size) {
+    return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
   }
+
+  const combined = [...allNames].map(name => {
+    const vc = rankings.find(r => r.name === name);
+    const ms = matchStats[name] || { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 };
+    return {
+      name,
+      score:    vc?.score    ?? 0,
+      sessions: vc?.validCount ?? 0,
+      status:   vc?.status   ?? 'inactive',
+      m: ms.played,
+      v: ms.wins,
+      d: ms.losses,
+      n: ms.draws || 0,
+      jDiff: ms.jFor - ms.jAgainst
+    };
+  }).sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+    return b.score - a.score;
+  });
+
   let rank = 0;
-  const rows = rankings.map(p => {
+  const rows = combined.map(p => {
     const active = p.status === 'active';
     if (active) rank++;
     const rc = !active ? 'rank-other' : rank===1?'rank-1':rank===2?'rank-2':rank===3?'rank-3':'rank-other';
-    const rankDisp = active ? rank : '—';
-    const oldest = p.oldestRetainedDate
-      ? new Date(p.oldestRetainedDate).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' })
-      : '—';
+    const dc = p.jDiff > 0 ? 'var(--success)' : p.jDiff < 0 ? 'var(--danger)' : 'var(--text-secondary)';
     const hl = highlightPlayer && p.name === highlightPlayer ? 'background:#1e1a12;' : '';
     return `<tr style="${active ? '' : 'opacity:0.6;'}${hl}">
-      <td><span class="rank-badge ${rc}">${rankDisp}</span></td>
+      <td><span class="rank-badge ${rc}">${active ? rank : '—'}</span></td>
       <td><span class="player-link" onclick="showVChampsPlayerDetail('${esc(p.name)}')">${p.name}</span></td>
-      <td style="font-weight:800;font-size:16px;">${active ? p.score : '—'}</td>
-      <td style="color:var(--text-secondary)">${p.validCount}</td>
-      <td style="color:var(--text-secondary)">${p.retainedCount}/8</td>
-      <td style="color:var(--accent)">${p.bestPerformance || '—'}</td>
-      <td style="color:var(--text-secondary);font-size:12px;">${oldest}</td>
+      <td style="font-weight:800;font-size:15px;">${active ? p.score : '—'}</td>
+      <td style="color:var(--text-secondary)">${p.sessions || '—'}</td>
+      <td>${p.m}</td>
+      <td style="color:var(--success)">${p.v}</td>
+      <td style="color:var(--danger)">${p.d}</td>
+      <td style="color:var(--text-secondary)">${p.n}</td>
+      <td style="font-weight:700;color:${dc}">${p.jDiff > 0 ? '+' : ''}${p.jDiff}</td>
       <td>${active
         ? '<span class="badge badge-active">Actif</span>'
         : '<span class="badge badge-inactive">Inactif</span>'}</td>
@@ -1627,8 +1624,8 @@ function renderVChampsTable(highlightPlayer) {
   return `<div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
     <table class="stats-table">
       <thead><tr>
-        <th>#</th><th>Joueur</th><th>Score</th>
-        <th>Perfs</th><th>Retenues</th><th>Meilleure</th><th>+Ancienne</th><th>Statut</th>
+        <th>#</th><th>Joueur</th><th>Score</th><th>Sessions</th>
+        <th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th><th>Statut</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -2608,39 +2605,8 @@ function rankingListHTML(entries, valFn, subFn, colorFn) {
 
 // ─── General tab: classement cumulé ───
 function renderGeneralStats() {
-  // Sous-onglet V-Champs
-  const vcEl = document.getElementById('sub-vchamps');
-  if (vcEl) vcEl.innerHTML = renderVChampsTable();
-
-  // Sous-onglet Matchs (historique victoires/défaites)
-  const matchEl = document.getElementById('sub-matches');
-  if (!matchEl) return;
-  const history = getHistory();
-  const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
-  if (!hasData) { matchEl.innerHTML = '<div class="empty-state">Aucune donnée pour l\'instant.</div>'; return; }
-
-  const ps = buildAllPlayerStats(true);
-  const matchList = Object.entries(ps)
-    .map(([name, p]) => ({ name, m:p.played, v:p.wins, d:p.losses, n:p.draws, diff:p.wins-p.losses }))
-    .sort((a, b) => b.diff - a.diff || b.v - a.v);
-
-  matchEl.innerHTML = `
-    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
-      <table class="stats-table">
-        <thead><tr><th>#</th><th>Joueur</th><th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th></tr></thead>
-        <tbody>${matchList.map((p, i) => {
-          const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
-          const dc = p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
-          return `<tr>
-            <td><span class="rank-badge ${rc}">${i+1}</span></td>
-            <td><span class="player-link" onclick="showPlayerModal('${esc(p.name)}')">${p.name}</span></td>
-            <td>${p.m}</td><td style="color:var(--success)">${p.v}</td>
-            <td style="color:var(--danger)">${p.d}</td><td style="color:var(--text-secondary)">${p.n}</td>
-            <td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>`;
+  const el = document.getElementById('sub-classement');
+  if (el) el.innerHTML = renderCombinedRanking();
 }
 
 // keep for backward compat (called from renderMatchPhase)
