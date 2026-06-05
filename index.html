@@ -766,7 +766,7 @@
 </div>
 
 <!-- Player Modal -->
-<div class="modal-overlay" id="player-modal" onclick="closePlayerModal(event)">
+<div class="modal-overlay" id="player-modal" onclick="if(event.target===this)forceClosePlayerModal()">
   <div class="modal"></div>
 </div>
 
@@ -2450,7 +2450,7 @@ function showPlayerModal(playerName) {
         <div class="modal-title">${playerName}</div>
         ${team ? `<div class="modal-subtitle">${team.name}</div>` : ''}
       </div>
-      <button class="modal-close" onclick="closePlayerModal()">✕</button>
+      <button class="modal-close" onclick="forceClosePlayerModal()" style="touch-action:manipulation;">✕</button>
     </div>
 
     <!-- Hero: Win Rate + Pills -->
@@ -2560,6 +2560,9 @@ function closePlayerModal(e) {
   if (!e || e.target === document.getElementById('player-modal')) {
     document.getElementById('player-modal').classList.remove('open');
   }
+}
+function forceClosePlayerModal() {
+  document.getElementById('player-modal').classList.remove('open');
 }
 
 // ═══════════════════════════════════════════════════
