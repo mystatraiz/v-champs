@@ -2208,20 +2208,20 @@ function renderSessionStats() {
 
 // ─── Sub-tab switcher ───
 function switchSubTab(sub) {
-  // Find the parent container of sub-tabs to scope correctly
-  const subEl = document.getElementById(`sub-${sub}`);
-  if (!subEl) return;
-  const parent = subEl.closest('div');
-  // Toggle sub-tab buttons in same .sub-tabs sibling
-  const wrapper = subEl.parentElement;
+  const target = document.getElementById(`sub-${sub}`);
+  if (!target) return;
+  const wrapper = target.parentElement;
   const tabsBar = wrapper.previousElementSibling;
+
+  // Masquer tous les contenus, activer celui cliqué
+  wrapper.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
+  target.classList.add('active');
+
+  // Mettre à jour les boutons si la barre de tabs est trouvée
   if (tabsBar?.classList.contains('sub-tabs')) {
-    const names = [...tabsBar.querySelectorAll('.sub-tab')].map((_,i)=>i);
-    tabsBar.querySelectorAll('.sub-tab').forEach((b,i) => {
-      const el = wrapper.querySelectorAll('.sub-tab-content')[i];
-      const match = el?.id === `sub-${sub}`;
-      b.classList.toggle('active', match);
-      if(el) el.classList.toggle('active', match);
+    tabsBar.querySelectorAll('.sub-tab').forEach(btn => {
+      const targetId = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+      btn.classList.toggle('active', targetId === sub);
     });
   }
 }
