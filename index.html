@@ -929,6 +929,7 @@ async function completeProfile() {
   if (!fn || !ln) { err.textContent = 'Prénom et nom sont requis.'; return; }
   if (!nick)      { err.textContent = 'Le surnom est requis.'; return; }
 
+  _routing = true;
   showLoader('Enregistrement…');
   const { count } = await db.from('profiles').select('*', { count: 'exact', head: true });
   const isFirst = (count || 0) === 0;
@@ -939,14 +940,16 @@ async function completeProfile() {
     handedness: hand, preferred_side: side, role,
     linked_player_name: isFirst ? nick : null
   });
-  if (error) { hideLoader(); err.textContent = error.message; return; }
+  if (error) { _routing = false; hideLoader(); err.textContent = error.message; return; }
   if (!isFirst) {
     await db.from('notifications').insert({
       type: 'new_user',
       payload: { user_id: currentUser.id, first_name: fn, last_name: ln, nickname: nick, email: currentUser.email }
     });
   }
-  await loadProfileAndRoute();
+  _routing = false;
+  hideLoader();
+  await routeUser(currentUser);
 }
 
 async function doLogin() {
@@ -978,8 +981,11 @@ async function doRegister() {
   if (digits.length < 8) { err.textContent = 'Numéro de téléphone invalide.'; return; }
   if (pass.length < 6)   { err.textContent = 'Mot de passe : minimum 6 caractères.'; return; }
 
+  // Bloquer onAuthStateChange pendant l'inscription
+  _routing = true;
   showLoader('Création du compte…');
   const { data, error } = await db.auth.signUp({ email: phoneToEmail(phone), password: pass });
+  _routing = false;
   hideLoader();
   if (error) { err.textContent = error.message; return; }
   currentUser = data.user;
