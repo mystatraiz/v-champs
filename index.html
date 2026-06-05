@@ -2647,55 +2647,42 @@ async function routeUser(user) {
 async function init() {
   showLoader('Connexion…');
 
-  // Détecter si on revient d'un redirect OAuth Google
-  const isOAuthCallback = window.location.hash.includes('access_token') ||
-                          window.location.hash.includes('error') ||
-                          window.location.search.includes('code=');
+  let handled = false;
 
-  // Timeout de sécurité : plus long si callback OAuth (Supabase a besoin de temps)
+  // Timeout de sécurité
   const safetyTimer = setTimeout(() => {
-    if (!_routing && !currentUser) {
-      hideLoader();
-      showAuthScreen();
-    }
-  }, isOAuthCallback ? 12000 : 6000);
+    if (!handled) { hideLoader(); showAuthScreen(); }
+  }, 10000);
 
-  // 1. onAuthStateChange en PREMIER — indispensable pour capturer SIGNED_IN après OAuth
+  // 1. onAuthStateChange en premier
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_OUT') {
-      clearTimeout(safetyTimer);
-      _routing = false;
-      currentUser = null;
-      currentProfile = null;
+      handled = false; _routing = false;
+      currentUser = null; currentProfile = null;
       showAuthScreen();
-    } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-      if (!_routing) {
-        clearTimeout(safetyTimer);
+      return;
+    }
+    // SIGNED_IN = nouveau login (Google inclus) | INITIAL_SESSION = session existante
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && !handled) {
+      clearTimeout(safetyTimer);
+      handled = true;
+      if (session?.user) {
         await routeUser(session.user);
-      }
-    } else if (event === 'INITIAL_SESSION' && !session) {
-      // Pas de session ET pas callback OAuth → afficher auth
-      if (!isOAuthCallback) {
-        clearTimeout(safetyTimer);
+      } else {
         hideLoader();
         showAuthScreen();
       }
     }
   });
 
-  // 2. Vérifier la session existante (utilisateurs déjà connectés)
-  if (!isOAuthCallback) {
-    try {
-      const { data: { session } } = await db.auth.getSession();
-      if (session?.user && !_routing) {
-        clearTimeout(safetyTimer);
-        await routeUser(session.user);
-      }
-    } catch(e) {
-      console.error('Session check error:', e);
-    }
+  // 2. getSession() déclenche l'échange du code PKCE si ?code= est dans l'URL
+  //    et fait aussi office de vérification de session existante
+  try {
+    await db.auth.getSession();
+  } catch(e) {
+    console.error('getSession error:', e);
+    if (!handled) { hideLoader(); showAuthScreen(); }
   }
-  // Si callback OAuth → laisser onAuthStateChange gérer le SIGNED_IN
 }
 
 init();
