@@ -394,6 +394,23 @@
     padding: 10px 0; border-bottom: 1px solid #2a2a2a; font-size: 13px;
   }
   .history-item:last-child { border-bottom: none; }
+  /* ─── V-Champs Ranking ─── */
+  .badge-inactive { background: #2a1010; color: #e74c3c; border: 1px solid #c0392b; }
+  .perf-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid #2a2a2a; font-size: 13px;
+  }
+  .perf-item:last-child { border-bottom: none; }
+  .perf-pos {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .perf-pos-1 { background: #c8a96e; color: var(--black); }
+  .perf-pos-2 { background: #aaa; color: var(--black); }
+  .perf-pos-3 { background: #8B6914; color: var(--white); }
+  .perf-pos-4 { background: var(--border); color: var(--text-secondary); }
+
   /* ─── Scrollbar ─── */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--dark); }
@@ -653,7 +670,14 @@
   <main style="max-width:600px;margin:0 auto;padding:16px;">
     <!-- Classement tab -->
     <div id="player-classement">
-      <div id="sub-p-matches"></div>
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchSubTab('p-vchamps')">V-Champs</button>
+        <button class="sub-tab" onclick="switchSubTab('p-matches')">Matchs</button>
+      </div>
+      <div>
+        <div class="sub-tab-content active" id="sub-p-vchamps"></div>
+        <div class="sub-tab-content" id="sub-p-matches"></div>
+      </div>
     </div>
     <!-- Profil tab -->
     <div id="player-profil" style="display:none;"></div>
@@ -748,7 +772,14 @@
 
   <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
-    <div id="sub-matches"></div>
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="switchSubTab('vchamps')">V-Champs</button>
+      <button class="sub-tab" onclick="switchSubTab('matches')">Matchs</button>
+    </div>
+    <div>
+      <div class="sub-tab-content active" id="sub-vchamps"></div>
+      <div class="sub-tab-content" id="sub-matches"></div>
+    </div>
   </section>
 </main>
 
@@ -1100,13 +1131,23 @@ function switchPlayerTab(tab) {
 }
 
 function renderPlayerClassement() {
+  const me = currentProfile?.linked_player_name;
+
+  // Sous-onglet V-Champs
+  const vcEl = document.getElementById('sub-p-vchamps');
+  if (vcEl) vcEl.innerHTML = renderVChampsTable(me);
+
+  // Sous-onglet Matchs
+  const matchEl = document.getElementById('sub-p-matches');
+  if (!matchEl) return;
   const history = getHistory();
-  const hasData = history.length>0 || (state.sessionStarted&&state.matches.some(m=>m.status==='finished'));
-  const empty = '<div class="empty-state">Aucune donnée.</div>';
-  if (!hasData) { document.getElementById('sub-p-matches').innerHTML=empty; return; }
+  const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
+  if (!hasData) { matchEl.innerHTML = '<div class="empty-state">Aucune donnée.</div>'; return; }
   const ps = buildAllPlayerStats(true);
-  const ml=Object.entries(ps).map(([n,p])=>({n,m:p.played,v:p.wins,d:p.losses,nul:p.draws,diff:p.wins-p.losses})).sort((a,b)=>b.diff-a.diff||b.v-a.v);
-  document.getElementById('sub-p-matches').innerHTML=playerRankTable(ml,'matches');
+  const ml = Object.entries(ps)
+    .map(([n, p]) => ({ n, m:p.played, v:p.wins, d:p.losses, nul:p.draws, diff:p.wins-p.losses }))
+    .sort((a, b) => b.diff - a.diff || b.v - a.v);
+  matchEl.innerHTML = playerRankTable(ml, 'matches');
 }
 
 function playerRankTable(list, type) {
@@ -1324,12 +1365,13 @@ async function loadFromSupabase() {
         db.from('app_state').select('value').eq('key','current_session').maybeSingle(),
         db.from('app_state').select('value').eq('key','session_history').maybeSingle(),
         db.from('pair_names').select('pair_key,team_name'),
-        db.from('known_players').select('name')
+        db.from('known_players').select('name'),
+        db.from('player_session_scores').select('*')
       ]),
       timeout.then(() => null)
     ]);
     if (!result) { console.warn('loadFromSupabase timeout'); return; }
-    const [sd, hd, pd, kd] = result;
+    const [sd, hd, pd, kd, psd] = result;
     if (sd.data?.value) {
       state = sd.data.value;
       if (!state.pairNameMap) state.pairNameMap = {};
@@ -1337,9 +1379,18 @@ async function loadFromSupabase() {
     if (hd.data?.value) _history = hd.data.value;
     if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
     if (kd.data) _knownPlayers = kd.data.map(r => r.name);
+    if (psd?.data) _playerSessionScores = psd.data;
   } catch(e) {
     console.error('Supabase load error', e);
   }
+
+  // Backfill V-Champs scores depuis l'historique si aucune donnée (fire & forget)
+  backfillSessionScores().then(() => {
+    const el = document.getElementById('sub-vchamps');
+    if (el) el.innerHTML = renderVChampsTable();
+    const elP = document.getElementById('sub-p-vchamps');
+    if (elP) elP.innerHTML = renderVChampsTable(currentProfile?.linked_player_name);
+  });
 }
 
 // ─── Session history ───
@@ -1347,12 +1398,298 @@ function getHistory() { return _history; }
 
 function archiveCurrentSession() {
   if (!state.sessionStarted || !state.matches.some(m => m.status === 'finished')) return;
-  _history.push({
-    date: new Date().toISOString(),
+  const sessionId = new Date().toISOString();
+  const sessionEntry = {
+    date: sessionId,
     teams: JSON.parse(JSON.stringify(state.teams)),
     matches: state.matches.filter(m => m.status === 'finished')
-  });
+  };
+  _history.push(sessionEntry);
   db.from('app_state').upsert({ key: 'session_history', value: _history, updated_at: new Date().toISOString() }).then();
+  // Calcul et sauvegarde des scores V-Champs
+  computeAndSaveSessionScores(sessionEntry, sessionId).then(() => {
+    if (document.getElementById('tab-general')?.classList.contains('active')) renderGeneralStats();
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  V-CHAMPS RANKING SYSTEM
+// ═══════════════════════════════════════════════════
+const BASE_POINTS_BY_POS = { 1: 100, 2: 75, 3: 50, 4: 25 };
+let _playerSessionScores = [];
+
+function getDiffCoeff(diff) {
+  if (diff >= 300)  return 0.80;
+  if (diff >= 200)  return 0.90;
+  if (diff >= 100)  return 0.95;
+  if (diff >= -99)  return 1.00;
+  if (diff >= -199) return 1.10;
+  if (diff >= -299) return 1.20;
+  return 1.30;
+}
+
+function getPlayerRawScore(playerName, excludeSessionId) {
+  const cutoff = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  return _playerSessionScores
+    .filter(r =>
+      r.player_name === playerName &&
+      r.session_id !== excludeSessionId &&
+      new Date(r.created_at).getTime() >= cutoff
+    )
+    .sort((a, b) => b.points_earned - a.points_earned)
+    .slice(0, 8)
+    .reduce((sum, r) => sum + r.points_earned, 0);
+}
+
+function rankTeamsInSession(teams) {
+  return [...teams].sort((a, b) => {
+    const pa = (a.wins || 0) * 3 + (a.draws || 0);
+    const pb = (b.wins || 0) * 3 + (b.draws || 0);
+    if (pa !== pb) return pb - pa;
+    const da = (a.pointsFor || 0) - (a.pointsAgainst || 0);
+    const db = (b.pointsFor || 0) - (b.pointsAgainst || 0);
+    if (da !== db) return db - da;
+    return (b.pointsFor || 0) - (a.pointsFor || 0);
+  });
+}
+
+async function computeAndSaveSessionScores(session, sessionId) {
+  if (!session.teams || session.teams.length < 4) return [];
+  const sortedTeams = rankTeamsInSession(session.teams);
+
+  // Scores des joueurs AVANT cette session (on l'exclut du calcul)
+  const playerScore = {};
+  sortedTeams.forEach(team => {
+    (team.players || []).filter(p => p && p.trim()).forEach(name => {
+      if (!(name in playerScore)) playerScore[name] = getPlayerRawScore(name, sessionId);
+    });
+  });
+
+  const strengths = sortedTeams.map(team =>
+    (team.players || []).filter(p => p && p.trim())
+      .reduce((s, p) => s + (playerScore[p] || 0), 0)
+  );
+
+  const records = [];
+  sortedTeams.forEach((team, idx) => {
+    const position = idx + 1;
+    const basePoints = BASE_POINTS_BY_POS[position] || 25;
+    const myStrength = strengths[idx];
+    const others = strengths.filter((_, i) => i !== idx);
+    const avgOpp = others.length ? others.reduce((s, v) => s + v, 0) / others.length : 0;
+    const diff = myStrength - avgOpp;
+    const coeff = getDiffCoeff(diff);
+    const pointsEarned = Math.round(basePoints * coeff);
+
+    (team.players || []).filter(p => p && p.trim()).forEach(playerName => {
+      records.push({
+        player_name: playerName,
+        session_id: sessionId,
+        position,
+        base_points: basePoints,
+        coefficient: coeff,
+        points_earned: pointsEarned,
+        team_strength: myStrength,
+        avg_opp_strength: Math.round(avgOpp),
+        created_at: sessionId
+      });
+    });
+  });
+
+  if (records.length) {
+    try {
+      await db.from('player_session_scores').upsert(records, { onConflict: 'player_name,session_id' });
+    } catch(e) {
+      console.warn('player_session_scores upsert failed:', e);
+    }
+    _playerSessionScores = _playerSessionScores
+      .filter(r => r.session_id !== sessionId)
+      .concat(records);
+  }
+  return records;
+}
+
+async function backfillSessionScores() {
+  if (_playerSessionScores.length > 0) return;
+  if (!_history.length) return;
+  const sorted = [..._history].sort((a, b) => new Date(a.date) - new Date(b.date));
+  for (const session of sorted) {
+    if (session.date && session.teams?.length >= 4) {
+      await computeAndSaveSessionScores(session, session.date);
+    }
+  }
+}
+
+function computeGlobalRankings() {
+  const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  const byPlayer = {};
+  _playerSessionScores.forEach(r => {
+    (byPlayer[r.player_name] = byPlayer[r.player_name] || []).push(r);
+  });
+
+  return Object.entries(byPlayer).map(([name, perfs]) => {
+    const valid = perfs.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
+    const sorted = [...valid].sort((a, b) => b.points_earned - a.points_earned);
+    const retained = sorted.slice(0, 8);
+    const score = retained.reduce((s, r) => s + r.points_earned, 0);
+    return {
+      name,
+      score,
+      validCount: valid.length,
+      retainedCount: retained.length,
+      bestPerformance: retained[0]?.points_earned ?? 0,
+      oldestRetainedDate: retained[retained.length - 1]?.created_at ?? null,
+      status: valid.length >= 4 ? 'active' : 'inactive',
+      allPerformances: perfs
+    };
+  }).sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+    return b.score - a.score;
+  });
+}
+
+function positionLabel(pos) { return pos === 1 ? '1er' : `${pos}e`; }
+
+function renderVChampsTable(highlightPlayer) {
+  const rankings = computeGlobalRankings();
+  if (!rankings.length) {
+    return '<div class="empty-state">Le classement V-Champs apparaîtra après la première session terminée.<br><span style="font-size:12px;color:var(--muted);">Les scores sont calculés à chaque fin de session.</span></div>';
+  }
+  let rank = 0;
+  const rows = rankings.map(p => {
+    const active = p.status === 'active';
+    if (active) rank++;
+    const rc = !active ? 'rank-other' : rank===1?'rank-1':rank===2?'rank-2':rank===3?'rank-3':'rank-other';
+    const rankDisp = active ? rank : '—';
+    const oldest = p.oldestRetainedDate
+      ? new Date(p.oldestRetainedDate).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' })
+      : '—';
+    const hl = highlightPlayer && p.name === highlightPlayer ? 'background:#1e1a12;' : '';
+    return `<tr style="${active ? '' : 'opacity:0.6;'}${hl}">
+      <td><span class="rank-badge ${rc}">${rankDisp}</span></td>
+      <td><span class="player-link" onclick="showVChampsPlayerDetail('${esc(p.name)}')">${p.name}</span></td>
+      <td style="font-weight:800;font-size:16px;">${active ? p.score : '—'}</td>
+      <td style="color:var(--text-secondary)">${p.validCount}</td>
+      <td style="color:var(--text-secondary)">${p.retainedCount}/8</td>
+      <td style="color:var(--accent)">${p.bestPerformance || '—'}</td>
+      <td style="color:var(--text-secondary);font-size:12px;">${oldest}</td>
+      <td>${active
+        ? '<span class="badge badge-active">Actif</span>'
+        : '<span class="badge badge-inactive">Inactif</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
+    <table class="stats-table">
+      <thead><tr>
+        <th>#</th><th>Joueur</th><th>Score</th>
+        <th>Perfs</th><th>Retenues</th><th>Meilleure</th><th>+Ancienne</th><th>Statut</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function showVChampsPlayerDetail(playerName) {
+  const rankings = computeGlobalRankings();
+  const player = rankings.find(p => p.name === playerName);
+  const modal = document.getElementById('player-modal');
+
+  if (!player) {
+    modal.querySelector('.modal').innerHTML = `
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <div><div class="modal-title">${playerName}</div></div>
+        <button class="modal-close" onclick="forceClosePlayerModal()">✕</button>
+      </div>
+      <div class="empty-state">Aucune donnée V-Champs.</div>`;
+    modal.classList.add('open');
+    return;
+  }
+
+  const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  const validPerfs = player.allPerformances.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
+  const sortedValid = [...validPerfs].sort((a, b) => b.points_earned - a.points_earned);
+  const retained = sortedValid.slice(0, 8);
+  const retainedIds = new Set(retained.map(r => r.session_id));
+  const notRetained = sortedValid.slice(8);
+  const expired = player.allPerformances
+    .filter(p => new Date(p.created_at).getTime() < cutoffMs)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  function perfRow(r, dimmed) {
+    const expireTs = new Date(r.created_at).getTime() + 180 * 24 * 60 * 60 * 1000;
+    const daysLeft = Math.max(0, Math.ceil((expireTs - Date.now()) / (24 * 60 * 60 * 1000)));
+    const dateStr = new Date(r.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    const posClass = `perf-pos-${r.position}`;
+    const c = r.coefficient;
+    const coeffColor = c > 1 ? 'var(--success)' : c < 1 ? 'var(--danger)' : 'var(--text-secondary)';
+    const isExpired = dimmed === 'expired';
+    return `<div class="perf-item" style="${dimmed?'opacity:0.45':''}">
+      <div class="perf-pos ${posClass}">${r.position}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;">${dateStr}</div>
+        <div style="font-size:11px;color:var(--text-secondary);">${positionLabel(r.position)} · <span style="color:${coeffColor}">×${c.toFixed(2)}</span> · base ${r.base_points}pts</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:16px;font-weight:800;${isExpired?'color:var(--text-secondary)':''}">${r.points_earned} pts</div>
+        <div style="font-size:10px;color:var(--muted);">${isExpired ? 'Expirée' : daysLeft + 'j restants'}</div>
+      </div>
+    </div>`;
+  }
+
+  const statusBadge = player.status === 'active'
+    ? '<span class="badge badge-active">Actif</span>'
+    : '<span class="badge badge-inactive">Inactif</span>';
+
+  modal.querySelector('.modal').innerHTML = `
+    <div class="modal-drag"></div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">${playerName}</div>
+        <div class="modal-subtitle">${player.score} pts V-Champs &nbsp;${statusBadge}</div>
+      </div>
+      <button class="modal-close" onclick="forceClosePlayerModal()" style="touch-action:manipulation;">✕</button>
+    </div>
+
+    <div style="display:flex;gap:8px;padding:12px 20px 0;flex-wrap:wrap;">
+      <div class="stat-pill" style="flex:1;min-width:90px;">
+        <span class="stat-pill-label">SCORE</span>
+        <span class="stat-pill-val">${player.score}</span>
+      </div>
+      <div class="stat-pill" style="flex:1;min-width:90px;">
+        <span class="stat-pill-label">SESSIONS VALIDES</span>
+        <span class="stat-pill-val">${player.validCount}</span>
+      </div>
+      <div class="stat-pill" style="flex:1;min-width:90px;">
+        <span class="stat-pill-label">MEILLEURE</span>
+        <span class="stat-pill-val" style="color:var(--accent)">${player.bestPerformance}</span>
+      </div>
+    </div>
+
+    ${retained.length ? `
+    <div class="modal-sep"></div>
+    <div class="modal-history">
+      <div class="history-label">Retenues (${retained.length}/8)</div>
+      ${retained.map(r => perfRow(r, false)).join('')}
+    </div>` : ''}
+
+    ${notRetained.length ? `
+    <div class="modal-sep"></div>
+    <div class="modal-history">
+      <div class="history-label" style="color:var(--muted);">Non retenues (${notRetained.length})</div>
+      ${notRetained.map(r => perfRow(r, 'dim')).join('')}
+    </div>` : ''}
+
+    ${expired.length ? `
+    <div class="modal-sep"></div>
+    <div class="modal-history">
+      <div class="history-label" style="color:var(--muted);">Expirées (${expired.length})</div>
+      ${expired.map(r => perfRow(r, 'expired')).join('')}
+    </div>` : ''}
+  `;
+
+  modal.classList.add('open');
 }
 
 // Build aggregated player stats from all sessions (history + optional current)
@@ -1389,10 +1726,7 @@ function buildAllPlayerStats(includeCurrent = true) {
   });
   return stats;
 }
-function savePairNames() {
-  localStorage.setItem('vchamps_pairnames', JSON.stringify(state.pairNameMap));
-}
-// getAllKnownPlayers / addKnownPlayers / savePairNames defined in SUPABASE section above
+// savePairNames / addKnownPlayers / getAllKnownPlayers définis dans la section SUPABASE ci-dessus
 
 // ═══════════════════════════════════════════════════
 //  SETUP
@@ -2229,21 +2563,27 @@ function rankingListHTML(entries, valFn, subFn, colorFn) {
 
 // ─── General tab: classement cumulé ───
 function renderGeneralStats() {
+  // Sous-onglet V-Champs
+  const vcEl = document.getElementById('sub-vchamps');
+  if (vcEl) vcEl.innerHTML = renderVChampsTable();
+
+  // Sous-onglet Matchs (historique victoires/défaites)
+  const matchEl = document.getElementById('sub-matches');
+  if (!matchEl) return;
   const history = getHistory();
   const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
-  const empty = '<div class="empty-state">Aucune donnée pour l\'instant.</div>';
-  if (!hasData) { document.getElementById('sub-matches').innerHTML = empty; return; }
+  if (!hasData) { matchEl.innerHTML = '<div class="empty-state">Aucune donnée pour l\'instant.</div>'; return; }
 
   const ps = buildAllPlayerStats(true);
   const matchList = Object.entries(ps)
-    .map(([name, p]) => ({name, m:p.played, v:p.wins, d:p.losses, n:p.draws, diff:p.wins-p.losses}))
-    .sort((a,b) => b.diff-a.diff || b.v-a.v);
+    .map(([name, p]) => ({ name, m:p.played, v:p.wins, d:p.losses, n:p.draws, diff:p.wins-p.losses }))
+    .sort((a, b) => b.diff - a.diff || b.v - a.v);
 
-  document.getElementById('sub-matches').innerHTML = `
+  matchEl.innerHTML = `
     <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
       <table class="stats-table">
         <thead><tr><th>#</th><th>Joueur</th><th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th></tr></thead>
-        <tbody>${matchList.map((p,i) => {
+        <tbody>${matchList.map((p, i) => {
           const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
           const dc = p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
           return `<tr>
