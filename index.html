@@ -1334,13 +1334,19 @@ function getAllKnownPlayers() { return _knownPlayers; }
 
 // ─── Load on init ───
 async function loadFromSupabase() {
+  const timeout = new Promise(resolve => setTimeout(resolve, 5000));
   try {
-    const [sd, hd, pd, kd] = await Promise.all([
-      db.from('app_state').select('value').eq('key','current_session').maybeSingle(),
-      db.from('app_state').select('value').eq('key','session_history').maybeSingle(),
-      db.from('pair_names').select('pair_key,team_name'),
-      db.from('known_players').select('name')
+    const result = await Promise.race([
+      Promise.all([
+        db.from('app_state').select('value').eq('key','current_session').maybeSingle(),
+        db.from('app_state').select('value').eq('key','session_history').maybeSingle(),
+        db.from('pair_names').select('pair_key,team_name'),
+        db.from('known_players').select('name')
+      ]),
+      timeout.then(() => null)
     ]);
+    if (!result) { console.warn('loadFromSupabase timeout'); return; }
+    const [sd, hd, pd, kd] = result;
     if (sd.data?.value) state = sd.data.value;
     if (hd.data?.value) _history = hd.data.value;
     if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
@@ -2618,13 +2624,24 @@ async function routeUser(user) {
   if (_routing) return;
   _routing = true;
   currentUser = user;
+  showLoader('Chargement…');
+
+  // Timeout 8s — si le chargement du profil/data bloque, on affiche l'auth
+  const bailout = setTimeout(() => {
+    console.warn('routeUser timeout');
+    _routing = false;
+    hideLoader();
+    showAuthScreen();
+  }, 8000);
+
   try {
-    showLoader('Chargement…');
     await loadProfileAndRoute();
   } catch(e) {
     console.error('Route error', e);
+    hideLoader();
     showAuthScreen();
   } finally {
+    clearTimeout(bailout);
     _routing = false;
   }
 }
