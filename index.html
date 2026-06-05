@@ -1573,7 +1573,6 @@ function renderCombinedRanking(highlightPlayer) {
   const rankings   = computeGlobalRankings();
   const matchStats = buildAllPlayerStats(true);
 
-  // Fusionner les joueurs des deux sources
   const allNames = new Set([...rankings.map(r => r.name), ...Object.keys(matchStats)]);
   if (!allNames.size) {
     return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
@@ -1586,38 +1585,29 @@ function renderCombinedRanking(highlightPlayer) {
       name,
       score:    vc?.score    ?? 0,
       sessions: vc?.validCount ?? 0,
-      status:   vc?.status   ?? 'inactive',
       m: ms.played,
       v: ms.wins,
       d: ms.losses,
       n: ms.draws || 0,
       jDiff: ms.jFor - ms.jAgainst
     };
-  }).sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
-    return b.score - a.score;
-  });
+  }).filter(p => p.sessions >= 1 || p.m >= 1)
+    .sort((a, b) => b.score - a.score || b.m - a.m);
 
-  let rank = 0;
-  const rows = combined.map(p => {
-    const active = p.status === 'active';
-    if (active) rank++;
-    const rc = !active ? 'rank-other' : rank===1?'rank-1':rank===2?'rank-2':rank===3?'rank-3':'rank-other';
+  const rows = combined.map((p, i) => {
+    const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
     const dc = p.jDiff > 0 ? 'var(--success)' : p.jDiff < 0 ? 'var(--danger)' : 'var(--text-secondary)';
     const hl = highlightPlayer && p.name === highlightPlayer ? 'background:#1e1a12;' : '';
-    return `<tr style="${active ? '' : 'opacity:0.6;'}${hl}">
-      <td><span class="rank-badge ${rc}">${active ? rank : '—'}</span></td>
+    return `<tr style="${hl}">
+      <td><span class="rank-badge ${rc}">${i + 1}</span></td>
       <td><span class="player-link" onclick="showVChampsPlayerDetail('${esc(p.name)}')">${p.name}</span></td>
-      <td style="font-weight:800;font-size:15px;">${active ? p.score : '—'}</td>
+      <td style="font-weight:800;font-size:15px;">${p.score || '—'}</td>
       <td style="color:var(--text-secondary)">${p.sessions || '—'}</td>
       <td>${p.m}</td>
       <td style="color:var(--success)">${p.v}</td>
       <td style="color:var(--danger)">${p.d}</td>
       <td style="color:var(--text-secondary)">${p.n}</td>
       <td style="font-weight:700;color:${dc}">${p.jDiff > 0 ? '+' : ''}${p.jDiff}</td>
-      <td>${active
-        ? '<span class="badge badge-active">Actif</span>'
-        : '<span class="badge badge-inactive">Inactif</span>'}</td>
     </tr>`;
   }).join('');
 
@@ -1625,7 +1615,7 @@ function renderCombinedRanking(highlightPlayer) {
     <table class="stats-table">
       <thead><tr>
         <th>#</th><th>Joueur</th><th>Score</th><th>Sessions</th>
-        <th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th><th>Statut</th>
+        <th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
