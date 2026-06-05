@@ -958,9 +958,14 @@ async function doLogin() {
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 8) { err.textContent = 'Numéro de téléphone invalide.'; return; }
   showLoader('Connexion…');
-  const { error } = await db.auth.signInWithPassword({ email: phoneToEmail(phone), password: pass });
-  hideLoader();
-  if (error) err.textContent = 'Numéro ou mot de passe incorrect.';
+  const { data, error } = await db.auth.signInWithPassword({ email: phoneToEmail(phone), password: pass });
+  if (error) {
+    hideLoader();
+    err.textContent = 'Numéro ou mot de passe incorrect.';
+    return;
+  }
+  // Connexion réussie → router directement sans attendre onAuthStateChange
+  await routeUser(data.user);
 }
 
 async function doRegister() {
@@ -1022,23 +1027,11 @@ async function loadProfileAndRoute() {
 
   // Admin or Player — charge les données une seule fois ici
   if (currentProfile.role === 'admin') {
-    showLoader('Chargement des données…');
-    try {
-      await loadFromSupabase();
-    } catch(e) {
-      console.error('Load data error:', e);
-    }
-    hideLoader();
-    showAdminApp();
+    try { await loadFromSupabase(); } catch(e) { console.error('loadFromSupabase:', e); }
+    try { showAdminApp(); } catch(e) { console.error('showAdminApp:', e); }
   } else if (currentProfile.role === 'player') {
-    showLoader('Chargement des données…');
-    try {
-      await loadFromSupabase();
-    } catch(e) {
-      console.error('Load data error:', e);
-    }
-    hideLoader();
-    showPlayerApp();
+    try { await loadFromSupabase(); } catch(e) { console.error('loadFromSupabase:', e); }
+    try { showPlayerApp(); } catch(e) { console.error('showPlayerApp:', e); }
   }
 }
 
@@ -1347,7 +1340,10 @@ async function loadFromSupabase() {
     ]);
     if (!result) { console.warn('loadFromSupabase timeout'); return; }
     const [sd, hd, pd, kd] = result;
-    if (sd.data?.value) state = sd.data.value;
+    if (sd.data?.value) {
+      state = sd.data.value;
+      if (!state.pairNameMap) state.pairNameMap = {};
+    }
     if (hd.data?.value) _history = hd.data.value;
     if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
     if (kd.data) _knownPlayers = kd.data.map(r => r.name);
