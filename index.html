@@ -653,14 +653,7 @@
   <main style="max-width:600px;margin:0 auto;padding:16px;">
     <!-- Classement tab -->
     <div id="player-classement">
-      <div class="sub-tabs">
-        <button class="sub-tab active" onclick="switchSubTab('p-matches')">Matchs</button>
-        <button class="sub-tab" onclick="switchSubTab('p-jeux')">Jeux</button>
-        <button class="sub-tab" onclick="switchSubTab('p-teams')">Équipes</button>
-      </div>
-      <div class="sub-tab-content active" id="sub-p-matches"></div>
-      <div class="sub-tab-content" id="sub-p-jeux"></div>
-      <div class="sub-tab-content" id="sub-p-teams"></div>
+      <div id="sub-p-matches"></div>
     </div>
     <!-- Profil tab -->
     <div id="player-profil" style="display:none;"></div>
@@ -755,14 +748,7 @@
 
   <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
-    <div class="sub-tabs">
-      <button class="sub-tab active" onclick="switchSubTab('matches')">Matchs</button>
-      <button class="sub-tab" onclick="switchSubTab('jeux')">Jeux</button>
-      <button class="sub-tab" onclick="switchSubTab('teams')">Équipes</button>
-    </div>
-    <div class="sub-tab-content active" id="sub-matches"></div>
-    <div class="sub-tab-content" id="sub-jeux"></div>
-    <div class="sub-tab-content" id="sub-teams"></div>
+    <div id="sub-matches"></div>
   </section>
 </main>
 
@@ -1114,21 +1100,13 @@ function switchPlayerTab(tab) {
 }
 
 function renderPlayerClassement() {
-  // Reuse general stats but in player sub-tabs
   const history = getHistory();
   const hasData = history.length>0 || (state.sessionStarted&&state.matches.some(m=>m.status==='finished'));
   const empty = '<div class="empty-state">Aucune donnée.</div>';
-  if (!hasData) { ['p-matches','p-jeux','p-teams'].forEach(s=>{ document.getElementById(`sub-${s}`).innerHTML=empty; }); return; }
+  if (!hasData) { document.getElementById('sub-p-matches').innerHTML=empty; return; }
   const ps = buildAllPlayerStats(true);
-  // Matchs
   const ml=Object.entries(ps).map(([n,p])=>({n,m:p.played,v:p.wins,d:p.losses,nul:p.draws,diff:p.wins-p.losses})).sort((a,b)=>b.diff-a.diff||b.v-a.v);
   document.getElementById('sub-p-matches').innerHTML=playerRankTable(ml,'matches');
-  // Jeux
-  const jl=Object.entries(ps).map(([n,p])=>({n,g:p.jFor,p2:p.jAgainst,diff:p.jFor-p.jAgainst})).sort((a,b)=>b.diff-a.diff);
-  document.getElementById('sub-p-jeux').innerHTML=playerRankTable(jl,'jeux');
-  // Teams
-  const teams=buildTeamStats();
-  document.getElementById('sub-p-teams').innerHTML=playerRankTable(teams,'teams');
 }
 
 function playerRankTable(list, type) {
@@ -2254,14 +2232,9 @@ function renderGeneralStats() {
   const history = getHistory();
   const hasData = history.length > 0 || (state.sessionStarted && state.matches.some(m => m.status === 'finished'));
   const empty = '<div class="empty-state">Aucune donnée pour l\'instant.</div>';
-  if (!hasData) {
-    ['matches','jeux','teams'].forEach(s => { document.getElementById(`sub-${s}`).innerHTML = empty; });
-    return;
-  }
+  if (!hasData) { document.getElementById('sub-matches').innerHTML = empty; return; }
 
   const ps = buildAllPlayerStats(true);
-
-  // ── Tab 1: Matchs — M V D N +/- ──
   const matchList = Object.entries(ps)
     .map(([name, p]) => ({name, m:p.played, v:p.wins, d:p.losses, n:p.draws, diff:p.wins-p.losses}))
     .sort((a,b) => b.diff-a.diff || b.v-a.v);
@@ -2269,73 +2242,16 @@ function renderGeneralStats() {
   document.getElementById('sub-matches').innerHTML = `
     <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
       <table class="stats-table">
-        <thead><tr>
-          <th>#</th><th>Joueur</th><th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th>
-        </tr></thead>
+        <thead><tr><th>#</th><th>Joueur</th><th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th></tr></thead>
         <tbody>${matchList.map((p,i) => {
           const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
           const dc = p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
           return `<tr>
             <td><span class="rank-badge ${rc}">${i+1}</span></td>
             <td><span class="player-link" onclick="showPlayerModal('${esc(p.name)}')">${p.name}</span></td>
-            <td>${p.m}</td>
-            <td style="color:var(--success)">${p.v}</td>
-            <td style="color:var(--danger)">${p.d}</td>
-            <td style="color:var(--text-secondary)">${p.n}</td>
+            <td>${p.m}</td><td style="color:var(--success)">${p.v}</td>
+            <td style="color:var(--danger)">${p.d}</td><td style="color:var(--text-secondary)">${p.n}</td>
             <td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>`;
-
-  // ── Tab 2: Jeux — G P +/- ──
-  const jeuxList = Object.entries(ps)
-    .map(([name, p]) => ({name, g:p.jFor, pe:p.jAgainst, diff:p.jFor-p.jAgainst}))
-    .sort((a,b) => b.diff-a.diff || b.g-a.g);
-
-  document.getElementById('sub-jeux').innerHTML = `
-    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
-      <table class="stats-table">
-        <thead><tr>
-          <th>#</th><th>Joueur</th><th>G</th><th>P</th><th>+/-</th>
-        </tr></thead>
-        <tbody>${jeuxList.map((p,i) => {
-          const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
-          const dc = p.diff>0?'var(--success)':p.diff<0?'var(--danger)':'var(--text-secondary)';
-          return `<tr>
-            <td><span class="rank-badge ${rc}">${i+1}</span></td>
-            <td><span class="player-link" onclick="showPlayerModal('${esc(p.name)}')">${p.name}</span></td>
-            <td style="color:var(--success)">${p.g}</td>
-            <td style="color:var(--danger)">${p.pe}</td>
-            <td style="font-weight:800;color:${dc}">${p.diff>0?'+':''}${p.diff}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>`;
-
-  // ── Tab 3: Équipes — M V D N J+ J- +/- ──
-  const teamsList = buildTeamStats();
-
-  document.getElementById('sub-teams').innerHTML = `
-    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;">
-      <table class="stats-table">
-        <thead><tr>
-          <th>#</th><th>Équipe</th><th>M</th><th>V</th><th>D</th><th>N</th><th>J+</th><th>J-</th><th>+/-</th>
-        </tr></thead>
-        <tbody>${teamsList.map((t,i) => {
-          const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
-          const diff = t.jFor-t.jAgainst;
-          const dc = diff>0?'var(--success)':diff<0?'var(--danger)':'var(--text-secondary)';
-          return `<tr>
-            <td><span class="rank-badge ${rc}">${i+1}</span></td>
-            <td style="color:var(--accent);font-weight:700;">${t.name}<br><span style="color:var(--text-secondary);font-size:11px;font-weight:400;">${t.players.join(' / ')}</span></td>
-            <td>${t.played}</td>
-            <td style="color:var(--success)">${t.wins}</td>
-            <td style="color:var(--danger)">${t.losses}</td>
-            <td style="color:var(--text-secondary)">${t.draws}</td>
-            <td>${t.jFor}</td>
-            <td>${t.jAgainst}</td>
-            <td style="font-weight:800;color:${dc}">${diff>0?'+':''}${diff}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>
