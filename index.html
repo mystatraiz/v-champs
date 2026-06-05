@@ -1334,27 +1334,20 @@ function getAllKnownPlayers() { return _knownPlayers; }
 
 // ─── Load on init ───
 async function loadFromSupabase() {
-  showLoader('Connexion à la base de données…');
   try {
-    // Current session
-    const { data: sd } = await db.from('app_state').select('value').eq('key', 'current_session').maybeSingle();
-    if (sd?.value) state = sd.value;
-
-    // History
-    const { data: hd } = await db.from('app_state').select('value').eq('key', 'session_history').maybeSingle();
-    if (hd?.value) _history = hd.value;
-
-    // Pair names
-    const { data: pd } = await db.from('pair_names').select('pair_key,team_name');
-    if (pd) pd.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
-
-    // Known players
-    const { data: kd } = await db.from('known_players').select('name');
-    if (kd) _knownPlayers = kd.map(r => r.name);
+    const [sd, hd, pd, kd] = await Promise.all([
+      db.from('app_state').select('value').eq('key','current_session').maybeSingle(),
+      db.from('app_state').select('value').eq('key','session_history').maybeSingle(),
+      db.from('pair_names').select('pair_key,team_name'),
+      db.from('known_players').select('name')
+    ]);
+    if (sd.data?.value) state = sd.data.value;
+    if (hd.data?.value) _history = hd.data.value;
+    if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
+    if (kd.data) _knownPlayers = kd.data.map(r => r.name);
   } catch(e) {
     console.error('Supabase load error', e);
   }
-  hideLoader();
 }
 
 // ─── Session history ───
@@ -2650,9 +2643,12 @@ async function init() {
     }
   });
 
-  // Vérifier la session au démarrage — direct et simple
+  // Timeout 4s si getSession ne répond pas (réseau mobile lent)
+  const timer = setTimeout(() => { hideLoader(); showAuthScreen(); }, 4000);
+
   try {
     const { data: { session } } = await db.auth.getSession();
+    clearTimeout(timer);
     if (session?.user) {
       await routeUser(session.user);
     } else {
@@ -2660,7 +2656,7 @@ async function init() {
       showAuthScreen();
     }
   } catch(e) {
-    console.error('Init error:', e);
+    clearTimeout(timer);
     hideLoader();
     showAuthScreen();
   }
