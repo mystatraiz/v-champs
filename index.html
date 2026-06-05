@@ -2647,45 +2647,55 @@ async function routeUser(user) {
 async function init() {
   showLoader('Connexion…');
 
-  // Timeout de sécurité : si rien ne se passe en 5s → écran auth
+  // Détecter si on revient d'un redirect OAuth Google
+  const isOAuthCallback = window.location.hash.includes('access_token') ||
+                          window.location.hash.includes('error') ||
+                          window.location.search.includes('code=');
+
+  // Timeout de sécurité : plus long si callback OAuth (Supabase a besoin de temps)
   const safetyTimer = setTimeout(() => {
     if (!_routing && !currentUser) {
       hideLoader();
       showAuthScreen();
     }
-  }, 5000);
+  }, isOAuthCallback ? 12000 : 6000);
 
-  // 1. Vérifier immédiatement la session (couvre le redirect OAuth mobile)
-  try {
-    const { data: { session } } = await db.auth.getSession();
-    clearTimeout(safetyTimer);
-    if (session?.user) {
-      await routeUser(session.user);
-    } else {
-      hideLoader();
-      showAuthScreen();
-    }
-  } catch(e) {
-    clearTimeout(safetyTimer);
-    console.error('Session check error:', e);
-    hideLoader();
-    showAuthScreen();
-  }
-
-  // 2. Écouter les changements ultérieurs (déconnexion, refresh token)
+  // 1. onAuthStateChange en PREMIER — indispensable pour capturer SIGNED_IN après OAuth
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_OUT') {
+      clearTimeout(safetyTimer);
       _routing = false;
       currentUser = null;
       currentProfile = null;
       showAuthScreen();
-    } else if (event === 'SIGNED_IN' && !_routing) {
-      // Nouveau login (pas le chargement initial déjà géré par getSession)
-      if (session?.user && session.user.id !== currentUser?.id) {
+    } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+      if (!_routing) {
+        clearTimeout(safetyTimer);
         await routeUser(session.user);
+      }
+    } else if (event === 'INITIAL_SESSION' && !session) {
+      // Pas de session ET pas callback OAuth → afficher auth
+      if (!isOAuthCallback) {
+        clearTimeout(safetyTimer);
+        hideLoader();
+        showAuthScreen();
       }
     }
   });
+
+  // 2. Vérifier la session existante (utilisateurs déjà connectés)
+  if (!isOAuthCallback) {
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      if (session?.user && !_routing) {
+        clearTimeout(safetyTimer);
+        await routeUser(session.user);
+      }
+    } catch(e) {
+      console.error('Session check error:', e);
+    }
+  }
+  // Si callback OAuth → laisser onAuthStateChange gérer le SIGNED_IN
 }
 
 init();
