@@ -958,25 +958,18 @@ async function completeProfile() {
 
   showLoader('Enregistrement…');
 
-  // Vérifier si c'est le premier profil (admin) — en bypass RLS via service
-  // On utilise une heuristique : si aucun profil n'existe pour cet user, compter via auth
-  const { data: existingProfiles } = await db.from('profiles').select('id').limit(1);
-  const isFirst = !existingProfiles || existingProfiles.length === 0;
-  const role = isFirst ? 'admin' : 'pending';
-
+  // Toujours 'pending' — seul un admin existant peut promouvoir un compte
   const { error } = await db.from('profiles').upsert({
     id: currentUser.id, first_name: fn, last_name: ln, nickname: nick,
-    handedness: hand, preferred_side: side, role,
-    linked_player_name: isFirst ? nick : null
+    handedness: hand, preferred_side: side, role: 'pending',
+    linked_player_name: null
   });
   if (error) { hideLoader(); err.textContent = error.message; return; }
 
-  if (!isFirst) {
-    await db.from('notifications').insert({
-      type: 'new_user',
-      payload: { user_id: currentUser.id, first_name: fn, last_name: ln, nickname: nick, email: currentUser.email }
-    });
-  }
+  await db.from('notifications').insert({
+    type: 'new_user',
+    payload: { user_id: currentUser.id, first_name: fn, last_name: ln, nickname: nick, email: currentUser.email }
+  });
   await enterApp(currentUser);
 }
 
@@ -1293,30 +1286,62 @@ async function openAdminPanel() {
             <div style="font-size:12px;color:var(--text-secondary);">${{right:'Droitier',left:'Gaucher'}[p.handedness]} · Côté ${{left:'gauche',right:'droit',any:'peu importe'}[p.preferred_side]}</div>
           </div>
         </div>
-        <div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary);">Lier au joueur :</div>
-        <div style="display:flex;gap:8px;">
-          <select id="link-select-${p.id}" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;">
+        <!-- Sélecteur de rôle -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">Rôle</div>
+          <div style="display:flex;gap:6px;">
+            <button id="rbtn-player-${p.id}" class="btn btn-sm" style="flex:1;justify-content:center;background:var(--success);color:#fff;" onclick="setRoleBtn('${p.id}','player')">🎾 Joueur</button>
+            <button id="rbtn-admin-${p.id}" class="btn btn-sm" style="flex:1;justify-content:center;background:var(--border);color:var(--text-secondary);" onclick="setRoleBtn('${p.id}','admin')">⚙️ Admin</button>
+          </div>
+          <input type="hidden" id="role-val-${p.id}" value="player">
+        </div>
+        <!-- Lien joueur (masqué si admin) -->
+        <div id="link-wrap-${p.id}">
+          <div style="margin-bottom:6px;font-size:12px;color:var(--text-secondary);">Lier au joueur :</div>
+          <select id="link-select-${p.id}" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:10px;">
             <option value="">-- Nouveau joueur (surnom) --</option>
             ${_knownPlayers.sort().map(n=>`<option value="${n}">${n}</option>`).join('')}
           </select>
-          <button class="btn btn-success btn-sm" onclick="linkPlayer('${p.id}')">Valider</button>
         </div>
+        <button class="btn btn-success btn-sm" style="width:100%;justify-content:center;" onclick="linkPlayer('${p.id}')">✓ Valider</button>
       </div>
     `).join('');
   }
   document.getElementById('admin-panel').classList.add('open');
 }
 
+function setRoleBtn(profileId, role) {
+  document.getElementById(`role-val-${profileId}`).value = role;
+  const pBtn = document.getElementById(`rbtn-player-${profileId}`);
+  const aBtn = document.getElementById(`rbtn-admin-${profileId}`);
+  const wrap = document.getElementById(`link-wrap-${profileId}`);
+  if (role === 'admin') {
+    pBtn.style.background = 'var(--border)'; pBtn.style.color = 'var(--text-secondary)';
+    aBtn.style.background = 'var(--danger)';  aBtn.style.color = '#fff';
+    wrap.style.display = 'none';
+  } else {
+    pBtn.style.background = 'var(--success)'; pBtn.style.color = '#fff';
+    aBtn.style.background = 'var(--border)';  aBtn.style.color = 'var(--text-secondary)';
+    wrap.style.display = 'block';
+  }
+}
+
 async function linkPlayer(profileId) {
-  const select = document.getElementById(`link-select-${profileId}`);
+  const role = document.getElementById(`role-val-${profileId}`)?.value || 'player';
   const { data: prof } = await db.from('profiles').select('nickname').eq('id', profileId).single();
-  const linkedName = select.value || prof.nickname;
-  await db.from('profiles').update({ role: 'player', linked_player_name: linkedName }).eq('id', profileId);
-  // Mark notifications as read
+
+  let linkedName = null;
+  if (role === 'player') {
+    const select = document.getElementById(`link-select-${profileId}`);
+    linkedName = select?.value || prof.nickname;
+  }
+
+  await db.from('profiles').update({ role, linked_player_name: linkedName }).eq('id', profileId);
   await db.from('notifications').update({ read: true }).eq('type', 'new_user').filter('payload->>user_id', 'eq', profileId);
   closeAdminPanel();
   loadAdminNotifications();
-  alert(`✓ Compte validé et lié à "${linkedName}"`);
+  const label = role === 'admin' ? '⚙️ Admin' : `🎾 Joueur — lié à "${linkedName}"`;
+  alert(`✓ Compte validé : ${label}`);
 }
 
 function closeAdminPanel(e) {
