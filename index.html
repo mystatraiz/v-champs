@@ -363,9 +363,10 @@
     color: var(--text-secondary); font-size: 14px;
   }
   /* ─── Sub-tabs (classement) ─── */
-  .sub-tabs { display: flex; gap: 0; margin-bottom: 16px; background: var(--dark); border-radius: 10px; padding: 4px; }
-  .sub-tab { flex: 1; text-align: center; padding: 8px 4px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-secondary); background: none; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-  .sub-tab.active { background: var(--border); color: var(--white); }
+  .sub-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--dark); border-radius: 10px; padding: 4px; border: 1px solid var(--border); }
+  .sub-tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text); background: none; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+  .sub-tab:hover:not(.active) { background: #2a2a2a; color: var(--white); }
+  .sub-tab.active { background: var(--accent); color: var(--black); }
   .sub-tab-content { display: none; }
   .sub-tab-content.active { display: block; }
   /* ─── Ranking list ─── */
