@@ -2639,41 +2639,30 @@ async function routeUser(user) {
 async function init() {
   showLoader('Connexion…');
 
-  let handled = false;
-
-  // Timeout de sécurité
-  const safetyTimer = setTimeout(() => {
-    if (!handled) { hideLoader(); showAuthScreen(); }
-  }, 10000);
-
-  // 1. onAuthStateChange en premier
+  // Écouter déconnexion et nouveaux logins
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_OUT') {
-      handled = false; _routing = false;
+      _routing = false;
       currentUser = null; currentProfile = null;
       showAuthScreen();
-      return;
-    }
-    // SIGNED_IN = nouveau login (Google inclus) | INITIAL_SESSION = session existante
-    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && !handled) {
-      clearTimeout(safetyTimer);
-      handled = true;
-      if (session?.user) {
-        await routeUser(session.user);
-      } else {
-        hideLoader();
-        showAuthScreen();
-      }
+    } else if (event === 'SIGNED_IN' && session?.user && !_routing) {
+      await routeUser(session.user);
     }
   });
 
-  // 2. getSession() déclenche l'échange du code PKCE si ?code= est dans l'URL
-  //    et fait aussi office de vérification de session existante
+  // Vérifier la session au démarrage — direct et simple
   try {
-    await db.auth.getSession();
+    const { data: { session } } = await db.auth.getSession();
+    if (session?.user) {
+      await routeUser(session.user);
+    } else {
+      hideLoader();
+      showAuthScreen();
+    }
   } catch(e) {
-    console.error('getSession error:', e);
-    if (!handled) { hideLoader(); showAuthScreen(); }
+    console.error('Init error:', e);
+    hideLoader();
+    showAuthScreen();
   }
 }
 
