@@ -558,33 +558,23 @@
     <button class="auth-tab" onclick="showAuthTab('register')">S'inscrire</button>
   </div>
 
-  <!-- ÉTAPE 1 : Méthode d'auth -->
+  <!-- ÉTAPE 1 : Téléphone + mot de passe -->
   <div id="auth-step1" style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:0;">
 
-    <!-- Boutons OAuth (login + register) -->
-    <button onclick="doGoogleLogin()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;background:#fff;color:#111;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;">
-      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-      Continuer avec Google
-    </button>
-
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-      <span style="color:var(--text-secondary);font-size:12px;">ou avec email</span>
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-    </div>
-
-    <!-- Email/password — login -->
+    <!-- Login -->
     <div id="auth-login" class="auth-form" style="display:flex;">
-      <input type="email" id="login-email" placeholder="Email" autocomplete="email">
-      <input type="password" id="login-password" placeholder="Mot de passe">
+      <div class="auth-field"><label class="auth-label">Numéro de téléphone</label>
+        <input type="tel" id="login-phone" placeholder="06 12 34 56 78" autocomplete="tel" inputmode="numeric"></div>
+      <div class="auth-field"><label class="auth-label">Mot de passe</label>
+        <input type="password" id="login-password" placeholder="Mot de passe"></div>
       <div class="auth-error" id="login-error"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="doLogin()">Se connecter</button>
     </div>
 
-    <!-- Email/password — register (juste email+mdp) -->
+    <!-- Register -->
     <div id="auth-register" class="auth-form" style="display:none;">
-      <div class="auth-field"><label class="auth-label">Email</label>
-        <input type="email" id="reg-email" placeholder="votre@email.com" autocomplete="email"></div>
+      <div class="auth-field"><label class="auth-label">Numéro de téléphone</label>
+        <input type="tel" id="reg-phone" placeholder="06 12 34 56 78" autocomplete="tel" inputmode="numeric"></div>
       <div class="auth-field"><label class="auth-label">Mot de passe</label>
         <input type="password" id="reg-password" placeholder="Minimum 6 caractères"></div>
       <div class="auth-error" id="reg-error"></div>
@@ -921,14 +911,10 @@ function showCompleteStep(prefillFn, welcomeMsg) {
   if (prefillFn) prefillFn();
 }
 
-const REDIRECT_URL = window.location.origin + window.location.pathname;
-
-async function doGoogleLogin() {
-  const { error } = await db.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: REDIRECT_URL }
-  });
-  if (error) alert(error.message);
+// Convertit un numéro de téléphone en email interne (jamais visible par l'utilisateur)
+function phoneToEmail(phone) {
+  const digits = phone.replace(/\D/g, ''); // garde uniquement les chiffres
+  return digits + '@vchamps.club';
 }
 
 
@@ -964,28 +950,34 @@ async function completeProfile() {
 }
 
 async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
+  const phone = document.getElementById('login-phone').value.trim();
   const pass  = document.getElementById('login-password').value;
   const err   = document.getElementById('login-error');
   err.textContent = '';
-  const { error } = await db.auth.signInWithPassword({ email, password: pass });
-  if (error) err.textContent = error.message;
+  if (!phone || !pass) { err.textContent = 'Téléphone et mot de passe requis.'; return; }
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 8) { err.textContent = 'Numéro de téléphone invalide.'; return; }
+  showLoader('Connexion…');
+  const { error } = await db.auth.signInWithPassword({ email: phoneToEmail(phone), password: pass });
+  hideLoader();
+  if (error) err.textContent = 'Numéro ou mot de passe incorrect.';
 }
 
 async function doRegister() {
-  const email = document.getElementById('reg-email').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
   const pass  = document.getElementById('reg-password').value;
   const err   = document.getElementById('reg-error');
   err.textContent = '';
-  if (!email || !pass) { err.textContent = 'Email et mot de passe requis.'; return; }
-  if (pass.length < 6) { err.textContent = 'Mot de passe : minimum 6 caractères.'; return; }
+  if (!phone || !pass) { err.textContent = 'Téléphone et mot de passe requis.'; return; }
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 8) { err.textContent = 'Numéro de téléphone invalide.'; return; }
+  if (pass.length < 6)   { err.textContent = 'Mot de passe : minimum 6 caractères.'; return; }
 
   showLoader('Création du compte…');
-  const { data, error } = await db.auth.signUp({ email, password: pass });
-  if (error) { hideLoader(); err.textContent = error.message; return; }
-  currentUser = data.user;
+  const { data, error } = await db.auth.signUp({ email: phoneToEmail(phone), password: pass });
   hideLoader();
-  // Go to profile completion step — no pre-fill for email accounts
+  if (error) { err.textContent = error.message; return; }
+  currentUser = data.user;
   showCompleteStep(null, 'Complétez votre profil');
 }
 
