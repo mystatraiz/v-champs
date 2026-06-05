@@ -929,10 +929,12 @@ async function completeProfile() {
   if (!fn || !ln) { err.textContent = 'Prénom et nom sont requis.'; return; }
   if (!nick)      { err.textContent = 'Le surnom est requis.'; return; }
 
-  _routing = true;
   showLoader('Enregistrement…');
-  const { count } = await db.from('profiles').select('*', { count: 'exact', head: true });
-  const isFirst = (count || 0) === 0;
+
+  // Vérifier si c'est le premier profil (admin) — en bypass RLS via service
+  // On utilise une heuristique : si aucun profil n'existe pour cet user, compter via auth
+  const { data: existingProfiles } = await db.from('profiles').select('id').limit(1);
+  const isFirst = !existingProfiles || existingProfiles.length === 0;
   const role = isFirst ? 'admin' : 'pending';
 
   const { error } = await db.from('profiles').upsert({
@@ -940,16 +942,15 @@ async function completeProfile() {
     handedness: hand, preferred_side: side, role,
     linked_player_name: isFirst ? nick : null
   });
-  if (error) { _routing = false; hideLoader(); err.textContent = error.message; return; }
+  if (error) { hideLoader(); err.textContent = error.message; return; }
+
   if (!isFirst) {
     await db.from('notifications').insert({
       type: 'new_user',
       payload: { user_id: currentUser.id, first_name: fn, last_name: ln, nickname: nick, email: currentUser.email }
     });
   }
-  _routing = false;
-  hideLoader();
-  await routeUser(currentUser);
+  await enterApp(currentUser);
 }
 
 async function doLogin() {
@@ -967,8 +968,7 @@ async function doLogin() {
     err.textContent = 'Numéro ou mot de passe incorrect.';
     return;
   }
-  // Connexion réussie → router directement sans attendre onAuthStateChange
-  await routeUser(data.user);
+  await enterApp(data.user);
 }
 
 async function doRegister() {
@@ -981,11 +981,8 @@ async function doRegister() {
   if (digits.length < 8) { err.textContent = 'Numéro de téléphone invalide.'; return; }
   if (pass.length < 6)   { err.textContent = 'Mot de passe : minimum 6 caractères.'; return; }
 
-  // Bloquer onAuthStateChange pendant l'inscription
-  _routing = true;
   showLoader('Création du compte…');
   const { data, error } = await db.auth.signUp({ email: phoneToEmail(phone), password: pass });
-  _routing = false;
   hideLoader();
   if (error) { err.textContent = error.message; return; }
   currentUser = data.user;
@@ -2620,53 +2617,35 @@ function newTournament() {
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
-let _routing = false;
-
-async function routeUser(user) {
-  if (_routing) return;
-  _routing = true;
+// Routing direct — appelé après login, register ou retour sur l'app
+async function enterApp(user) {
   currentUser = user;
   showLoader('Chargement…');
-
-  // Timeout 8s — si le chargement du profil/data bloque, on affiche l'auth
-  const bailout = setTimeout(() => {
-    console.warn('routeUser timeout');
-    _routing = false;
-    hideLoader();
-    showAuthScreen();
-  }, 8000);
-
   try {
     await loadProfileAndRoute();
   } catch(e) {
-    console.error('Route error', e);
+    console.error('enterApp error:', e);
     hideLoader();
     showAuthScreen();
-  } finally {
-    clearTimeout(bailout);
-    _routing = false;
   }
 }
 
 async function init() {
-  showLoader('Connexion…');
+  showLoader('Chargement…');
 
-  // Écouter déconnexion et nouveaux logins ultérieurs
-  db.auth.onAuthStateChange(async (event, session) => {
+  // Déconnexion → recharger la page proprement
+  db.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
-      _routing = false;
       currentUser = null; currentProfile = null;
+      hideLoader();
       showAuthScreen();
-    } else if (event === 'SIGNED_IN' && session?.user && !_routing) {
-      await routeUser(session.user);
     }
   });
 
-  // Vérifier la session (Supabase lit d'abord localStorage = quasi instantané)
   try {
     const { data: { session } } = await db.auth.getSession();
     if (session?.user) {
-      await routeUser(session.user);
+      await enterApp(session.user);
     } else {
       hideLoader();
       showAuthScreen();
