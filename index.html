@@ -2632,7 +2632,7 @@ async function routeUser(user) {
 async function init() {
   showLoader('Connexion…');
 
-  // Écouter déconnexion et nouveaux logins
+  // Écouter déconnexion et nouveaux logins ultérieurs
   db.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_OUT') {
       _routing = false;
@@ -2643,12 +2643,9 @@ async function init() {
     }
   });
 
-  // Timeout 4s si getSession ne répond pas (réseau mobile lent)
-  const timer = setTimeout(() => { hideLoader(); showAuthScreen(); }, 4000);
-
+  // Vérifier la session (Supabase lit d'abord localStorage = quasi instantané)
   try {
     const { data: { session } } = await db.auth.getSession();
-    clearTimeout(timer);
     if (session?.user) {
       await routeUser(session.user);
     } else {
@@ -2656,7 +2653,6 @@ async function init() {
       showAuthScreen();
     }
   } catch(e) {
-    clearTimeout(timer);
     hideLoader();
     showAuthScreen();
   }
