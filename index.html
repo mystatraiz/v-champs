@@ -1573,14 +1573,20 @@ function renderCombinedRanking(highlightPlayer) {
   const rankings   = computeGlobalRankings();
   const matchStats = buildAllPlayerStats(true);
 
-  const allNames = new Set([...rankings.map(r => r.name), ...Object.keys(matchStats)]);
-  if (!allNames.size) {
+  // Déduplication insensible à la casse (ex: "Alex" et "alex" → même joueur)
+  const seen = new Map(); // clé lowercase → nom canonique
+  [...rankings.map(r => r.name), ...Object.keys(matchStats)].forEach(name => {
+    const key = name.toLowerCase().trim();
+    if (!seen.has(key)) seen.set(key, name);
+  });
+  if (!seen.size) {
     return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
   }
 
-  const combined = [...allNames].map(name => {
-    const vc = rankings.find(r => r.name === name);
-    const ms = matchStats[name] || { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 };
+  const combined = [...seen.entries()].map(([key, name]) => {
+    const vc = rankings.find(r => r.name.toLowerCase().trim() === key);
+    const msKey = Object.keys(matchStats).find(k => k.toLowerCase().trim() === key);
+    const ms = msKey ? matchStats[msKey] : { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 };
     return {
       name,
       score:    vc?.score    ?? 0,
@@ -1849,7 +1855,7 @@ function renderTeamsGrid() {
 
 function onPlayerInput(input) {
   const ti = +input.dataset.team, pi = +input.dataset.player;
-  state.teams[ti].players[pi] = input.value;
+  state.teams[ti].players[pi] = input.value; // brut pendant la saisie
   saveState();
   checkAllPlayersEntered();
   updateTeamNameDisplay(ti);
@@ -1901,8 +1907,9 @@ function onPlayerKeydown(e, ti, pi) {
     e.preventDefault();
     if (highlighted) {
       const input = document.getElementById(`player-${ti}-${pi}`);
-      input.value = highlighted.textContent;
-      state.teams[ti].players[pi] = highlighted.textContent;
+      const normalized = normalizeName(highlighted.textContent);
+      input.value = normalized;
+      state.teams[ti].players[pi] = normalized;
       saveState();
       document.getElementById(`ac-${ti}-${pi}`).style.display = 'none';
       checkAllPlayersEntered();
@@ -1951,8 +1958,9 @@ function showAutocomplete(input) {
 
 function pickAutocomplete(ti, pi, name) {
   const input = document.getElementById(`player-${ti}-${pi}`);
-  input.value = name;
-  state.teams[ti].players[pi] = name;
+  const normalized = normalizeName(name);
+  input.value = normalized;
+  state.teams[ti].players[pi] = normalized;
   saveState();
   document.getElementById(`ac-${ti}-${pi}`).style.display = 'none';
   checkAllPlayersEntered();
@@ -2021,7 +2029,10 @@ function resolveTeamName(team) {
 //  SESSION START
 // ═══════════════════════════════════════════════════
 function startSession() {
-  // Resolve team names and save players
+  // Normaliser tous les noms avant de sauvegarder
+  state.teams.forEach(t => {
+    t.players = t.players.map(p => normalizeName(p));
+  });
   const allNames = state.teams.flatMap(t => t.players);
   addKnownPlayers(allNames);
   state.teams.forEach(t => resolveTeamName(t));
@@ -2644,6 +2655,12 @@ function tickTimers() {
 
 function esc(s) {
   return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+// Normalise un nom de joueur : trim + collapse espaces + 1ère lettre majuscule
+function normalizeName(name) {
+  const t = (name || '').trim().replace(/\s+/g, ' ');
+  return t ? t[0].toUpperCase() + t.slice(1) : t;
 }
 
 // ═══════════════════════════════════════════════════
