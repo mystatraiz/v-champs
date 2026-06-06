@@ -392,6 +392,11 @@
   .timer-over { color: var(--danger); animation: timerPulse 1s ease-in-out infinite; }
   @keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
+  /* ─── Warmup Timer ─── */
+  .warmup-time { font-size: 88px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 4px; line-height: 1; color: var(--white); }
+  .warmup-warn { color: var(--accent); }
+  @media (max-width: 640px) { .warmup-time { font-size: 64px; } }
+
   /* ─── History list ─── */
   .history-item {
     display: flex; justify-content: space-between; align-items: center;
@@ -735,20 +740,28 @@
 
     <!-- Match Phase -->
     <div id="phase-matches" style="display:none;">
+
+      <!-- Échauffement -->
+      <div id="warmup-section" style="display:none;text-align:center;padding:48px 20px 32px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:16px;">⏱ Échauffement</div>
+        <div id="warmup-countdown" class="warmup-time">06:00</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:14px;">Le 1er match se lance automatiquement à la fin</div>
+        <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;margin:20px auto 0;max-width:280px;">
+          <div id="warmup-bar" style="height:100%;background:var(--accent);border-radius:4px;width:0%;transition:width 1s linear;"></div>
+        </div>
+      </div>
+
       <div id="active-matches-section">
         <div class="section-title" id="round-title">Matchs en cours</div>
         <div class="matches-grid" id="active-matches-grid"></div>
         <div style="margin-top:16px;" id="end-all-wrap" style="display:none;">
           <button class="btn btn-lg" id="end-all-btn" onclick="endAllMatches()" disabled>
-            ✓ Terminer les matchs
+            ✓ Valider les scores
           </button>
         </div>
       </div>
 
-      <div id="proposed-section" class="proposed-section" style="display:none;">
-        <div class="section-title">Prochain match proposé</div>
-        <div id="proposed-match"></div>
-      </div>
+      <!-- La section "proposer un match" est supprimée — l'enchaînement est automatique -->
 
       <div style="margin-top:24px;">
         <div class="section-title">Historique des matchs</div>
@@ -1079,6 +1092,14 @@ function showAdminApp() {
     document.getElementById('setup-screen').style.display  = 'block';
     document.getElementById('phase-players').style.display = 'none';
     document.getElementById('phase-matches').style.display = 'none';
+  } else if (state.warmupStart) {
+    // Reprise du warmup après rechargement
+    document.getElementById('setup-screen').style.display  = 'none';
+    document.getElementById('phase-players').style.display = 'none';
+    document.getElementById('phase-matches').style.display = 'block';
+    document.getElementById('warmup-section').style.display = 'block';
+    document.getElementById('active-matches-section').style.display = 'none';
+    resumeWarmup();
   } else {
     document.getElementById('setup-screen').style.display  = 'none';
     document.getElementById('phase-players').style.display = 'none';
@@ -2077,13 +2098,11 @@ function startSession() {
   addKnownPlayers(allNames);
   state.teams.forEach(t => resolveTeamName(t));
   state.sessionStarted = true;
+  state.roundNum = 0;
   saveState();
   savePairNames();
-  document.getElementById('phase-players').style.display = 'none';
-  document.getElementById('phase-matches').style.display = 'block';
-  document.getElementById('session-end-bar').style.display = 'flex';
-  launchNextRound();
   updateHeaderActions();
+  startWarmup(); // 6 min d'échauffement, puis 1er match auto
 }
 
 // ═══════════════════════════════════════════════════
@@ -2163,6 +2182,14 @@ function renderMatchPhase() {
     grid.appendChild(buildMatchCard(m));
   });
 
+  // Titre du round
+  const roundTitle = document.getElementById('round-title');
+  if (roundTitle) {
+    roundTitle.textContent = state.roundNum
+      ? `Round ${state.roundNum} / ${MAX_ROUNDS}`
+      : 'Matchs en cours';
+  }
+
   document.getElementById('active-matches-section').style.display =
     activeMatches.length ? 'block' : 'none';
 
@@ -2173,18 +2200,13 @@ function renderMatchPhase() {
     const allScored = activeMatches.length > 0 && activeMatches.every(m =>
       m.scoreType === 'sets' ? (m.score1 === 2 || m.score2 === 2) : (m.score1 > 0 || m.score2 > 0)
     );
+    const isLast = state.roundNum >= MAX_ROUNDS;
     endAllBtn.disabled = !allScored;
     endAllBtn.className = 'btn btn-lg ' + (allScored ? 'btn-end-all-on' : 'btn-end-all-off');
+    endAllBtn.textContent = allScored && isLast ? '✓ Terminer la session' : '✓ Valider les scores';
   }
 
-  // Proposed section — only show if no active matches
-  const proposed = document.getElementById('proposed-section');
-  if (!activeMatches.length && !state.sessionFinished) {
-    proposed.style.display = 'block';
-    renderProposedMatch();
-  } else {
-    proposed.style.display = 'none';
-  }
+  // La section "proposer" n'existe plus dans le nouveau flow automatique
 
   renderMatchHistory();
   renderStats();
@@ -2450,6 +2472,15 @@ function endAllMatches() {
   active.forEach(m => endMatch(m.id, true));
   saveState();
   renderMatchPhase();
+
+  if (state.roundNum >= MAX_ROUNDS) {
+    // Fin de session après le 3ème round
+    playBell(3);
+    setTimeout(autoEndSession, 2500);
+  } else {
+    // Lancer le round suivant automatiquement
+    setTimeout(launchNextRound, 1200);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -2654,6 +2685,93 @@ function renderGeneralStats() {
 function renderStats() { renderSessionStats(); }
 
 // ═══════════════════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════════════════
+function playBell(times = 1) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const play = (delay) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(880, ctx.currentTime + delay);
+      o.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + delay + 1.5);
+      g.gain.setValueAtTime(0, ctx.currentTime + delay);
+      g.gain.linearRampToValueAtTime(0.6, ctx.currentTime + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 2);
+      o.start(ctx.currentTime + delay);
+      o.stop(ctx.currentTime + delay + 2.1);
+    };
+    for (let i = 0; i < times; i++) play(i * 2.6);
+  } catch(e) { console.warn('Audio:', e); }
+}
+
+// ═══════════════════════════════════════════════════
+//  WARMUP TIMER
+// ═══════════════════════════════════════════════════
+const WARMUP_DURATION = 6 * 60; // 360 secondes
+const MAX_ROUNDS = 3;
+let _warmupInterval = null;
+const _matchBellPlayed = new Set();
+
+function startWarmup() {
+  state.warmupStart = Date.now();
+  saveState();
+  document.getElementById('phase-players').style.display = 'none';
+  document.getElementById('phase-matches').style.display = 'block';
+  document.getElementById('warmup-section').style.display = 'block';
+  document.getElementById('active-matches-section').style.display = 'none';
+  document.getElementById('session-end-bar').style.display = 'none';
+  clearInterval(_warmupInterval);
+  _warmupInterval = setInterval(tickWarmup, 1000);
+  tickWarmup();
+}
+
+function resumeWarmup() {
+  clearInterval(_warmupInterval);
+  _warmupInterval = setInterval(tickWarmup, 1000);
+  tickWarmup();
+}
+
+function tickWarmup() {
+  if (!state.warmupStart) return;
+  const elapsed    = Math.floor((Date.now() - state.warmupStart) / 1000);
+  const remaining  = WARMUP_DURATION - elapsed;
+  const el         = document.getElementById('warmup-countdown');
+  const bar        = document.getElementById('warmup-bar');
+  if (!el) return;
+
+  if (remaining > 0) {
+    const m = Math.floor(remaining / 60), s = remaining % 60;
+    el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    el.className   = remaining <= 60 ? 'warmup-time warmup-warn' : 'warmup-time';
+    if (bar) bar.style.width = ((WARMUP_DURATION - remaining) / WARMUP_DURATION * 100) + '%';
+  } else {
+    clearInterval(_warmupInterval); _warmupInterval = null;
+    if (bar) bar.style.width = '100%';
+    el.textContent = '00:00';
+    state.warmupStart = null;
+    saveState();
+    playBell(2);
+    document.getElementById('warmup-section').style.display = 'none';
+    document.getElementById('active-matches-section').style.display = 'block';
+    launchNextRound();
+  }
+}
+
+function autoEndSession() {
+  state.sessionFinished = true;
+  saveState();
+  archiveCurrentSession();
+  document.getElementById('session-end-bar').style.display = 'none';
+  updateHeaderActions();
+  renderMatchPhase();
+  switchTab('general');
+  renderGeneralStats();
+}
+
+// ═══════════════════════════════════════════════════
 //  MATCH TIMERS
 // ═══════════════════════════════════════════════════
 const MATCH_DURATION = 27 * 60; // 27 minutes en secondes
@@ -2684,6 +2802,10 @@ function tickTimers() {
         el.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
         el.className = remaining > 5 * 60 ? 'timer-ok' : 'timer-warn';
       } else {
+        if (!_matchBellPlayed.has(m.id)) {
+          _matchBellPlayed.add(m.id);
+          playBell(1);
+        }
         const over = Math.abs(remaining);
         const mins = Math.floor(over / 60);
         const secs = over % 60;
