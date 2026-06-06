@@ -2108,24 +2108,45 @@ function resolveTeamName(team) {
 let _pendingMatchups = null; // matchups pré-calculés (preview → launchNextRound)
 
 function startSession() {
-  state.teams.forEach(t => { t.players = t.players.map(p => normalizeName(p)); });
-  addKnownPlayers(state.teams.flatMap(t => t.players));
-  state.teams.forEach(t => resolveTeamName(t));
+  // Normalisation + setup de base
+  try { state.teams.forEach(t => { t.players = t.players.map(p => normalizeName(p)); }); } catch(e) {}
+  try { addKnownPlayers(state.teams.flatMap(t => t.players)); } catch(e) {}
+  try { state.teams.forEach(t => resolveTeamName(t)); } catch(e) {}
   state.sessionStarted = true;
   state.roundNum = 0;
   saveState();
-  savePairNames();
-  updateHeaderActions();
-  showMatchPreview();
+  try { savePairNames(); } catch(e) {}
+  try { updateHeaderActions(); } catch(e) {}
+
+  // Transition visible en premier — garantie quoi qu'il arrive
+  document.getElementById('phase-players').style.display = 'none';
+  document.getElementById('phase-matches').style.display = 'block';
+  try { document.getElementById('session-end-bar').style.display = 'none'; } catch(e) {}
+
+  // Preview → warmup → matchs
+  try {
+    showMatchPreview();
+  } catch(e) {
+    console.error('showMatchPreview failed:', e);
+    // Fallback : warmup direct
+    try { startWarmup(); } catch(e2) {
+      console.error('startWarmup failed:', e2);
+      // Fallback ultime : lancer les matchs directement
+      try { document.getElementById('session-end-bar').style.display = 'flex'; } catch(e3) {}
+      launchNextRound();
+    }
+  }
+}
+
+function setDisplay(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = val;
 }
 
 function showMatchPreview() {
-  // D'abord : transition de phase (avant toute opération qui pourrait échouer)
-  document.getElementById('phase-players').style.display = 'none';
-  document.getElementById('phase-matches').style.display = 'block';
-  document.getElementById('session-end-bar').style.display = 'none';
-  document.getElementById('warmup-section').style.display = 'none';
-  document.getElementById('active-matches-section').style.display = 'none';
+  setDisplay('session-end-bar', 'none');
+  setDisplay('warmup-section', 'none');
+  setDisplay('active-matches-section', 'none');
 
   const matchups = proposeBestMatchups(state.courts);
 
@@ -2796,11 +2817,11 @@ const _matchBellPlayed = new Set();
 function startWarmup() {
   state.warmupStart = Date.now();
   saveState();
-  document.getElementById('phase-players').style.display = 'none';
-  document.getElementById('phase-matches').style.display = 'block';
-  document.getElementById('warmup-section').style.display = 'block';
-  document.getElementById('active-matches-section').style.display = 'none';
-  document.getElementById('session-end-bar').style.display = 'none';
+  setDisplay('phase-players', 'none');
+  setDisplay('phase-matches', 'block');
+  setDisplay('warmup-section', 'block');
+  setDisplay('active-matches-section', 'none');
+  setDisplay('session-end-bar', 'none');
   clearInterval(_warmupInterval);
   _warmupInterval = setInterval(tickWarmup, 1000);
   tickWarmup();
