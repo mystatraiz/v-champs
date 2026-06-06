@@ -2819,7 +2819,7 @@ function playBell(times = 1) {
       o.frequency.setValueAtTime(880, ctx.currentTime + delay);
       o.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + delay + 1.5);
       g.gain.setValueAtTime(0, ctx.currentTime + delay);
-      g.gain.linearRampToValueAtTime(0.6, ctx.currentTime + delay + 0.02);
+      g.gain.linearRampToValueAtTime(1.0, ctx.currentTime + delay + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 2);
       o.start(ctx.currentTime + delay);
       o.stop(ctx.currentTime + delay + 2.1);
