@@ -2784,12 +2784,34 @@ function renderGeneralStats() {
 function renderStats() { renderSessionStats(); }
 
 // ═══════════════════════════════════════════════════
-//  AUDIO
+//  AUDIO — AudioContext persistant (requis sur iOS)
 // ═══════════════════════════════════════════════════
-function playBell(times = 1) {
+let _audioCtx = null;
+
+function ensureAudioCtx() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const play = (delay) => {
+    if (!_audioCtx) {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (_audioCtx.state === 'suspended') {
+      _audioCtx.resume();
+    }
+    return _audioCtx;
+  } catch(e) {
+    console.warn('AudioContext:', e);
+    return null;
+  }
+}
+
+// Déverrouillez l'audio au premier geste utilisateur (obligatoire sur iOS Safari)
+document.addEventListener('touchend', () => ensureAudioCtx(), { once: true });
+document.addEventListener('click',    () => ensureAudioCtx(), { once: true });
+
+function playBell(times = 1) {
+  const ctx = ensureAudioCtx();
+  if (!ctx) return;
+  const play = (delay) => {
+    try {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.connect(g); g.connect(ctx.destination);
@@ -2801,9 +2823,9 @@ function playBell(times = 1) {
       g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 2);
       o.start(ctx.currentTime + delay);
       o.stop(ctx.currentTime + delay + 2.1);
-    };
-    for (let i = 0; i < times; i++) play(i * 2.6);
-  } catch(e) { console.warn('Audio:', e); }
+    } catch(e) { console.warn('bell oscillator:', e); }
+  };
+  for (let i = 0; i < times; i++) play(i * 2.6);
 }
 
 // ═══════════════════════════════════════════════════
