@@ -1229,7 +1229,7 @@ function renderPlayerProfile() {
         <div style="padding:0 16px;">
           <div class="stats-hero" style="margin-bottom:16px;">
             <div class="donut-wrap">
-              ${svgDonut(wr, wrColor, 100, 10)}
+              ${svgDonutTriple(ps.wins, ps.draws||0, ps.losses, 100, 10)}
               <div class="donut-label">
                 <span class="donut-pct" style="color:${wrColor}">${wr}%</span>
                 <span class="donut-sub">WIN</span>
@@ -1238,6 +1238,7 @@ function renderPlayerProfile() {
             <div class="stats-pills">
               <div class="stat-pill"><span class="stat-pill-label">MATCHS</span><span class="stat-pill-val">${ps.played}</span></div>
               <div class="stat-pill"><span class="stat-pill-label">VICTOIRES</span><span class="stat-pill-val" style="color:var(--success)">${ps.wins}</span></div>
+              <div class="stat-pill"><span class="stat-pill-label">NULS</span><span class="stat-pill-val" style="color:#888">${ps.draws||0}</span></div>
               <div class="stat-pill"><span class="stat-pill-label">DÉFAITES</span><span class="stat-pill-val" style="color:var(--danger)">${ps.losses}</span></div>
             </div>
           </div>
@@ -2961,6 +2962,32 @@ function svgDonut(pct, color, size=90, sw=9) {
   </svg>`;
 }
 
+// Roue tricolore : victoires (vert) · nuls (gris) · défaites (rouge)
+function svgDonutTriple(wins, draws, losses, size=100, sw=10) {
+  const total = (wins + draws + losses) || 1;
+  const r = (size - sw) / 2;
+  const cx = size / 2, cy = size / 2;
+  const C = 2 * Math.PI * r;
+  const winLen  = (wins  / total) * C;
+  const drawLen = (draws / total) * C;
+  const lossLen = (losses / total) * C;
+  const arc = (len, startPos, color) => {
+    if (len < 1) return '';
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${color}" stroke-width="${sw}"
+      stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}"
+      stroke-dashoffset="${(C - startPos).toFixed(2)}"
+      stroke-linecap="butt"
+      transform="rotate(-90 ${cx} ${cy})"/>`;
+  };
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#2a2a2a" stroke-width="${sw}"/>
+    ${arc(winLen,  0,               'var(--success)')}
+    ${arc(drawLen, winLen,          '#888')}
+    ${arc(lossLen, winLen + drawLen,'var(--danger)')}
+  </svg>`;
+}
+
 function svgBalance(jFor, jAgainst, size=56, sw=7) {
   const total = jFor + jAgainst || 1;
   const pct = (jFor / total) * 100;
@@ -3048,9 +3075,10 @@ function showPlayerModal(playerName) {
   const nemesis = oe.length ? [...oe].sort((a,b)=>(b[1].losses-b[1].wins)-(a[1].losses-a[1].wins))[0] : null;
 
   // ── Win rate ──
-  const played  = ps ? ps.played : 0;
-  const wins    = ps ? ps.wins   : 0;
-  const losses  = ps ? ps.losses : 0;
+  const played  = ps ? ps.played      : 0;
+  const wins    = ps ? ps.wins        : 0;
+  const losses  = ps ? ps.losses      : 0;
+  const draws   = ps ? (ps.draws||0)  : 0;
   const winRate = played ? Math.round(wins/played*100) : 0;
   const wr_color = winRate>=60?'var(--success)':winRate>=40?'var(--accent)':'var(--danger)';
 
@@ -3067,7 +3095,7 @@ function showPlayerModal(playerName) {
     <!-- Hero: Win Rate + Pills -->
     <div class="stats-hero">
       <div class="donut-wrap">
-        ${svgDonut(winRate, wr_color, 100, 10)}
+        ${svgDonutTriple(wins, draws, losses, 100, 10)}
         <div class="donut-label">
           <span class="donut-pct" style="color:${wr_color}">${winRate}%</span>
           <span class="donut-sub">WIN</span>
@@ -3081,6 +3109,10 @@ function showPlayerModal(playerName) {
         <div class="stat-pill">
           <span class="stat-pill-label">VICTOIRES</span>
           <span class="stat-pill-val" style="color:var(--success)">${wins}</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-pill-label">NULS</span>
+          <span class="stat-pill-val" style="color:#888">${draws}</span>
         </div>
         <div class="stat-pill">
           <span class="stat-pill-label">DÉFAITES</span>
