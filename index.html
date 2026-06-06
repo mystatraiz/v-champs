@@ -267,6 +267,16 @@
   .rank-2 { background: #aaa; color: var(--black); }
   .rank-3 { background: #8B6914; color: var(--white); }
   .rank-other { background: var(--border); color: var(--text-secondary); }
+  /* ─── Trend arrows ─── */
+  .rank-trend {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
+    text-align: center; margin-top: 3px; white-space: nowrap;
+    line-height: 1;
+  }
+  .rank-trend-up   { color: #2ecc71; }
+  .rank-trend-down { color: #e74c3c; }
+  .rank-trend-same { color: var(--muted); }
+  .rank-trend-new  { color: var(--accent); font-size: 8px; letter-spacing: 0.5px; }
   .player-link { color: var(--accent); cursor: pointer; font-weight: 600; }
   .player-link:hover { text-decoration: underline; }
   /* ─── Player Modal ─── */
@@ -1504,6 +1514,44 @@ function computeGlobalRankings() {
 
 function positionLabel(pos) { return pos === 1 ? '1er' : `${pos}e`; }
 
+// Calcule le rang précédent de chaque joueur (hors dernière session)
+// Retourne une Map : clé lowercase → rang 1-based avant la dernière session
+function computePrevRankMap(cutoffMs) {
+  const allSids = [...new Set(_playerSessionScores.map(r => r.session_id))].sort();
+  if (allSids.length < 2) return new Map(); // pas assez de sessions pour comparer
+  const latestSid = allSids[allSids.length - 1];
+
+  // Regrouper par clé (lowercase) en excluant la dernière session
+  const byKey = {};
+  _playerSessionScores
+    .filter(r => r.session_id !== latestSid)
+    .forEach(r => {
+      const key = r.player_name.toLowerCase().trim();
+      (byKey[key] = byKey[key] || []).push(r);
+    });
+
+  const prevList = Object.entries(byKey).map(([key, perfs]) => {
+    const valid    = perfs.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
+    const retained = [...valid].sort((a, b) => b.points_earned - a.points_earned).slice(0, 8);
+    const score    = retained.reduce((s, p) => s + p.points_earned, 0);
+    return { key, score, sessions: valid.length };
+  }).filter(p => p.sessions >= 1)
+    .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
+
+  const map = new Map();
+  prevList.forEach((p, i) => map.set(p.key, i + 1));
+  return map;
+}
+
+function rankTrendHtml(currRank, prevRank, isNew) {
+  if (isNew)       return `<div class="rank-trend rank-trend-new">NEW</div>`;
+  if (prevRank === undefined) return '';
+  const delta = prevRank - currRank; // positif = monté
+  if (delta > 0)   return `<div class="rank-trend rank-trend-up">▲${delta}</div>`;
+  if (delta < 0)   return `<div class="rank-trend rank-trend-down">▼${Math.abs(delta)}</div>`;
+  return             `<div class="rank-trend rank-trend-same">—</div>`;
+}
+
 function renderCombinedRanking(highlightPlayer) {
   const rankings   = computeGlobalRankings();
   const matchStats = buildAllPlayerStats(true);
@@ -1518,7 +1566,10 @@ function renderCombinedRanking(highlightPlayer) {
     return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
   }
 
-  const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  const cutoffMs   = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  const prevRankMap = computePrevRankMap(cutoffMs);
+  // Quand il n'y a qu'une seule session toutes les entrées sont « NEW »
+  const hasPrevData = prevRankMap.size > 0;
 
   const combined = [...seen.entries()].map(([key, name]) => {
     // V-Champs : fusionner TOUTES les variantes de nom (ex: "Jean Louis" + "Jean-Louis")
@@ -1544,6 +1595,7 @@ function renderCombinedRanking(highlightPlayer) {
       }, { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 });
 
     return {
+      key,
       name,
       score,
       sessions: validPerfs.length,
@@ -1557,11 +1609,17 @@ function renderCombinedRanking(highlightPlayer) {
     .sort((a, b) => b.score - a.score || b.m - a.m);
 
   const rows = combined.map((p, i) => {
-    const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
-    const dc = p.jDiff > 0 ? 'var(--success)' : p.jDiff < 0 ? 'var(--danger)' : 'var(--text-secondary)';
-    const hl = highlightPlayer && p.name === highlightPlayer ? 'background:#1e1a12;' : '';
+    const rc       = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+    const dc       = p.jDiff > 0 ? 'var(--success)' : p.jDiff < 0 ? 'var(--danger)' : 'var(--text-secondary)';
+    const hl       = highlightPlayer && p.name === highlightPlayer ? 'background:#1e1a12;' : '';
+    const prevRank = prevRankMap.get(p.key);
+    const isNew    = hasPrevData && prevRank === undefined;
+    const trend    = rankTrendHtml(i + 1, prevRank, isNew);
     return `<tr style="${hl}">
-      <td><span class="rank-badge ${rc}">${i + 1}</span></td>
+      <td>
+        <span class="rank-badge ${rc}">${i + 1}</span>
+        ${trend}
+      </td>
       <td><span class="player-link" onclick="showVChampsPlayerDetail('${esc(p.name)}')">${p.name}</span></td>
       <td style="font-weight:800;font-size:15px;">${p.score || '—'}</td>
       <td style="color:var(--text-secondary)">${p.sessions || '—'}</td>
