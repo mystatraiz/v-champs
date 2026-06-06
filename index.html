@@ -813,109 +813,6 @@
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════
-//  TEAM NAMES — 150 noms fun
-// ═══════════════════════════════════════════════════
-const TEAM_NAMES = [
-  // Animaux féroces
-  "Les Tornados","Les Requins","Les Cobras","Les Panthères","Les Volcans",
-  "Les Pumas","Les Léopards","Les Faucons","Les Crocos","Les Rhinocéros",
-  "Les Buffles","Les Scorpions","Les Méduses","Les Piranhas","Les Cobras Royaux",
-  "Les Ours Polaires","Les Dragons Rouges","Les Loups Gris","Les Aigles Royaux","Les Ratons Laveurs",
-  "Les Poulpes","Les Blaireaux","Les Hippocampes","Les Manchots","Les Castors",
-  "Les Fourmis Géantes","Les Abeilles Killer","Les Frelons","Les Tarentules","Les Komodos",
-  "Les Jaguars","Les Guépards","Les Hyènes","Les Coyotes","Les Dingos",
-  "Les Piranhas Noirs","Les Requins Tigres","Les Cobras Cracheurs","Les Faucons Pèlerins","Les Vautours",
-  "Les Crocodiles","Les Anacondas","Les Pythons","Les Mambas","Les Raies Manta",
-  "Les Orques","Les Ours Grizzlys","Les Loups Arctiques","Les Lynx","Les Ocelots",
-  // Espace & Science
-  "Les Comètes","Les Électrons","Les Photons","Les Neutrons","Les Quarks",
-  "Les Astronautes","Les Lasers","Les Plasmas","Les Fusées","Les Météorites",
-  "Les Nébuleuses","Les Pulsars","Les Quasars","Les Supernovas","Les Astéroïdes",
-  "Les Galaxies","Les Trous Noirs","Les Étoiles Filantes","Les Novae","Les Cosmonautes",
-  "Les Ions","Les Protons","Les Neutrinos","Les Antimatières","Les Singularités",
-  "Les Orbiteurs","Les Satellites","Les Télescopes","Les Interstellaires","Les Voyageurs",
-  // Guerriers & Histoire
-  "Les Gladiateurs","Les Vikings","Les Spartans","Les Samouraïs","Les Ninjas",
-  "Les Corsaires","Les Pirates","Les Conquistadors","Les Mercenaires","Les Templiers",
-  "Les Bandits","Les Desperados","Les Outlaws","Les Renegades","Les Rebelles",
-  "Les Barbares","Les Légionnaires","Les Centurions","Les Prétoriens","Les Legions",
-  "Les Janissaires","Les Cosaques","Les Lanciers","Les Hallebardiers","Les Arbalétriers",
-  "Les Assassins","Les Ninjas Fantômes","Les Chevaliers Noirs","Les Templiers Fous","Les Croisés",
-  "Les Bérets Verts","Les Marines","Les Rangers","Les Parachutistes","Les Commandos",
-  "Les Zouaves","Les Hussards","Les Dragons","Les Uhlans","Les Grenadiers",
-  // Surnaturel & Fantasy
-  "Les Phénix","Les Sorciers","Les Vampires","Les Zombies","Les Fantômes",
-  "Les Démons","Les Anges","Les Goules","Les Wendigos","Les Poltergeists",
-  "Les Mutants","Les Aliens","Les Martiens","Les Clones","Les Cyborgs",
-  "Les Robots","Les Androïdes","Les Extraterrestres","Les Métamorphes","Les Hybrides",
-  "Les Trolls","Les Ogres","Les Géants","Les Nains Berserkers","Les Elfes Sombres",
-  "Les Sorcières Noires","Les Nécromanciens","Les Lich","Les Wraiths","Les Banshees",
-  "Les Gobelins Fous","Les Orques Sauvages","Les Minotaures","Les Centaures","Les Chimères",
-  // Pop Culture
-  "Les Jedi","Les Sith","Les Mandaloriens","Les Wookies","Les Padawans",
-  "Les Klingons","Les Vulcains","Les Borg","Les Romulans","Les Cardassiens",
-  "Les Avengers","Les Thunderbolts","Les Stormtroopers","Les Predators","Les Terminators",
-  "Les Transformers","Les Galactica","Les Rebels Galactiques","Les Clones Impériaux","Les Chasseurs de Primes",
-  "Les Shaolin","Les Ninjas Turtle","Les Power Rangers","Les Ghostbusters","Les Men in Black",
-  // Padel & Tennis
-  "Les Ace Makers","Les Match Points","Les Break Points","Les Set Closers","Les Game Changers",
-  "Les Lob Masters","Les Smash Bros","Les Drop Shots","Les Winners","Les Aces",
-  "Les Spinners","Les Slicers","Les Topspins","Les Court Kings","Les Net Busters",
-  "Les Wall Crushers","Les Bandeja Kings","Les Vibora Boys","Les Bajada Crew","Les Globo Masters",
-  "Les Chiquita Gang","Les Remate Kings","Les Rulo Players","Les Globo Boys","Les Pared Girls",
-  "Les Cristal Hunters","Les Side Glass","Les Back Glass","Les Volée Killers","Les Mi-Filet",
-  "Les Paraboles","Les Demi-Volées","Les Contre-Pieds","Les Faux-Rebonds","Les Amortis",
-  // Nature & Éléments
-  "Les Cyclones","Les Ouragans","Les Tsunamis","Les Séismes","Les Éruptions",
-  "Les Avalanches","Les Foudres","Les Tempêtes","Les Tourbillons","Les Tornades Rouges",
-  "Les Glaciers","Les Icebergs","Les Déserts","Les Jungles","Les Abysses",
-  "Les Marées Noires","Les Raz-de-Marée","Les Crues Soudaines","Les Sécheresses","Les Blizzards",
-  "Les Feux de Forêt","Les Coulées","Les Geysers","Les Failles","Les Crevasses",
-  // Vitesse & Technologie
-  "Les Turbo Jets","Les Speed Demons","Les Road Warriors","Les Night Riders","Les Sky Hunters",
-  "Les Sonic Boom","Les Hypersoniques","Les Supersoniques","Les Overdrive","Les Redlines",
-  "Les Nitro","Les Turbo","Les Full Throttle","Les Overdrive","Les Warpspeed",
-  "Les Hackers","Les Crackers","Les Glitches","Les Bugs","Les Exploits",
-  "Les Firewalls","Les Cyphers","Les Encoders","Les Rootkits","Les Botnets",
-  "Les Dark Nets","Les Deep Webs","Les Cryptos","Les Blockchains","Les NFT Killers",
-  // Couleurs & Style
-  "Les Black Hawks","Les Red Devils","Les Blue Storm","Les Golden Boys","Les Silver Bullets",
-  "Les Iron Bears","Les Steel Sharks","Les Fire Dragons","Les Ice Tigers","Les Dark Panthers",
-  "Les Shadow Wolves","Les Crimson Kings","Les Obsidian Blades","Les Ivory Towers","Les Scarlet Hawks",
-  "Les Midnight Blues","Les Neon Lights","Les Chrome Spirits","Les Titanium Fists","Les Cobalt Riders",
-  "Les Amber Flames","Les Jade Warriors","Les Onyx Shadows","Les Pearl Strikers","Les Ruby Smashers",
-  // Espagnol
-  "Los Galácticos","Los Diablos","Los Tigres","Los Leones","Los Toros",
-  "Los Halcones","Los Lobos","Los Demonios","Los Guerreros","Los Invencibles",
-  "Los Fenómenos","Los Intocables","Los Imparables","Los Imbatibles","Los Letales",
-  "Los Matadores","Los Conquistadores","Los Cazadores","Los Destructores","Los Campeones",
-  // Italien
-  "I Guerrieri","I Draghi","I Leoni","I Falchi","I Lupi",
-  "I Gladiatori","I Predatori","I Dominatori","I Campioni","I Furiosi",
-  // Allemand
-  "Die Blitze","Die Adler","Die Wölfe","Die Bären","Die Falken",
-  "Die Krieger","Die Jäger","Die Stürmer","Die Donner","Die Eisbrecher",
-  // Noms Épiques Français
-  "Les Indomptables","Les Implacables","Les Irréductibles","Les Indestructibles","Les Invincibles",
-  "Les Intouchables","Les Inégalables","Les Indétrônables","Les Insurmontables","Les Incomparables",
-  "Les Fous Furieux","Les Dingos","Les Barjots","Les Tarés","Les Allumés",
-  "Les Sauvages","Les Déchaînés","Les Enragés","Les Furieux","Les Insensés",
-  "Les Redoutables","Les Terribles","Les Formidables","Les Incroyables","Les Stupéfiants",
-  "Les Inarrêtables","Les Irrésistibles","Les Infernaux","Les Diaboliques","Les Sataniques",
-  "Les Légendaires","Les Mythiques","Les Épiques","Les Héroïques","Les Titanesques",
-  "Les Fabuleux","Les Prodigieux","Les Phénoménaux","Les Extraordinaires","Les Colossaux",
-  // Noms Fun & Décalés
-  "Les Briseurs de Filets","Les Rois du Fond","Les Maîtres du Lob","Les Tueurs de Pared","Les Rois du Smash",
-  "Les Dieux du Padel","Les Seigneurs du Court","Les Maîtres du Cristal","Les Princes du Fond","Les Rois du Verre",
-  "Les Indomitus Warriors","Les Padel Ninjas","Les Court Commandos","Les Glass Warriors","Les Net Assassins",
-  "Les Pared Phantoms","Les Wall Wizards","Les Smash Saints","Les Lob Lords","Les Drop Kings",
-  "Les Slice Sorcerers","Les Spin Doctors","Les Ace Hunters","Les Break Artists","Les Game Poets",
-  "Les Court Prophets","Les Match Makers","Les Set Breakers","Les Point Takers","Les Game Stealers",
-  "Les Ballistic Bros","Les Kinetic Kings","Les Dynamic Duo","Les Power Pair","Les Force Tandem",
-  "Les Unstoppables","Les Unbreakables","Les Untouchables","Les Undeniables","Les Unconquerables",
-];
-
 
 // ═══════════════════════════════════════════════════
 //  STATE
@@ -1869,12 +1766,10 @@ function initTournament() {
   state.sessionStarted = false;
   state.sessionFinished = false;
 
-  // Assign fun names — shuffle pool
-  const pool = [...TEAM_NAMES].sort(() => Math.random() - 0.5);
   for (let i = 0; i < numTeams; i++) {
     state.teams.push({
       id: i,
-      name: pool[i % pool.length],
+      name: `Équipe ${i + 1}`,
       players: ['', ''],
       wins: 0, losses: 0, draws: 0,
       pointsFor: 0, pointsAgainst: 0, matchesPlayed: 0
@@ -1903,11 +1798,8 @@ function renderTeamsGrid() {
   state.teams.forEach((team, ti) => {
     const div = document.createElement('div');
     div.className = 'team-card';
-    const bothFilled = team.players[0].trim() && team.players[1].trim();
     div.innerHTML = `
-      <div class="team-name ${bothFilled ? '' : 'team-name-hidden'}" id="team-name-${ti}">
-        ${bothFilled ? team.name : '· · · · ·'}
-      </div>
+      <div class="team-name" style="color:var(--text-secondary);">Équipe ${ti + 1}</div>
       ${team.players.map((p, pi) => `
         <div class="player-input-wrap" id="wrap-${ti}-${pi}">
           <input type="text"
@@ -2173,14 +2065,14 @@ function showMatchPreview() {
         <div class="match-court" style="margin-bottom:12px;">🏟 Terrain ${m.court}</div>
         <div class="match-teams">
           <div class="match-team">
-            <div class="match-team-name">${t1.name}</div>
-            <div class="match-team-players">${t1.players[0]} / ${t1.players[1]}</div>
+            <div class="match-team-name">${t1.players[0]}</div>
+            <div class="match-team-players">${t1.players[1]}</div>
             ${svc === 1 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
           </div>
           <div class="match-vs">VS</div>
           <div class="match-team">
-            <div class="match-team-name">${t2.name}</div>
-            <div class="match-team-players">${t2.players[0]} / ${t2.players[1]}</div>
+            <div class="match-team-name">${t2.players[0]}</div>
+            <div class="match-team-players">${t2.players[1]}</div>
             ${svc === 2 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
           </div>
         </div>
@@ -2330,15 +2222,15 @@ function buildMatchCard(m) {
     </div>
     <div class="match-teams">
       <div class="match-team">
-        <div class="match-team-name" style="${w1?'color:var(--accent)':''}">${t1.name}</div>
-        <div class="match-team-players">${t1.players[0]} / ${t1.players[1]}</div>
+        <div class="match-team-name" style="${w1?'color:var(--accent)':''}">${t1.players[0]}</div>
+        <div class="match-team-players">${t1.players[1]}</div>
         ${w1 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
         ${!finished && m.servingTeam === 1 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
       </div>
       <div class="match-vs">VS</div>
       <div class="match-team">
-        <div class="match-team-name" style="${w2?'color:var(--accent)':''}">${t2.name}</div>
-        <div class="match-team-players">${t2.players[0]} / ${t2.players[1]}</div>
+        <div class="match-team-name" style="${w2?'color:var(--accent)':''}">${t2.players[0]}</div>
+        <div class="match-team-players">${t2.players[1]}</div>
         ${w2 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
         ${!finished && m.servingTeam === 2 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
       </div>
@@ -2510,9 +2402,9 @@ function renderMatchHistory() {
     return `
       <div class="history-item">
         <span style="color:var(--text-secondary);font-size:11px;width:60px;">T${m.court} R${m.roundNum}</span>
-        <span style="${w1?'color:var(--accent);font-weight:700;':''}">${t1.name}</span>
+        <span style="${w1?'color:var(--accent);font-weight:700;':''}">${t1.players.filter(p=>p).join(' / ')}</span>
         <span style="color:var(--muted);margin:0 8px;font-size:12px;">${scoreStr}</span>
-        <span style="${w2?'color:var(--accent);font-weight:700;':''}">${t2.name}</span>
+        <span style="${w2?'color:var(--accent);font-weight:700;':''}">${t2.players.filter(p=>p).join(' / ')}</span>
       </div>
     `;
   }).join('');
@@ -2698,37 +2590,106 @@ function teamTableHTML(teams) {
 }
 
 // ─── Session tab: stats de la session courante uniquement ───
+function computeSessionPointsLive(sortedTeamStats) {
+  const strengths = sortedTeamStats.map(ts =>
+    ts.team.players.filter(p => p && p.trim())
+      .reduce((s, p) => s + getPlayerScoreForCoeff(p, null), 0)
+  );
+  const results = [];
+  sortedTeamStats.forEach((ts, idx) => {
+    const position = idx + 1;
+    const basePoints = BASE_POINTS_BY_POS[position] || 25;
+    const myStrength = strengths[idx];
+    const others = strengths.filter((_, i) => i !== idx);
+    const avgOpp = others.length ? others.reduce((s, v) => s + v, 0) / others.length : 0;
+    const coeff = getDiffCoeff(myStrength - avgOpp);
+    const points = Math.round(basePoints * coeff);
+    ts.team.players.filter(p => p && p.trim()).forEach(name => {
+      results.push({ name, position, points });
+    });
+  });
+  return results.sort((a, b) => b.points - a.points);
+}
+
 function renderSessionStats() {
   const container = document.getElementById('stats-content');
   if (!state.sessionStarted) {
     container.innerHTML = '<div class="empty-state">Lancez une session pour voir les statistiques.</div>';
     return;
   }
-  const sessionStats = buildAllPlayerStats(false); // history=false → current session only
-  // Override: build current-session-only stats from scratch
-  const curStats = {};
-  const curSession = { teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') };
-  [curSession].forEach(session => {
-    session.matches.forEach(m => {
-      const t1 = session.teams.find(t => t.id === m.team1Id);
-      const t2 = session.teams.find(t => t.id === m.team2Id);
-      if (!t1 || !t2) return;
-      [[t1, m.score1, m.score2],[t2, m.score2, m.score1]].forEach(([team, sf, sa]) => {
-        team.players.filter(p => p && p.trim()).forEach(p => {
-          if (!curStats[p]) curStats[p] = {wins:0,losses:0,draws:0,jFor:0,jAgainst:0,played:0};
-          const ps = curStats[p];
-          ps.played++; ps.jFor += sf; ps.jAgainst += sa;
-          if (sf > sa) ps.wins++; else if (sa > sf) ps.losses++; else ps.draws++;
-        });
-      });
-    });
+  const finished = state.matches.filter(m => m.status === 'finished');
+  if (!finished.length) {
+    container.innerHTML = '<div class="empty-state">Aucun match terminé pour l\'instant.</div>';
+    return;
+  }
+
+  // Stats par équipe pour cette session
+  const teamMap = {};
+  state.teams.forEach(t => {
+    teamMap[t.id] = { team: t, wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 };
+  });
+  finished.forEach(m => {
+    const ts1 = teamMap[m.team1Id], ts2 = teamMap[m.team2Id];
+    if (!ts1 || !ts2) return;
+    let jf1 = m.score1, ja1 = m.score2;
+    if (m.scoreType === 'sets' && m.sets) {
+      jf1 = m.sets.reduce((s,r) => s+r[0], 0);
+      ja1 = m.sets.reduce((s,r) => s+r[1], 0);
+    }
+    ts1.played++; ts1.jFor += jf1; ts1.jAgainst += ja1;
+    ts2.played++; ts2.jFor += ja1; ts2.jAgainst += jf1;
+    if (m.score1 > m.score2) { ts1.wins++; ts2.losses++; }
+    else if (m.score2 > m.score1) { ts2.wins++; ts1.losses++; }
+    else { ts1.draws++; ts2.draws++; }
   });
 
+  const sorted = Object.values(teamMap).sort((a, b) => {
+    const pa = a.wins*3 + a.draws, pb = b.wins*3 + b.draws;
+    if (pa !== pb) return pb - pa;
+    const da = a.jFor - a.jAgainst, db = b.jFor - b.jAgainst;
+    if (da !== db) return db - da;
+    return b.jFor - a.jFor;
+  });
+
+  // Table classement équipes
+  const teamRows = sorted.map((ts, i) => {
+    const rc = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+    const diff = ts.jFor - ts.jAgainst;
+    const dc = diff>0?'var(--success)':diff<0?'var(--danger)':'var(--text-secondary)';
+    const players = ts.team.players.filter(p=>p&&p.trim()).join(' / ');
+    return `<tr>
+      <td><span class="rank-badge ${rc}">${i+1}</span></td>
+      <td style="font-weight:700;">${players}</td>
+      <td>${ts.played}</td>
+      <td style="color:var(--success)">${ts.wins}</td>
+      <td style="color:var(--danger)">${ts.losses}</td>
+      <td style="color:var(--text-secondary)">${ts.draws}</td>
+      <td>${ts.jFor}</td><td>${ts.jAgainst}</td>
+      <td style="font-weight:700;color:${dc}">${diff>=0?'+':''}${diff}</td>
+    </tr>`;
+  }).join('');
+
+  // Points V-Champs individuels
+  const playerPts = computeSessionPointsLive(sorted);
+  const playerRows = playerPts.map((p, i) => {
+    const color = p.position <= 2 ? 'var(--success)' : 'var(--danger)';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #2a2a2a;">
+      <span style="width:22px;text-align:center;font-size:12px;font-weight:800;color:var(--text-secondary);">${i+1}</span>
+      <span style="flex:1;font-weight:700;">${p.name}</span>
+      <span style="font-size:18px;font-weight:800;color:${color}">+${p.points} pts</span>
+    </div>`;
+  }).join('');
+
   container.innerHTML = `
-    <div class="section-title">Équipes · session en cours</div>
-    ${teamTableHTML(state.teams)}
-    <div class="section-title" style="margin-top:24px;">Individuel · session en cours</div>
-    ${individualTableHTML(curStats)}
+    <div class="section-title">Classement équipes</div>
+    <div class="card stats-table-wrap" style="padding:0;overflow:hidden;margin-bottom:20px;">
+      <table class="stats-table">
+        <thead><tr><th>#</th><th>Équipe</th><th>M</th><th>V</th><th>D</th><th>N</th><th>J+</th><th>J-</th><th>+/-</th></tr></thead>
+        <tbody>${teamRows}</tbody>
+      </table>
+    </div>
+    <div class="section-title">Points V-Champs · session</div>
+    <div class="card" style="padding:8px 16px;">${playerRows}</div>
   `;
 }
 
@@ -3087,7 +3048,7 @@ function showPlayerModal(playerName) {
     <div class="modal-header">
       <div>
         <div class="modal-title">${playerName}</div>
-        ${team ? `<div class="modal-subtitle">${team.name}</div>` : ''}
+        ${team ? `<div class="modal-subtitle">${team.players.filter(p=>p&&p!==playerName).join(' / ')}</div>` : ''}
       </div>
       <button class="modal-close" onclick="forceClosePlayerModal()" style="touch-action:manipulation;">✕</button>
     </div>
