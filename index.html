@@ -234,6 +234,13 @@
     font-size: 11px; font-weight: 700; letter-spacing: 1px;
     text-transform: uppercase; color: var(--accent); margin-top: 4px;
   }
+  /* ─── Service badge ─── */
+  .service-badge {
+    display: inline-block; margin-top: 5px;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--black);
+    background: var(--accent); border-radius: 20px; padding: 2px 8px;
+  }
   /* ─── Proposed match ─── */
   .proposed-section { margin-top: 24px; }
   .proposed-section .card { border-color: #444; }
@@ -761,7 +768,16 @@
         </div>
       </div>
 
-      <!-- La section "proposer un match" est supprimée — l'enchaînement est automatique -->
+      <!-- Preview avant le timer d'échauffement -->
+      <div id="preview-section" style="display:none;">
+        <div class="section-title">Round 1 — Rendez-vous sur vos terrains</div>
+        <div class="matches-grid" id="preview-grid"></div>
+        <div style="margin-top:24px;">
+          <button class="btn btn-primary btn-lg" onclick="confirmAndStartWarmup()" style="width:100%;max-width:360px;justify-content:center;">
+            ✓ Tout le monde est prêt — Lancer le timer →
+          </button>
+        </div>
+      </div>
 
       <div style="margin-top:24px;">
         <div class="section-title">Historique des matchs</div>
@@ -2089,20 +2105,63 @@ function resolveTeamName(team) {
 // ═══════════════════════════════════════════════════
 //  SESSION START
 // ═══════════════════════════════════════════════════
+let _pendingMatchups = null; // matchups pré-calculés (preview → launchNextRound)
+
 function startSession() {
-  // Normaliser tous les noms avant de sauvegarder
-  state.teams.forEach(t => {
-    t.players = t.players.map(p => normalizeName(p));
-  });
-  const allNames = state.teams.flatMap(t => t.players);
-  addKnownPlayers(allNames);
+  state.teams.forEach(t => { t.players = t.players.map(p => normalizeName(p)); });
+  addKnownPlayers(state.teams.flatMap(t => t.players));
   state.teams.forEach(t => resolveTeamName(t));
   state.sessionStarted = true;
   state.roundNum = 0;
   saveState();
   savePairNames();
   updateHeaderActions();
-  startWarmup(); // 6 min d'échauffement, puis 1er match auto
+  showMatchPreview();
+}
+
+function showMatchPreview() {
+  const matchups = proposeBestMatchups(state.courts);
+  // Tirage aléatoire du service, stocké pour être réutilisé dans launchNextRound
+  _pendingMatchups = matchups.map((m, idx) => ({
+    ...m,
+    court: idx + 1,
+    servingTeam: Math.random() < 0.5 ? 1 : 2
+  }));
+
+  const grid = document.getElementById('preview-grid');
+  grid.innerHTML = _pendingMatchups.map(m => {
+    const t1 = state.teams[m.t1], t2 = state.teams[m.t2];
+    const svc = m.servingTeam;
+    return `
+      <div class="card" style="border-color:var(--accent);">
+        <div class="match-court" style="margin-bottom:12px;">🏟 Terrain ${m.court}</div>
+        <div class="match-teams">
+          <div class="match-team">
+            <div class="match-team-name">${t1.name}</div>
+            <div class="match-team-players">${t1.players[0]} / ${t1.players[1]}</div>
+            ${svc === 1 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
+          </div>
+          <div class="match-vs">VS</div>
+          <div class="match-team">
+            <div class="match-team-name">${t2.name}</div>
+            <div class="match-team-players">${t2.players[0]} / ${t2.players[1]}</div>
+            ${svc === 2 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('phase-players').style.display = 'none';
+  document.getElementById('phase-matches').style.display = 'block';
+  document.getElementById('preview-section').style.display = 'block';
+  document.getElementById('warmup-section').style.display = 'none';
+  document.getElementById('active-matches-section').style.display = 'none';
+  document.getElementById('session-end-bar').style.display = 'none';
+}
+
+function confirmAndStartWarmup() {
+  document.getElementById('preview-section').style.display = 'none';
+  startWarmup();
 }
 
 // ═══════════════════════════════════════════════════
@@ -2147,18 +2206,24 @@ function proposeBestMatchups(numCourts) {
 
 function launchNextRound() {
   state.roundNum++;
-  const matchups = proposeBestMatchups(state.courts);
+  // Utiliser les matchups pré-calculés (preview) ou en générer de nouveaux
+  const raw = _pendingMatchups || proposeBestMatchups(state.courts).map((m, idx) => ({
+    ...m, court: idx + 1, servingTeam: Math.random() < 0.5 ? 1 : 2
+  }));
+  _pendingMatchups = null;
+
   state.activeMatches = [];
   const useSets = state.courts === 1;
-  matchups.forEach((m, idx) => {
+  raw.forEach(m => {
     const match = {
       id: state.matchCounter++,
       team1Id: m.t1,
       team2Id: m.t2,
-      court: idx + 1,
+      court: m.court,
+      servingTeam: m.servingTeam,
       scoreType: useSets ? 'sets' : 'games',
-      sets: [[0,0],[0,0],[0,0]], // set scores [[t1,t2], ...]
-      score1: 0, // sets won (sets mode) or games (games mode)
+      sets: [[0,0],[0,0],[0,0]],
+      score1: 0,
       score2: 0,
       status: 'active',
       roundNum: state.roundNum,
@@ -2235,12 +2300,14 @@ function buildMatchCard(m) {
         <div class="match-team-name" style="${w1?'color:var(--accent)':''}">${t1.name}</div>
         <div class="match-team-players">${t1.players[0]} / ${t1.players[1]}</div>
         ${w1 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
+        ${!finished && m.servingTeam === 1 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
       </div>
       <div class="match-vs">VS</div>
       <div class="match-team">
         <div class="match-team-name" style="${w2?'color:var(--accent)':''}">${t2.name}</div>
         <div class="match-team-players">${t2.players[0]} / ${t2.players[1]}</div>
         ${w2 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
+        ${!finished && m.servingTeam === 2 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
       </div>
     </div>
     ${!finished
