@@ -766,6 +766,9 @@
         <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;margin:20px auto 0;max-width:280px;">
           <div id="warmup-bar" style="height:100%;background:var(--accent);border-radius:4px;width:0%;transition:width 1s linear;"></div>
         </div>
+        <button onclick="skipWarmup()" style="margin-top:28px;background:none;border:1px solid var(--border);color:var(--text-secondary);padding:9px 22px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:0.5px;">
+          ⚡ Démarrer le 1er match maintenant
+        </button>
       </div>
 
       <div id="active-matches-section">
@@ -2873,6 +2876,15 @@ function resumeWarmup() {
   clearInterval(_warmupInterval);
   _warmupInterval = setInterval(tickWarmup, 1000);
   tickWarmup();
+}
+
+function skipWarmup() {
+  clearInterval(_warmupInterval); _warmupInterval = null;
+  state.warmupStart = null;
+  saveState();
+  setDisplay('warmup-section', 'none');
+  setDisplay('active-matches-section', 'block');
+  launchNextRound();
 }
 
 function tickWarmup() {
