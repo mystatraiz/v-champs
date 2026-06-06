@@ -1583,18 +1583,39 @@ function renderCombinedRanking(highlightPlayer) {
     return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
   }
 
+  const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
+
   const combined = [...seen.entries()].map(([key, name]) => {
-    const vc = rankings.find(r => r.name.toLowerCase().trim() === key);
-    const msKey = Object.keys(matchStats).find(k => k.toLowerCase().trim() === key);
-    const ms = msKey ? matchStats[msKey] : { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 };
+    // V-Champs : fusionner TOUTES les variantes de nom (ex: "Jean Louis" + "Jean-Louis")
+    const vcVariants = rankings.filter(r => r.name.toLowerCase().trim() === key);
+    const allPerfs   = vcVariants.flatMap(r => r.allPerformances);
+    const validPerfs = allPerfs.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
+    const retained   = [...validPerfs].sort((a, b) => b.points_earned - a.points_earned).slice(0, 8);
+    const score      = retained.reduce((s, p) => s + p.points_earned, 0);
+
+    // Match stats : agréger toutes les variantes
+    const ms = Object.keys(matchStats)
+      .filter(k => k.toLowerCase().trim() === key)
+      .reduce((acc, k) => {
+        const s = matchStats[k];
+        return {
+          wins:      acc.wins      + s.wins,
+          losses:    acc.losses    + s.losses,
+          draws:     acc.draws     + (s.draws || 0),
+          jFor:      acc.jFor      + s.jFor,
+          jAgainst:  acc.jAgainst  + s.jAgainst,
+          played:    acc.played    + s.played
+        };
+      }, { wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 });
+
     return {
       name,
-      score:    vc?.score    ?? 0,
-      sessions: vc?.validCount ?? 0,
+      score,
+      sessions: validPerfs.length,
       m: ms.played,
       v: ms.wins,
       d: ms.losses,
-      n: ms.draws || 0,
+      n: ms.draws,
       jDiff: ms.jFor - ms.jAgainst
     };
   }).filter(p => p.sessions >= 1 || p.m >= 1)
@@ -1630,7 +1651,26 @@ function renderCombinedRanking(highlightPlayer) {
 
 function showVChampsPlayerDetail(playerName) {
   const rankings = computeGlobalRankings();
-  const player = rankings.find(p => p.name === playerName);
+  const key = playerName.toLowerCase().trim();
+  // Fusionner toutes les variantes de nom pour ce joueur
+  const variants = rankings.filter(p => p.name.toLowerCase().trim() === key);
+  let player = null;
+  if (variants.length > 0) {
+    const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
+    const allPerfs   = variants.flatMap(v => v.allPerformances);
+    const validPerfs = allPerfs.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
+    const retained   = [...validPerfs].sort((a, b) => b.points_earned - a.points_earned).slice(0, 8);
+    player = {
+      name:             playerName,
+      score:            retained.reduce((s, p) => s + p.points_earned, 0),
+      validCount:       validPerfs.length,
+      retainedCount:    retained.length,
+      bestPerformance:  retained[0]?.points_earned ?? 0,
+      oldestRetainedDate: retained[retained.length - 1]?.created_at ?? null,
+      status:           validPerfs.length >= 4 ? 'active' : 'inactive',
+      allPerformances:  allPerfs
+    };
+  }
   const modal = document.getElementById('player-modal');
 
   if (!player) {
