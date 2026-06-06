@@ -2120,8 +2120,18 @@ function startSession() {
 }
 
 function showMatchPreview() {
+  // D'abord : transition de phase (avant toute opération qui pourrait échouer)
+  document.getElementById('phase-players').style.display = 'none';
+  document.getElementById('phase-matches').style.display = 'block';
+  document.getElementById('session-end-bar').style.display = 'none';
+  document.getElementById('warmup-section').style.display = 'none';
+  document.getElementById('active-matches-section').style.display = 'none';
+
   const matchups = proposeBestMatchups(state.courts);
-  // Tirage aléatoire du service, stocké pour être réutilisé dans launchNextRound
+
+  // Fallback si aucun matchup possible (sécurité)
+  if (!matchups.length) { startWarmup(); return; }
+
   _pendingMatchups = matchups.map((m, idx) => ({
     ...m,
     court: idx + 1,
@@ -2129,8 +2139,12 @@ function showMatchPreview() {
   }));
 
   const grid = document.getElementById('preview-grid');
+  // Fallback si l'élément n'existe pas (cache PWA avec ancien HTML)
+  if (!grid) { startWarmup(); return; }
+
   grid.innerHTML = _pendingMatchups.map(m => {
     const t1 = state.teams[m.t1], t2 = state.teams[m.t2];
+    if (!t1 || !t2) return '';
     const svc = m.servingTeam;
     return `
       <div class="card" style="border-color:var(--accent);">
@@ -2151,12 +2165,9 @@ function showMatchPreview() {
       </div>`;
   }).join('');
 
-  document.getElementById('phase-players').style.display = 'none';
-  document.getElementById('phase-matches').style.display = 'block';
-  document.getElementById('preview-section').style.display = 'block';
-  document.getElementById('warmup-section').style.display = 'none';
-  document.getElementById('active-matches-section').style.display = 'none';
-  document.getElementById('session-end-bar').style.display = 'none';
+  const previewSection = document.getElementById('preview-section');
+  if (previewSection) previewSection.style.display = 'block';
+  else startWarmup(); // fallback ultime
 }
 
 function confirmAndStartWarmup() {
