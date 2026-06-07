@@ -4116,7 +4116,7 @@ function openAddTournament() {
   const next = new Date();
   next.setDate(next.getDate() + 1);
   document.getElementById('pt-date').value = next.toISOString().slice(0,10);
-  document.getElementById('pt-label').value = '';
+  document.getElementById('pt-label').value = '6/7';
   // Reset time to default each time (in case user changed it previously)
   const selTime = document.getElementById('pt-time');
   if (selTime) selTime.value = '12:30';
