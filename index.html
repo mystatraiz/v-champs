@@ -4155,7 +4155,7 @@ function openPlannedTournament(id) {
     info.style.display = 'block';
     info.textContent = `📅 ${dateLabel.charAt(0).toUpperCase()+dateLabel.slice(1)}${pt.time ? ' · '+pt.time : ''}${pt.label ? ' — '+pt.label : ''}`;
   }
-  if (exitBtn) exitBtn.textContent = '✓ Sauvegarder';
+  if (exitBtn) exitBtn.textContent = '← Retour';
   // Afficher la liste des inscrits via lien
   renderJoinPool(pt);
 }
@@ -4192,7 +4192,7 @@ async function saveDraftPlayers() {
   updateHeaderActions();
 }
 
-// Bouton ← Retour / ✓ Sauvegarder de l'écran joueurs
+// Bouton ← Retour de l'écran joueurs
 function exitPlayerSetup() {
   if (state.plannedTournamentId) {
     saveDraftPlayers();
