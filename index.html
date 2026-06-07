@@ -4285,23 +4285,46 @@ function getJoinUrl(tournamentId) {
 function shareToWhatsApp(id) {
   const pt = _plannedTournaments.find(t => t.id === id);
   if (!pt) return;
-  const { filled, total } = _plannedPlayerCount(pt);
-  const free = total - filled - (pt.joinList?.length || 0);
-  const freeCapped = Math.max(0, free);
+
   const d = new Date(pt.date);
   const dateStr = d.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' });
   const dateFmt = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-  const msg = [
+
+  // Liste de tous les joueurs déjà enregistrés (grille admin + inscrits via lien)
+  const gridPlayers = (pt.teams || [])
+    .flatMap(t => t.players)
+    .filter(p => p?.trim());
+  const joinPlayers = (pt.joinList || []).map(j => j.name);
+  const allPlayers = [...new Set([...gridPlayers, ...joinPlayers])];
+
+  const { total } = _plannedPlayerCount(pt);
+  const filled = allPlayers.length;
+  const free = Math.max(0, total - filled);
+
+  const playerEmojis = ['🎾','🏅','⚡','🔥','💪','🎯','🌟','👊'];
+  const playerLines = allPlayers.map((p, i) => `${playerEmojis[i % playerEmojis.length]} ${p}`);
+
+  const spotsLine = free === 0
+    ? `🔴 *Complet !*`
+    : `🟢 *${free} place${free > 1 ? 's' : ''} disponible${free > 1 ? 's' : ''}*`;
+
+  const lines = [
     `🎾 *Partie de padel — V-Champs*`,
+    pt.label ? `_${pt.label}_` : null,
     ``,
-    `📅 ${dateFmt}${pt.time ? ' à ' + pt.time : ''}`,
-    `🎟️ ${freeCapped} place${freeCapped !== 1 ? 's' : ''} disponible${freeCapped !== 1 ? 's' : ''}`,
-    pt.label ? `📝 ${pt.label}` : null,
+    `📅 *${dateFmt}*`,
+    pt.time ? `⏰ *${pt.time}*` : null,
     ``,
-    `Inscris-toi 👇`,
+    allPlayers.length ? `👥 *Joueurs inscrits (${filled}/${total}) :*` : null,
+    ...playerLines,
+    ``,
+    spotsLine,
+    ``,
+    `👇 Rejoins-nous !`,
     getJoinUrl(id)
   ].filter(l => l !== null).join('\n');
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+
+  window.open('https://wa.me/?text=' + encodeURIComponent(lines), '_blank');
 }
 
 function showJoinScreen(id) {
