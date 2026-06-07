@@ -4112,9 +4112,9 @@ function openAddTournament() {
     });
     sel.value = '12:30';
   }
-  // Pré-remplir avec le prochain samedi
+  // Pré-remplir avec demain
   const next = new Date();
-  next.setDate(next.getDate() + ((6 - next.getDay() + 7) % 7 || 7));
+  next.setDate(next.getDate() + 1);
   document.getElementById('pt-date').value = next.toISOString().slice(0,10);
   document.getElementById('pt-label').value = '';
   // Reset time to default each time (in case user changed it previously)
