@@ -914,7 +914,16 @@
           <input type="date" id="pt-date" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;">
           <select id="pt-time" style="width:110px;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;"></select>
         </div>
-        <input type="text" id="pt-label" placeholder="Description (optionnel)" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;">Niveau</label>
+          <select id="pt-label" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;">
+            <option value="">— tous niveaux —</option>
+            <option value="4/5">4 / 5</option>
+            <option value="5/6">5 / 6</option>
+            <option value="6/7">6 / 7</option>
+            <option value="7/8">7 / 8</option>
+          </select>
+        </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" onclick="savePlannedTournament()">✓ Enregistrer</button>
           <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="closeAddTournament()">Annuler</button>
@@ -4079,13 +4088,16 @@ function openAddTournament() {
       opt.value = s; opt.textContent = s;
       sel.appendChild(opt);
     });
-    sel.value = '10:00';
+    sel.value = '12:30';
   }
   // Pré-remplir avec le prochain samedi
   const next = new Date();
   next.setDate(next.getDate() + ((6 - next.getDay() + 7) % 7 || 7));
   document.getElementById('pt-date').value = next.toISOString().slice(0,10);
   document.getElementById('pt-label').value = '';
+  // Reset time to default each time (in case user changed it previously)
+  const selTime = document.getElementById('pt-time');
+  if (selTime) selTime.value = '12:30';
   el.style.display = 'block';
 }
 
