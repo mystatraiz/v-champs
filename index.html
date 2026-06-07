@@ -841,7 +841,10 @@
       <!-- Formulaire ajout (caché par défaut) -->
       <div id="add-tournament-form" style="display:none;margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">Nouveau tournoi planifié</div>
-        <input type="date" id="pt-date" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:8px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input type="date" id="pt-date" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;">
+          <select id="pt-time" style="width:110px;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;"></select>
+        </div>
         <input type="text" id="pt-label" placeholder="Description (optionnel)" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:10px;">
         <div style="display:flex;gap:8px;">
           <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" onclick="savePlannedTournament()">✓ Enregistrer</button>
@@ -857,9 +860,10 @@
         <span>Entrée des joueurs</span>
         <span id="player-count-badge" style="font-size:12px;font-weight:700;color:var(--accent);letter-spacing:1px;"></span>
       </div>
+      <div id="player-setup-draft-info" style="display:none;font-size:12px;color:var(--accent);margin-bottom:8px;text-align:center;letter-spacing:0.5px;"></div>
       <div class="teams-grid" id="teams-grid"></div>
       <div style="margin-top:24px;display:flex;gap:12px;">
-        <button class="btn btn-secondary btn-lg" onclick="cancelSession()" style="flex:0 0 auto;">
+        <button class="btn btn-secondary btn-lg" id="exit-player-setup-btn" onclick="exitPlayerSetup()" style="flex:0 0 auto;">
           ← Retour
         </button>
         <button class="btn btn-primary btn-lg" onclick="startSession()" id="launch-session-btn" disabled style="flex:1;">
@@ -990,6 +994,7 @@ let state = {
   activeMatches: [],  // ids of currently running matches
   sessionStarted: false,
   sessionFinished: false,
+  plannedTournamentId: null, // set when editing players for a planned session
   // pair→teamName map persisted across sessions
   pairNameMap: {}     // "p1|p2" => teamName
 };
@@ -2477,6 +2482,16 @@ function startSession() {
   try { state.teams.forEach(t => { t.players = t.players.map(p => normalizeName(p)); }); } catch(e) {}
   try { addKnownPlayers(state.teams.flatMap(t => t.players)); } catch(e) {}
   try { state.teams.forEach(t => resolveTeamName(t)); } catch(e) {}
+  // Si lancé depuis un tournoi planifié → le retirer de la liste
+  if (state.plannedTournamentId) {
+    _plannedTournaments = _plannedTournaments.filter(t => t.id !== state.plannedTournamentId);
+    savePlannedTournamentsDB().catch(() => {});
+    state.plannedTournamentId = null;
+    const info = document.getElementById('player-setup-draft-info');
+    const exitBtn = document.getElementById('exit-player-setup-btn');
+    if (info) info.style.display = 'none';
+    if (exitBtn) exitBtn.textContent = '← Retour';
+  }
   state.sessionStarted = true;
   state.roundNum = 0;
   saveState();
@@ -3878,7 +3893,20 @@ function renderTournamentSetup() {
 }
 
 // ─── Planned tournaments ────────────────────────────────────────────────────
-let _plannedTournaments = []; // [{id, date, label}]
+let _plannedTournaments = []; // [{id, date, time, label, teams, status}]
+
+// Créneaux de 1h30 de 8h à 23h
+const PLANNED_TIME_SLOTS = (() => {
+  const slots = [];
+  let m = 8 * 60;
+  while (m <= 23 * 60) {
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    slots.push(`${hh}:${mm}`);
+    m += 90;
+  }
+  return slots; // ['08:00','09:30','11:00',...]
+})();
 
 async function loadPlannedTournaments() {
   const { data } = await db.from('app_state').select('value').eq('key','planned_tournaments').maybeSingle();
@@ -3890,13 +3918,20 @@ async function savePlannedTournamentsDB() {
   await db.from('app_state').upsert({ key:'planned_tournaments', value: _plannedTournaments, updated_at: new Date().toISOString() });
 }
 
+function _plannedPlayerCount(t) {
+  if (!t.teams) return { filled: 0, total: 8 };
+  const total = t.teams.length * 2;
+  const filled = t.teams.reduce((n, tm) => n + (tm.players[0]?.trim()?1:0) + (tm.players[1]?.trim()?1:0), 0);
+  return { filled, total };
+}
+
 function renderUpcomingTournaments() {
   const el = document.getElementById('upcoming-list');
   if (!el) return;
   const today = new Date(); today.setHours(0,0,0,0);
   const future = _plannedTournaments
     .filter(t => new Date(t.date) >= today)
-    .sort((a,b) => new Date(a.date) - new Date(b.date));
+    .sort((a,b) => new Date(a.date+' '+(a.time||'00:00')) - new Date(b.date+' '+(b.time||'00:00')));
   const past = _plannedTournaments
     .filter(t => new Date(t.date) < today)
     .sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -3909,13 +3944,31 @@ function renderUpcomingTournaments() {
     const d = new Date(t.date);
     const isPast = d < today;
     const dayName = d.toLocaleDateString('fr-FR',{weekday:'long'});
-    const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid ${isPast?'var(--border)':'var(--muted)'};border-radius:var(--radius);margin-bottom:8px;opacity:${isPast?0.5:1};">
-      <div style="flex:1;">
-        <div style="font-weight:700;color:${isPast?'var(--text-secondary)':'var(--white)'};">${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dateStr}</div>
-        ${t.label ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${t.label}</div>` : ''}
+    const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long'});
+    const {filled, total} = _plannedPlayerCount(t);
+    const allReady = filled === total && total > 0;
+    const pctColor = allReady ? 'var(--success)' : filled > 0 ? 'var(--accent)' : 'var(--text-secondary)';
+    return `
+    <div style="background:var(--card);border:1px solid ${isPast?'var(--border)':allReady?'var(--success)':'var(--muted)'};border-radius:var(--radius);margin-bottom:8px;opacity:${isPast?0.55:1};overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:${isPast?'var(--text-secondary)':'var(--white)'};">
+            ${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dateStr}${t.time ? ` · <span style="color:var(--accent);">${t.time}</span>` : ''}
+          </div>
+          ${t.label ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:1px;">${t.label}</div>` : ''}
+          <div style="font-size:11px;font-weight:700;color:${pctColor};margin-top:3px;letter-spacing:0.5px;">
+            ${total > 0 ? `${filled}/${total} joueurs` : 'Aucun joueur'}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          ${!isPast ? `<button onclick="openPlannedTournament('${t.id}')"
+            style="background:var(--dark);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:700;padding:5px 9px;border-radius:5px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;">
+            ✏️ Joueurs
+          </button>` : ''}
+          <button onclick="deletePlannedTournament('${t.id}')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 4px;" title="Supprimer">✕</button>
+        </div>
       </div>
-      <button onclick="deletePlannedTournament('${t.id}')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 4px;" title="Supprimer">✕</button>
+      ${total > 0 ? `<div style="height:3px;background:var(--border);"><div style="height:100%;width:${Math.round(filled/total*100)}%;background:${pctColor};transition:width 0.3s;"></div></div>` : ''}
     </div>`;
   }).join('');
 }
@@ -3923,7 +3976,17 @@ function renderUpcomingTournaments() {
 function openAddTournament() {
   const el = document.getElementById('add-tournament-form');
   if (!el) return;
-  // Pre-fill with next Saturday
+  // Pré-remplir les créneaux
+  const sel = document.getElementById('pt-time');
+  if (sel && !sel.children.length) {
+    PLANNED_TIME_SLOTS.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      sel.appendChild(opt);
+    });
+    sel.value = '10:00';
+  }
+  // Pré-remplir avec le prochain samedi
   const next = new Date();
   next.setDate(next.getDate() + ((6 - next.getDay() + 7) % 7 || 7));
   document.getElementById('pt-date').value = next.toISOString().slice(0,10);
@@ -3938,18 +4001,95 @@ function closeAddTournament() {
 
 async function savePlannedTournament() {
   const date  = document.getElementById('pt-date')?.value;
+  const time  = document.getElementById('pt-time')?.value || '';
   const label = document.getElementById('pt-label')?.value.trim() || '';
   if (!date) { alert('Choisissez une date.'); return; }
-  _plannedTournaments.push({ id: Date.now().toString(36), date, label });
+  _plannedTournaments.push({ id: Date.now().toString(36), date, time, label, teams: null, status: 'draft' });
   await savePlannedTournamentsDB();
   closeAddTournament();
   renderUpcomingTournaments();
 }
 
 async function deletePlannedTournament(id) {
+  if (!confirm('Supprimer ce tournoi planifié ?')) return;
   _plannedTournaments = _plannedTournaments.filter(t => t.id !== id);
   await savePlannedTournamentsDB();
   renderUpcomingTournaments();
+}
+
+// Ouvre l'écran joueurs pour renseigner les joueurs d'un tournoi planifié
+function openPlannedTournament(id) {
+  const pt = _plannedTournaments.find(t => t.id === id);
+  if (!pt) return;
+  // Charge les équipes existantes ou en crée 4 vides
+  state.courts = 2;
+  state.plannedTournamentId = id;
+  state.sessionStarted = false;
+  state.sessionFinished = false;
+  state.matches = [];
+  state.activeMatches = [];
+  state.matchCounter = 0;
+  state.roundNum = 0;
+  if (pt.teams && pt.teams.length) {
+    state.teams = JSON.parse(JSON.stringify(pt.teams));
+  } else {
+    state.teams = [];
+    for (let i = 0; i < 4; i++) {
+      state.teams.push({ id: i, name: `Équipe ${i+1}`, players: ['',''], wins:0, losses:0, draws:0, pointsFor:0, pointsAgainst:0, matchesPlayed:0 });
+    }
+  }
+  showPlayerSetup();
+  // Afficher l'info créneau dans l'écran
+  const info = document.getElementById('player-setup-draft-info');
+  const exitBtn = document.getElementById('exit-player-setup-btn');
+  const d = new Date(pt.date);
+  const dateLabel = d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long'});
+  if (info) {
+    info.style.display = 'block';
+    info.textContent = `📅 ${dateLabel.charAt(0).toUpperCase()+dateLabel.slice(1)}${pt.time ? ' · '+pt.time : ''}${pt.label ? ' — '+pt.label : ''}`;
+  }
+  if (exitBtn) exitBtn.textContent = '✓ Sauvegarder';
+}
+
+// Sauvegarde les joueurs dans le tournoi planifié et revient au setup
+async function saveDraftPlayers() {
+  const id = state.plannedTournamentId;
+  const pt = _plannedTournaments.find(t => t.id === id);
+  if (pt) {
+    pt.teams = JSON.parse(JSON.stringify(state.teams));
+    const {filled, total} = _plannedPlayerCount(pt);
+    pt.status = filled === total && total > 0 ? 'ready' : 'draft';
+    await savePlannedTournamentsDB();
+  }
+  // Reset état courant
+  state.plannedTournamentId = null;
+  state.teams = [];
+  state.matches = [];
+  state.activeMatches = [];
+  state.sessionStarted = false;
+  state.sessionFinished = false;
+  state.warmupStart = null;
+  db.from('app_state').delete().eq('key', 'current_session').then();
+  setDisplay('phase-players', 'none');
+  setDisplay('phase-matches', 'none');
+  setDisplay('session-end-bar', 'none');
+  const info = document.getElementById('player-setup-draft-info');
+  const exitBtn = document.getElementById('exit-player-setup-btn');
+  if (info) info.style.display = 'none';
+  if (exitBtn) exitBtn.textContent = '← Retour';
+  renderTournamentSetup();
+  renderUpcomingTournaments();
+  switchTab('tournament');
+  updateHeaderActions();
+}
+
+// Bouton ← Retour / ✓ Sauvegarder de l'écran joueurs
+function exitPlayerSetup() {
+  if (state.plannedTournamentId) {
+    saveDraftPlayers();
+  } else {
+    cancelSession();
+  }
 }
 
 function updateHeaderActions() {
@@ -3983,7 +4123,7 @@ function cancelSession() {
   state = {
     courts: 2, teams: [], matches: [], matchCounter: 0, roundNum: 0,
     activeMatches: [], sessionStarted: false, sessionFinished: false,
-    warmupStart: null,
+    warmupStart: null, plannedTournamentId: null,
     pairNameMap: state.pairNameMap
   };
 
@@ -3992,6 +4132,10 @@ function cancelSession() {
   setDisplay('phase-players', 'none');
   setDisplay('phase-matches', 'none');
   setDisplay('warmup-section', 'none');
+  const info = document.getElementById('player-setup-draft-info');
+  const exitBtn = document.getElementById('exit-player-setup-btn');
+  if (info) info.style.display = 'none';
+  if (exitBtn) exitBtn.textContent = '← Retour';
   renderTournamentSetup();
   renderUpcomingTournaments();
   switchTab('tournament');
