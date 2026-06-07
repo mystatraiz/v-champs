@@ -290,7 +290,7 @@
   .team-section-label {
     font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
     text-transform: uppercase; color: var(--accent);
-    margin-bottom: 5px; padding-left: 2px;
+    margin-bottom: 5px; text-align: center;
   }
   .team-players-row {
     display: flex; align-items: center; gap: 6px;
@@ -853,7 +853,10 @@
 
     <!-- Player Setup Phase -->
     <div id="phase-players" style="display:none;">
-      <div class="section-title">Entrée des joueurs</div>
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Entrée des joueurs</span>
+        <span id="player-count-badge" style="font-size:12px;font-weight:700;color:var(--accent);letter-spacing:1px;"></span>
+      </div>
       <div class="teams-grid" id="teams-grid"></div>
       <div style="margin-top:24px;display:flex;gap:12px;">
         <button class="btn btn-secondary btn-lg" onclick="cancelSession()" style="flex:0 0 auto;">
@@ -2437,6 +2440,14 @@ function checkAllPlayersEntered() {
   const hasDuplicate = validateAllInputs();
   const btn = document.getElementById('launch-session-btn');
   if (btn) btn.disabled = !allFilled || hasDuplicate;
+  // Compteur joueurs renseignés
+  const badge = document.getElementById('player-count-badge');
+  if (badge) {
+    const total = state.teams.length * 2;
+    const filled = state.teams.reduce((n, t) => n + (t.players[0].trim()?1:0) + (t.players[1].trim()?1:0), 0);
+    badge.textContent = `${filled} / ${total}`;
+    badge.style.color = filled === total ? 'var(--success)' : 'var(--accent)';
+  }
 }
 
 // ═══════════════════════════════════════════════════
