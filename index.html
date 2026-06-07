@@ -726,10 +726,11 @@
 </header>
 
 <nav class="tabs" id="main-tabs">
-  <button class="active" onclick="switchTab('tournament')">Tournoi</button>
-  <button onclick="switchTab('stats')">Session</button>
-  <button onclick="switchTab('general')">Classement</button>
-  <button onclick="switchTab('admin-tab')" style="margin-left:auto;">⚙️ Admin</button>
+  <button data-tab="tournament" class="active" onclick="switchTab('tournament')">Tournoi</button>
+  <button data-tab="stats" onclick="switchTab('stats')">Session</button>
+  <button data-tab="general" onclick="switchTab('general')">Classement</button>
+  <button data-tab="profile" onclick="switchTab('profile')">Mon profil</button>
+  <button data-tab="admin-tab" id="admin-tab-btn" onclick="switchTab('admin-tab')" style="margin-left:auto;">⚙️ Admin</button>
 </nav>
 
 <main id="admin-main">
@@ -812,6 +813,11 @@
   <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
     <div id="sub-classement"></div>
+  </section>
+
+  <!-- ═══ MON PROFIL TAB (admin / organisateur) ═══ -->
+  <section class="tab-content" id="tab-profile">
+    <div id="admin-profile-content"></div>
   </section>
 
   <!-- ═══ ADMINISTRATION TAB ═══ -->
@@ -1001,10 +1007,13 @@ async function loadProfileAndRoute() {
     return;
   }
 
-  // Admin or Player — charge les données une seule fois ici
+  // Route selon le rôle
   if (currentProfile.role === 'admin') {
     try { await loadFromSupabase(); } catch(e) { console.error('loadFromSupabase:', e); }
-    try { showAdminApp(); } catch(e) { console.error('showAdminApp:', e); }
+    try { showAdminApp(false); } catch(e) { console.error('showAdminApp:', e); }
+  } else if (currentProfile.role === 'organisateur') {
+    try { await loadFromSupabase(); } catch(e) { console.error('loadFromSupabase:', e); }
+    try { showAdminApp(true); } catch(e) { console.error('showAdminApp(org):', e); }
   } else if (currentProfile.role === 'player') {
     try { await loadFromSupabase(); } catch(e) { console.error('loadFromSupabase:', e); }
     try { showPlayerApp(); } catch(e) { console.error('showPlayerApp:', e); }
@@ -1031,14 +1040,16 @@ function showPendingScreen() {
   document.getElementById('admin-main').style.display      = 'none';
 }
 
-function showAdminApp() {
+function showAdminApp(isOrg = false) {
   document.getElementById('auth-screen').style.display    = 'none';
   document.getElementById('pending-screen').style.display  = 'none';
   document.getElementById('player-app').style.display      = 'none';
   document.getElementById('admin-header').style.display    = 'flex';
   document.getElementById('main-tabs').style.display       = 'flex';
   document.getElementById('admin-main').style.display      = 'block';
-  // accounts-btn always visible for admin (no toggle needed)
+  // Onglet Admin masqué pour les organisateurs
+  const adminBtn = document.getElementById('admin-tab-btn');
+  if (adminBtn) adminBtn.style.display = isOrg ? 'none' : '';
   if (!state.sessionStarted) {
     document.getElementById('setup-screen').style.display  = 'block';
     document.getElementById('phase-players').style.display = 'none';
@@ -1145,7 +1156,7 @@ function buildTeamStats() {
   return Object.values(allTeams).sort((a,b)=>(b.wins*3+b.draws)-(a.wins*3+a.draws)||(b.jFor-b.jAgainst)-(a.jFor-a.jAgainst));
 }
 
-function renderPlayerProfile() {
+function renderPlayerProfile(targetId = 'player-profil') {
   const p = currentProfile;
   if (!p) return;
   const initials = (p.first_name[0]||'') + (p.last_name[0]||'');
@@ -1189,7 +1200,7 @@ function renderPlayerProfile() {
     }
   }
 
-  document.getElementById('player-profil').innerHTML = `
+  document.getElementById(targetId).innerHTML = `
     <div class="player-profile-header">
       <div class="avatar-circle">${initials.toUpperCase()}</div>
       <div class="player-full-name">
@@ -3265,18 +3276,14 @@ function forceClosePlayerModal() {
 // ═══════════════════════════════════════════════════
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('nav.tabs button').forEach((b,i) => {
-    b.classList.toggle('active',
-      (i===0 && tab==='tournament') ||
-      (i===1 && tab==='stats') ||
-      (i===2 && tab==='general') ||
-      (i===3 && tab==='admin-tab')
-    );
+  document.querySelectorAll('nav.tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'stats')     renderSessionStats();
   if (tab === 'general')   renderGeneralStats();
   if (tab === 'admin-tab') renderAdminTab();
+  if (tab === 'profile')   renderPlayerProfile('admin-profile-content');
 }
 
 async function renderAdminTab() {
@@ -3300,8 +3307,9 @@ async function renderAdminTab() {
         <div style="margin-bottom:10px;">
           <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">Rôle</div>
           <div style="display:flex;gap:6px;">
-            <button id="atrbtn-player-${p.id}" class="btn btn-sm" style="flex:1;justify-content:center;background:var(--success);color:#fff;" onclick="atSetRole('${p.id}','player')">🎾 Joueur</button>
-            <button id="atrbtn-admin-${p.id}"  class="btn btn-sm" style="flex:1;justify-content:center;background:var(--border);color:var(--text-secondary);" onclick="atSetRole('${p.id}','admin')">⚙️ Admin</button>
+            <button id="atrbtn-player-${p.id}"  class="btn btn-sm" style="flex:1;justify-content:center;background:var(--success);color:#fff;" onclick="atSetRole('${p.id}','player')">🎾 Joueur</button>
+            <button id="atrbtn-org-${p.id}"     class="btn btn-sm" style="flex:1;justify-content:center;background:var(--border);color:var(--text-secondary);" onclick="atSetRole('${p.id}','organisateur')">🗂 Orga</button>
+            <button id="atrbtn-admin-${p.id}"   class="btn btn-sm" style="flex:1;justify-content:center;background:var(--border);color:var(--text-secondary);" onclick="atSetRole('${p.id}','admin')">⚙️ Admin</button>
           </div>
           <input type="hidden" id="atrole-${p.id}" value="player">
         </div>
@@ -3325,8 +3333,8 @@ async function renderAdminTab() {
     allEl.innerHTML = `<table class="stats-table" style="width:100%;">
       <thead><tr><th>Nom</th><th>Surnom</th><th>Rôle</th><th>Joueur lié</th></tr></thead>
       <tbody>${all.map(p => {
-        const roleColor = p.role==='admin' ? 'var(--accent)' : p.role==='player' ? 'var(--success)' : 'var(--text-secondary)';
-        const roleLabel = p.role==='admin' ? '⚙️ Admin' : p.role==='player' ? '🎾 Joueur' : '⏳ En attente';
+        const roleColor = p.role==='admin'?'var(--accent)':p.role==='organisateur'?'#60a5fa':p.role==='player'?'var(--success)':'var(--text-secondary)';
+        const roleLabel = p.role==='admin'?'⚙️ Admin':p.role==='organisateur'?'🗂 Orga':p.role==='player'?'🎾 Joueur':'⏳ En attente';
         return `<tr>
           <td>${p.first_name} ${(p.last_name||'').toUpperCase()}</td>
           <td style="color:var(--accent);">${p.nickname||'—'}</td>
@@ -3341,17 +3349,17 @@ async function renderAdminTab() {
 function atSetRole(profileId, role) {
   document.getElementById(`atrole-${profileId}`).value = role;
   const pBtn = document.getElementById(`atrbtn-player-${profileId}`);
+  const oBtn = document.getElementById(`atrbtn-org-${profileId}`);
   const aBtn = document.getElementById(`atrbtn-admin-${profileId}`);
   const wrap = document.getElementById(`atlink-wrap-${profileId}`);
-  if (role === 'admin') {
-    pBtn.style.background = 'var(--border)'; pBtn.style.color = 'var(--text-secondary)';
-    aBtn.style.background = 'var(--danger)';  aBtn.style.color = '#fff';
-    wrap.style.display = 'none';
-  } else {
-    pBtn.style.background = 'var(--success)'; pBtn.style.color = '#fff';
-    aBtn.style.background = 'var(--border)';  aBtn.style.color = 'var(--text-secondary)';
-    wrap.style.display = 'block';
-  }
+  // Reset all
+  [pBtn, oBtn, aBtn].forEach(b => { if(b){b.style.background='var(--border)';b.style.color='var(--text-secondary)';} });
+  // Highlight selected
+  if (role === 'player')       { pBtn.style.background='var(--success)'; pBtn.style.color='#fff'; }
+  if (role === 'organisateur') { oBtn.style.background='#2563eb';        oBtn.style.color='#fff'; }
+  if (role === 'admin')        { aBtn.style.background='var(--danger)';  aBtn.style.color='#fff'; }
+  // Masquer le lien joueur si admin (un orga peut aussi être lié à un joueur)
+  wrap.style.display = (role === 'admin') ? 'none' : 'block';
 }
 
 async function atValidate(profileId, nickname) {
@@ -3363,7 +3371,7 @@ async function atValidate(profileId, nickname) {
   }
   await db.from('profiles').update({ role, linked_player_name: linkedName }).eq('id', profileId);
   await db.from('notifications').update({ read: true }).eq('type','new_user').filter('payload->>user_id','eq',profileId);
-  const label = role === 'admin' ? '⚙️ Admin' : `🎾 Joueur — lié à "${linkedName}"`;
+  const label = role==='admin'?'⚙️ Admin':role==='organisateur'?`🗂 Organisateur — lié à "${linkedName}"`:`🎾 Joueur — lié à "${linkedName}"`;
   alert(`✓ Compte validé : ${label}`);
   renderAdminTab(); // rafraîchit les deux sections
 }
