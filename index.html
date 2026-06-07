@@ -151,30 +151,16 @@
   .court-btn.selected { border-color: var(--white); background: var(--white); color: var(--black); }
   /* ─── Player Entry ─── */
   .teams-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 16px;
+    display: block;
+    padding: 0 4px;
   }
   .team-card {
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px;
   }
-  .team-card .team-name {
-    font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
-    text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
-    min-height: 20px;
-  }
-  .team-name-hidden {
-    color: var(--muted) !important;
-    letter-spacing: 6px !important;
-    font-size: 11px !important;
-  }
-  .team-name-reveal {
-    animation: revealName 0.4s ease forwards;
-  }
   @keyframes revealName {
-    0%   { opacity: 0; transform: translateY(-4px); letter-spacing: 6px; }
-    100% { opacity: 1; transform: translateY(0);    letter-spacing: 1.5px; }
+    0%   { opacity: 0; transform: translateY(-4px); }
+    100% { opacity: 1; transform: translateY(0); }
   }
   .player-input-wrap { position: relative; margin-bottom: 8px; }
   .input-error { border-color: var(--danger) !important; }
@@ -297,6 +283,51 @@
   .rank-trend-down { color: #e74c3c; }
   .rank-trend-same { color: var(--muted); }
   .rank-trend-new  { color: var(--accent); font-size: 8px; letter-spacing: 0.5px; }
+  /* ─── Side grid (Gauche / Droite player entry) ─── */
+  .side-grid-hdr {
+    display: grid; grid-template-columns: 58px 1fr 1fr; gap: 8px;
+    padding: 4px 0 8px;
+  }
+  .side-hdr-cell {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; text-align: center; padding: 4px 0;
+  }
+  .side-hdr-gauche { color: #3b82f6; }
+  .side-hdr-droite { color: #f97316; }
+  .side-team-row {
+    display: grid; grid-template-columns: 58px 1fr 1fr; gap: 8px;
+    align-items: start; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 8px; margin-bottom: 8px;
+  }
+  .side-team-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--accent);
+    text-align: center; padding-top: 9px;
+  }
+  .side-cell {
+    position: relative; border-radius: 6px;
+    transition: background 0.15s, border-color 0.15s;
+    border: 2px solid transparent;
+  }
+  .side-cell.drag-over {
+    background: rgba(200,169,110,0.12); border-color: var(--accent);
+  }
+  .drag-chip { user-select: none; cursor: grab; }
+  .drag-chip.dragging { opacity: 0.4; }
+  /* ─── Side stats donuts ─── */
+  .side-donuts {
+    display: flex; gap: 16px; justify-content: center;
+    margin: 12px 0 0; padding: 0 16px;
+  }
+  .side-donut-item {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    flex: 1;
+  }
+  .side-donut-lbl { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .side-donut-gauche { color: #3b82f6; }
+  .side-donut-droite { color: #f97316; }
+  .side-donut-pct  { font-size: 13px; font-weight: 800; color: var(--white); }
+  .side-donut-sub  { font-size: 10px; color: var(--text-secondary); }
   .player-link { color: var(--accent); cursor: pointer; font-weight: 600; }
   .player-link:hover { text-decoration: underline; }
   /* ─── Player Modal ─── */
@@ -501,7 +532,7 @@
     .court-btn { width: 80px; height: 80px; font-size: 32px; }
 
     /* Teams grid */
-    .teams-grid { grid-template-columns: 1fr; gap: 12px; }
+    .side-grid-hdr, .side-team-row { grid-template-columns: 48px 1fr 1fr; }
     .team-card { padding: 14px; }
     input[type=text], input[type=number] { padding: 13px 14px; font-size: 16px; }
     .autocomplete-list div { padding: 12px 14px; font-size: 15px; }
@@ -562,7 +593,6 @@
   @media (min-width: 641px) and (max-width: 900px) {
     main { padding: 16px; }
     .matches-grid { grid-template-columns: 1fr 1fr; }
-    .teams-grid { grid-template-columns: 1fr 1fr; }
     .score-btn { width: 38px; height: 38px; font-size: 20px; }
   }
 
@@ -1749,13 +1779,21 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
   if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
 
   const partnerStats = {}, oppStats = {}, matchRows = [];
+  const sideStats = {
+    gauche: { wins: 0, losses: 0, draws: 0, played: 0 },
+    droite: { wins: 0, losses: 0, draws: 0, played: 0 }
+  };
   sessions.forEach(session => {
     session.matches.forEach(m => {
       const t1 = session.teams.find(t => t.id === m.team1Id);
       const t2 = session.teams.find(t => t.id === m.team2Id);
       if (!t1 || !t2) return;
-      const myTeam  = t1.players.some(p => p?.toLowerCase().trim() === playerName.toLowerCase().trim()) ? t1
-                    : t2.players.some(p => p?.toLowerCase().trim() === playerName.toLowerCase().trim()) ? t2 : null;
+      const pnLow = playerName.toLowerCase().trim();
+      let myTeam = null, myIdx = -1;
+      for (const team of [t1, t2]) {
+        const idx = (team.players || []).findIndex(p => p?.toLowerCase().trim() === pnLow);
+        if (idx !== -1) { myTeam = team; myIdx = idx; break; }
+      }
       if (!myTeam) return;
       const oppTeam = myTeam === t1 ? t2 : t1;
       const myScore = myTeam === t1 ? m.score1 : m.score2;
@@ -1766,6 +1804,14 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
         oppJ = myTeam === t1 ? m.sets.reduce((s,r)=>s+r[1],0) : m.sets.reduce((s,r)=>s+r[0],0);
       }
       const won = myScore > oppScore, draw = myScore === oppScore;
+      // Track side stats (index 0 = gauche, 1 = droite)
+      if (myIdx !== -1) {
+        const side = myIdx === 0 ? 'gauche' : 'droite';
+        sideStats[side].played++;
+        if (won) sideStats[side].wins++;
+        else if (!draw) sideStats[side].losses++;
+        else sideStats[side].draws++;
+      }
       myTeam.players.filter(p => p && p.toLowerCase().trim() !== playerName.toLowerCase().trim()).forEach(partner => {
         if (!partnerStats[partner]) partnerStats[partner] = {wins:0,losses:0,draws:0,played:0};
         partnerStats[partner].played++;
@@ -1798,6 +1844,42 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
   const winRate = played ? Math.round(wins/played*100) : 0;
   const wr_color = winRate>=60?'var(--success)':winRate>=40?'var(--accent)':'var(--danger)';
 
+  // Side donut section (only if at least 1 match with side data)
+  const sideTotal = sideStats.gauche.played + sideStats.droite.played;
+  const sideSection = sideTotal > 0 ? (() => {
+    const g = sideStats.gauche, d = sideStats.droite;
+    const gPct = g.played ? Math.round(g.wins / g.played * 100) : 0;
+    const dPct = d.played ? Math.round(d.wins / d.played * 100) : 0;
+    return `
+    <div class="modal-sep"></div>
+    <div style="padding:0 16px 4px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:2px;">Win rate par côté</div>
+      <div class="side-donuts">
+        <div class="side-donut-item">
+          <div style="position:relative;width:64px;height:64px;">
+            ${svgDonutSide(g.wins, g.played, '#3b82f6', 64, 7)}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:13px;font-weight:800;color:#3b82f6;">${gPct}%</span>
+            </div>
+          </div>
+          <div class="side-donut-lbl side-donut-gauche">◀ Gauche</div>
+          <div class="side-donut-sub">${g.wins}V · ${g.losses}D · ${g.played}M</div>
+        </div>
+        <div style="display:flex;align-items:center;color:var(--muted);font-size:18px;font-weight:700;padding-bottom:24px;">|</div>
+        <div class="side-donut-item">
+          <div style="position:relative;width:64px;height:64px;">
+            ${svgDonutSide(d.wins, d.played, '#f97316', 64, 7)}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:13px;font-weight:800;color:#f97316;">${dPct}%</span>
+            </div>
+          </div>
+          <div class="side-donut-lbl side-donut-droite">Droite ▶</div>
+          <div class="side-donut-sub">${d.wins}V · ${d.losses}D · ${d.played}M</div>
+        </div>
+      </div>
+    </div>`;
+  })() : '';
+
   const statsHTML = `
     <div class="stats-hero" style="padding:14px 16px 0;">
       <div class="donut-wrap">
@@ -1814,6 +1896,7 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
         <div class="stat-pill"><span class="stat-pill-label">DÉFAITES</span><span class="stat-pill-val" style="color:var(--danger)">${losses}</span></div>
       </div>
     </div>
+    ${sideSection}
     ${pe.length ? `
     <div class="modal-sep"></div>
     <div class="partner-section">
@@ -2039,32 +2122,123 @@ function showPlayerSetup() {
 function renderTeamsGrid() {
   const grid = document.getElementById('teams-grid');
   grid.innerHTML = '';
+
+  // Header row
+  const hdr = document.createElement('div');
+  hdr.className = 'side-grid-hdr';
+  hdr.innerHTML = `
+    <div></div>
+    <div class="side-hdr-cell side-hdr-gauche">◀ Gauche</div>
+    <div class="side-hdr-cell side-hdr-droite">Droite ▶</div>
+  `;
+  grid.appendChild(hdr);
+
   state.teams.forEach((team, ti) => {
-    const div = document.createElement('div');
-    div.className = 'team-card';
-    div.innerHTML = `
-      <div class="team-name" style="color:var(--text-secondary);">Équipe ${ti + 1}</div>
-      ${team.players.map((p, pi) => `
-        <div class="player-input-wrap" id="wrap-${ti}-${pi}">
-          <input type="text"
-            id="player-${ti}-${pi}"
-            placeholder="Joueur ${pi+1}"
-            value="${p}"
-            data-team="${ti}" data-player="${pi}"
-            oninput="onPlayerInput(this)"
-            onkeydown="onPlayerKeydown(event, ${ti}, ${pi})"
-            onfocus="showAutocomplete(this)"
-            onblur="hideAutocomplete(${ti},${pi})"
-            autocomplete="off"
-          >
-          <div class="autocomplete-list" id="ac-${ti}-${pi}" style="display:none;"></div>
-          <div class="input-error-msg" id="err-${ti}-${pi}">Joueur déjà dans une autre équipe</div>
+    const row = document.createElement('div');
+    row.className = 'side-team-row';
+    row.id = `team-row-${ti}`;
+    row.innerHTML = `
+      <div class="side-team-label">Éq.${ti+1}</div>
+      ${[0, 1].map(pi => `
+        <div class="side-cell" id="cell-${ti}-${pi}"
+             data-ti="${ti}" data-pi="${pi}"
+             ondragover="onDragOver(event,${ti},${pi})"
+             ondragleave="onDragLeave(event,${ti},${pi})"
+             ondrop="onDrop(event,${ti},${pi})">
+          <div class="drag-chip" id="chip-${ti}-${pi}"
+               draggable="true"
+               ondragstart="onDragStart(event,${ti},${pi})"
+               ondragend="onDragEnd(event)"
+               ontouchstart="onTouchStart(event,${ti},${pi})"
+               ontouchend="onTouchEnd(event,${ti},${pi})">
+            <div class="player-input-wrap" id="wrap-${ti}-${pi}">
+              <input type="text"
+                id="player-${ti}-${pi}"
+                placeholder="${pi===0?'Gauche':'Droite'}"
+                value="${team.players[pi]||''}"
+                data-team="${ti}" data-player="${pi}"
+                oninput="onPlayerInput(this)"
+                onkeydown="onPlayerKeydown(event,${ti},${pi})"
+                onfocus="showAutocomplete(this)"
+                onblur="hideAutocomplete(${ti},${pi})"
+                autocomplete="off"
+              >
+              <div class="autocomplete-list" id="ac-${ti}-${pi}" style="display:none;"></div>
+              <div class="input-error-msg" id="err-${ti}-${pi}">Déjà dans une autre équipe</div>
+            </div>
+          </div>
         </div>
       `).join('')}
     `;
-    grid.appendChild(div);
+    grid.appendChild(row);
   });
   checkAllPlayersEntered();
+}
+
+// ─── Drag-and-drop (desktop + touch) ───
+let _dragSrc = null;
+let _touchSrc = null;
+
+function swapPlayers(ti1, pi1, ti2, pi2) {
+  if (ti1 === ti2 && pi1 === pi2) return;
+  const tmp = state.teams[ti1].players[pi1];
+  state.teams[ti1].players[pi1] = state.teams[ti2].players[pi2];
+  state.teams[ti2].players[pi2] = tmp;
+  saveState();
+  renderTeamsGrid();
+  checkAllPlayersEntered();
+}
+
+function onDragStart(e, ti, pi) {
+  _dragSrc = {ti, pi};
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { const c = document.getElementById(`chip-${ti}-${pi}`); if (c) c.classList.add('dragging'); }, 0);
+}
+function onDragEnd(e) {
+  document.querySelectorAll('.drag-chip').forEach(c => c.classList.remove('dragging'));
+  document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
+  _dragSrc = null;
+}
+function onDragOver(e, ti, pi) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
+  document.getElementById(`cell-${ti}-${pi}`)?.classList.add('drag-over');
+}
+function onDragLeave(e, ti, pi) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    document.getElementById(`cell-${ti}-${pi}`)?.classList.remove('drag-over');
+  }
+}
+function onDrop(e, ti, pi) {
+  e.preventDefault();
+  document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
+  if (!_dragSrc) return;
+  swapPlayers(_dragSrc.ti, _dragSrc.pi, ti, pi);
+  _dragSrc = null;
+}
+
+// Touch drag-and-drop (only when touching the handle, not the input)
+function onTouchStart(e, ti, pi) {
+  // Don't start drag when touching the text input
+  if (e.target.tagName === 'INPUT') return;
+  _touchSrc = {ti, pi};
+  _touchSrc.moved = false;
+  document.getElementById(`chip-${ti}-${pi}`)?.classList.add('dragging');
+}
+function onTouchEnd(e, ti, pi) {
+  document.querySelectorAll('.drag-chip').forEach(c => c.classList.remove('dragging'));
+  document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
+  if (!_touchSrc) return;
+  const src = _touchSrc;
+  _touchSrc = null;
+  const touch = e.changedTouches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const targetCell = el?.closest('.side-cell');
+  if (targetCell) {
+    const dti = +targetCell.dataset.ti, dpi = +targetCell.dataset.pi;
+    if (dti !== src.ti || dpi !== src.pi) swapPlayers(src.ti, src.pi, dti, dpi);
+  }
 }
 
 function onPlayerInput(input) {
@@ -2077,19 +2251,12 @@ function onPlayerInput(input) {
 }
 
 function updateTeamNameDisplay(ti) {
+  // Highlight the row when both players are filled
+  const row = document.getElementById(`team-row-${ti}`);
+  if (!row) return;
   const team = state.teams[ti];
-  const el = document.getElementById(`team-name-${ti}`);
-  if (!el) return;
-  const bothFilled = team.players[0].trim() && team.players[1].trim();
-  if (bothFilled && el.classList.contains('team-name-hidden')) {
-    el.textContent = team.name;
-    el.classList.remove('team-name-hidden');
-    el.classList.add('team-name-reveal');
-  } else if (!bothFilled && !el.classList.contains('team-name-hidden')) {
-    el.textContent = '· · · · ·';
-    el.classList.add('team-name-hidden');
-    el.classList.remove('team-name-reveal');
-  }
+  const bothFilled = team.players[0]?.trim() && team.players[1]?.trim();
+  row.style.borderColor = bothFilled ? 'var(--accent)' : '';
 }
 
 function onPlayerKeydown(e, ti, pi) {
@@ -2309,14 +2476,18 @@ function showMatchPreview() {
         <div class="match-court" style="margin-bottom:12px;">🏟 Terrain ${m.court}</div>
         <div class="match-teams">
           <div class="match-team">
-            <div class="match-team-name">${t1.players[0]}</div>
-            <div class="match-team-players">${t1.players[1]}</div>
+            <div class="match-team-name">${t1.players[0]||'?'}</div>
+            <div class="match-team-players" style="color:#3b82f6;font-size:10px;font-weight:700;letter-spacing:1px;">◀ G</div>
+            <div class="match-team-players">${t1.players[1]||'?'}</div>
+            <div class="match-team-players" style="color:#f97316;font-size:10px;font-weight:700;letter-spacing:1px;">D ▶</div>
             ${svc === 1 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
           </div>
           <div class="match-vs">VS</div>
           <div class="match-team">
-            <div class="match-team-name">${t2.players[0]}</div>
-            <div class="match-team-players">${t2.players[1]}</div>
+            <div class="match-team-name">${t2.players[0]||'?'}</div>
+            <div class="match-team-players" style="color:#3b82f6;font-size:10px;font-weight:700;letter-spacing:1px;">◀ G</div>
+            <div class="match-team-players">${t2.players[1]||'?'}</div>
+            <div class="match-team-players" style="color:#f97316;font-size:10px;font-weight:700;letter-spacing:1px;">D ▶</div>
             ${svc === 2 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
           </div>
         </div>
@@ -2466,15 +2637,25 @@ function buildMatchCard(m) {
     </div>
     <div class="match-teams">
       <div class="match-team">
-        <div class="match-team-name" style="${w1?'color:var(--accent)':''}">${t1.players[0]}</div>
-        <div class="match-team-players">${t1.players[1]}</div>
+        <div class="match-team-name" style="${w1?'color:var(--accent)':''}">
+          <span style="font-size:10px;font-weight:700;color:#3b82f6;letter-spacing:1px;display:block;margin-bottom:1px;">◀ G</span>
+          ${t1.players[0]||'?'}
+        </div>
+        <div class="match-team-players">
+          <span style="font-size:10px;font-weight:700;color:#f97316;letter-spacing:1px;">D ▶ </span>${t1.players[1]||'?'}
+        </div>
         ${w1 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
         ${!finished && m.servingTeam === 1 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
       </div>
       <div class="match-vs">VS</div>
       <div class="match-team">
-        <div class="match-team-name" style="${w2?'color:var(--accent)':''}">${t2.players[0]}</div>
-        <div class="match-team-players">${t2.players[1]}</div>
+        <div class="match-team-name" style="${w2?'color:var(--accent)':''}">
+          <span style="font-size:10px;font-weight:700;color:#3b82f6;letter-spacing:1px;display:block;margin-bottom:1px;">◀ G</span>
+          ${t2.players[0]||'?'}
+        </div>
+        <div class="match-team-players">
+          <span style="font-size:10px;font-weight:700;color:#f97316;letter-spacing:1px;">D ▶ </span>${t2.players[1]||'?'}
+        </div>
         ${w2 ? '<div class="winner-badge">▲ VAINQUEUR</div>' : ''}
         ${!finished && m.servingTeam === 2 ? '<div class="service-badge">🎾 SERVICE</div>' : ''}
       </div>
@@ -3199,6 +3380,24 @@ function svgDonutTriple(wins, draws, losses, size=100, sw=10) {
     ${arc(winLen,  0,               'var(--success)')}
     ${arc(drawLen, winLen,          '#888')}
     ${arc(lossLen, winLen + drawLen,'var(--danger)')}
+  </svg>`;
+}
+
+// Mini donut for one side (gauche or droite)
+function svgDonutSide(wins, played, color, size=64, sw=7) {
+  const pct = played > 0 ? wins / played : 0;
+  const r = (size - sw) / 2;
+  const cx = size / 2, cy = size / 2;
+  const C = 2 * Math.PI * r;
+  const filled = pct * C;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#2a2a2a" stroke-width="${sw}"/>
+    ${filled > 0 ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${color}" stroke-width="${sw}"
+      stroke-dasharray="${filled.toFixed(2)} ${(C-filled).toFixed(2)}"
+      stroke-dashoffset="0"
+      stroke-linecap="round"
+      transform="rotate(-90 ${cx} ${cy})"/>` : ''}
   </svg>`;
 }
 
