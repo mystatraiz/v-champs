@@ -1038,13 +1038,23 @@
     </div>
 
     <!-- Tous les profils -->
-    <div class="card">
+    <div class="card" style="margin-bottom:16px;">
       <div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:14px;">
         👥 Tous les profils
       </div>
       <div id="admin-tab-all-profiles">
         <div class="empty-state">Chargement…</div>
       </div>
+    </div>
+
+    <!-- Zone danger -->
+    <div class="card" style="border-color:var(--danger);">
+      <div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--danger);margin-bottom:14px;">
+        ⚠️ Zone dangereuse
+      </div>
+      <button class="btn btn-danger" style="width:100%;justify-content:center;" onclick="resetAllScores()">
+        🗑 Remettre le classement à zéro
+      </button>
     </div>
   </section>
 </main>
@@ -3956,6 +3966,17 @@ async function saveProfileLink(profileId) {
   // Si c'est notre propre compte, mettre à jour currentProfile aussi
   if (currentProfile?.id === profileId) currentProfile.linked_player_name = linkedName;
   renderAdminTab();
+}
+
+async function resetAllScores() {
+  if (!confirm('Remettre tout le classement V-Champs à zéro ? Cette action est irréversible.')) return;
+  const { error } = await db.from('player_session_scores').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) { alert('Erreur : ' + error.message); return; }
+  await db.from('app_state').delete().in('key', ['session_history', 'current_session']);
+  _playerSessionScores = [];
+  _history = [];
+  renderGeneralStats();
+  alert('Classement remis à zéro.');
 }
 
 // ─── Tournament tab display ─────────────────────────────────────────────────
