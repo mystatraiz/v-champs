@@ -772,16 +772,37 @@
 </div>
 
 <main id="admin-main">
-  <!-- ═══ SETUP ═══ -->
-  <div id="setup-screen">
-    <img src="logo.png" alt="Indomitus Padel" class="hero-logo">
-    <button class="btn btn-primary btn-lg" onclick="initTournament()" id="start-btn" style="width:100%;max-width:320px;justify-content:center;">
-      Créer un nouveau tournoi →
-    </button>
-  </div>
 
   <!-- ═══ TOURNAMENT TAB ═══ -->
   <section class="tab-content" id="tab-tournament">
+
+  <!-- ── Phase 0 : aucun tournoi actif ── -->
+  <div id="setup-screen">
+    <img src="logo.png" alt="Indomitus Padel" class="hero-logo">
+    <button class="btn btn-primary btn-lg" onclick="initTournament()" id="start-btn" style="width:100%;max-width:320px;justify-content:center;">
+      + Nouveau tournoi
+    </button>
+
+    <!-- Prochains tournois -->
+    <div id="upcoming-section" style="margin-top:32px;text-align:left;max-width:480px;margin-left:auto;margin-right:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-secondary);">📅 Prochains tournois</div>
+        <button class="btn btn-sm" onclick="openAddTournament()" style="font-size:11px;padding:4px 10px;">+ Ajouter</button>
+      </div>
+      <div id="upcoming-list"><div class="empty-state" style="padding:16px 0;">Aucun tournoi planifié.</div></div>
+
+      <!-- Formulaire ajout (caché par défaut) -->
+      <div id="add-tournament-form" style="display:none;margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">Nouveau tournoi planifié</div>
+        <input type="date" id="pt-date" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:8px;">
+        <input type="text" id="pt-label" placeholder="Description (optionnel)" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:10px;">
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" onclick="savePlannedTournament()">✓ Enregistrer</button>
+          <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="closeAddTournament()">Annuler</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
     <!-- Player Setup Phase -->
     <div id="phase-players" style="display:none;">
@@ -1096,24 +1117,14 @@ function showAdminApp(isOrg = false) {
   // Onglet Admin masqué pour les organisateurs
   const adminBtn = document.getElementById('admin-tab-btn');
   if (adminBtn) adminBtn.style.display = isOrg ? 'none' : '';
-  if (!state.sessionStarted) {
-    document.getElementById('setup-screen').style.display  = 'block';
-    document.getElementById('phase-players').style.display = 'none';
-    document.getElementById('phase-matches').style.display = 'none';
-  } else if (state.warmupStart) {
-    // Reprise du warmup après rechargement
-    document.getElementById('setup-screen').style.display  = 'none';
-    document.getElementById('phase-players').style.display = 'none';
-    document.getElementById('phase-matches').style.display = 'block';
+  renderTournamentSetup(); // gère setup-screen / phase-players / phase-matches
+  if (state.warmupStart) {
     document.getElementById('warmup-section').style.display = 'block';
     document.getElementById('active-matches-section').style.display = 'none';
     resumeWarmup();
-  } else {
-    document.getElementById('setup-screen').style.display  = 'none';
-    document.getElementById('phase-players').style.display = 'none';
-    document.getElementById('phase-matches').style.display = 'block';
-    if (!state.sessionFinished) document.getElementById('session-end-bar').style.display = 'flex';
-    renderMatchPhase();
+  }
+  if (!state.sessionStarted || state.sessionFinished) {
+    renderUpcomingTournaments();
   }
   switchTab('tournament');
   updateHeaderActions();
@@ -1389,6 +1400,7 @@ async function loadFromSupabase() {
       Promise.all([
         db.from('app_state').select('value').eq('key','current_session').maybeSingle(),
         db.from('app_state').select('value').eq('key','session_history').maybeSingle(),
+        db.from('app_state').select('value').eq('key','planned_tournaments').maybeSingle(),
         db.from('pair_names').select('pair_key,team_name'),
         db.from('known_players').select('name'),
         db.from('player_session_scores').select('*')
@@ -1396,12 +1408,13 @@ async function loadFromSupabase() {
       timeout.then(() => null)
     ]);
     if (!result) { console.warn('loadFromSupabase timeout'); return; }
-    const [sd, hd, pd, kd, psd] = result;
+    const [sd, hd, ptd, pd, kd, psd] = result;
     if (sd.data?.value) {
       state = sd.data.value;
       if (!state.pairNameMap) state.pairNameMap = {};
     }
-    if (hd.data?.value) _history = hd.data.value;
+    if (hd.data?.value)  _history = hd.data.value;
+    if (ptd.data?.value) _plannedTournaments = ptd.data.value;
     if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
     if (kd.data) _knownPlayers = kd.data.map(r => r.name);
     if (psd?.data) _playerSessionScores = psd.data;
@@ -3578,17 +3591,111 @@ async function saveProfileLink(profileId) {
   renderAdminTab();
 }
 
+// ─── Tournament tab display ─────────────────────────────────────────────────
+function renderTournamentSetup() {
+  const active = state.sessionStarted && !state.sessionFinished;
+  const finished = state.sessionFinished;
+
+  setDisplay('setup-screen',  (!state.sessionStarted || finished) ? 'block' : 'none');
+  setDisplay('phase-players', (state.sessionStarted && !finished && !state.warmupStart && !state.activeMatches?.length && !document.getElementById('phase-matches')?.style.display !== 'block') ? 'block' : 'none');
+  setDisplay('phase-matches', (state.sessionStarted && !finished && state.warmupStart) ? 'block' : 'none');
+
+  // Simpler state-driven version
+  if (!state.sessionStarted || finished) {
+    setDisplay('setup-screen', 'block');
+    setDisplay('phase-players', 'none');
+    setDisplay('phase-matches', 'none');
+    // Enable/disable button
+    const btn = document.getElementById('start-btn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = finished ? '+ Nouveau tournoi' : '+ Nouveau tournoi';
+    }
+  } else {
+    setDisplay('setup-screen', 'none');
+    // phase-players and phase-matches are managed by initTournament/startSession
+  }
+}
+
+// ─── Planned tournaments ────────────────────────────────────────────────────
+let _plannedTournaments = []; // [{id, date, label}]
+
+async function loadPlannedTournaments() {
+  const { data } = await db.from('app_state').select('value').eq('key','planned_tournaments').maybeSingle();
+  _plannedTournaments = data?.value || [];
+  renderUpcomingTournaments();
+}
+
+async function savePlannedTournamentsDB() {
+  await db.from('app_state').upsert({ key:'planned_tournaments', value: _plannedTournaments, updated_at: new Date().toISOString() });
+}
+
+function renderUpcomingTournaments() {
+  const el = document.getElementById('upcoming-list');
+  if (!el) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const future = _plannedTournaments
+    .filter(t => new Date(t.date) >= today)
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  const past = _plannedTournaments
+    .filter(t => new Date(t.date) < today)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  const all = [...future, ...past];
+  if (!all.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:16px 0;text-align:center;">Aucun tournoi planifié.</div>';
+    return;
+  }
+  el.innerHTML = all.map(t => {
+    const d = new Date(t.date);
+    const isPast = d < today;
+    const dayName = d.toLocaleDateString('fr-FR',{weekday:'long'});
+    const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid ${isPast?'var(--border)':'var(--muted)'};border-radius:var(--radius);margin-bottom:8px;opacity:${isPast?0.5:1};">
+      <div style="flex:1;">
+        <div style="font-weight:700;color:${isPast?'var(--text-secondary)':'var(--white)'};">${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dateStr}</div>
+        ${t.label ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${t.label}</div>` : ''}
+      </div>
+      <button onclick="deletePlannedTournament('${t.id}')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 4px;" title="Supprimer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function openAddTournament() {
+  const el = document.getElementById('add-tournament-form');
+  if (!el) return;
+  // Pre-fill with next Saturday
+  const next = new Date();
+  next.setDate(next.getDate() + ((6 - next.getDay() + 7) % 7 || 7));
+  document.getElementById('pt-date').value = next.toISOString().slice(0,10);
+  document.getElementById('pt-label').value = '';
+  el.style.display = 'block';
+}
+
+function closeAddTournament() {
+  const el = document.getElementById('add-tournament-form');
+  if (el) el.style.display = 'none';
+}
+
+async function savePlannedTournament() {
+  const date  = document.getElementById('pt-date')?.value;
+  const label = document.getElementById('pt-label')?.value.trim() || '';
+  if (!date) { alert('Choisissez une date.'); return; }
+  _plannedTournaments.push({ id: Date.now().toString(36), date, label });
+  await savePlannedTournamentsDB();
+  closeAddTournament();
+  renderUpcomingTournaments();
+}
+
+async function deletePlannedTournament(id) {
+  _plannedTournaments = _plannedTournaments.filter(t => t.id !== id);
+  await savePlannedTournamentsDB();
+  renderUpcomingTournaments();
+}
+
 function updateHeaderActions() {
   const bar = document.getElementById('header-actions');
-  let html = '';
-  if (state.sessionFinished) {
-    html = `<button class="btn btn-accent btn-sm" onclick="newTournament()">+ Nouveau tournoi</button>`;
-  } else if (state.sessionStarted) {
-    html = `<button class="btn btn-secondary btn-sm" onclick="newTournament()">+ Nouveau</button>`;
-  }
-  html += `<button class="btn btn-secondary btn-sm" onclick="doLogout()">⎋</button>`;
-  bar.innerHTML = html;
-  // accounts-btn is always visible in admin header — nothing to do here
+  // Nouveau tournoi is now in the Tournoi tab — only keep logout here
+  bar.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="doLogout()">⎋</button>`;
 }
 
 // ═══════════════════════════════════════════════════
@@ -3603,13 +3710,11 @@ function newTournament() {
     activeMatches: [], sessionStarted: false, sessionFinished: false,
     pairNameMap: state.pairNameMap
   };
-  document.getElementById('session-end-bar').style.display = 'none';
-  document.getElementById('setup-screen').style.display = 'block';
-  document.getElementById('tab-tournament').classList.add('active');
-  document.getElementById('tab-stats').classList.remove('active');
-  document.getElementById('tab-general').classList.remove('active');
-  document.getElementById('phase-players').style.display = 'none';
-  document.getElementById('phase-matches').style.display = 'none';
+  setDisplay('session-end-bar', 'none');
+  setDisplay('phase-players', 'none');
+  setDisplay('phase-matches', 'none');
+  renderTournamentSetup();
+  renderUpcomingTournaments();
   switchTab('tournament');
   updateHeaderActions();
 }
