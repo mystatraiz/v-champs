@@ -38,6 +38,11 @@
     min-height: 100vh;
     font-size: 15px;
   }
+  /* ─── Top bar (header + tabs collés en bloc sticky) ─── */
+  #top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--dark);
+  }
   /* ─── Header ─── */
   header {
     background: var(--dark);
@@ -46,6 +51,9 @@
     display: flex;
     align-items: center;
     gap: 16px;
+  }
+  /* Le header du player-app reste sticky individuellement (hors top-bar) */
+  #player-app header {
     position: sticky; top: 0; z-index: 100;
   }
   header img#logo { height: 52px; filter: invert(1) brightness(1.1); opacity: 1; }
@@ -57,16 +65,27 @@
     background: var(--dark);
     border-bottom: 1px solid var(--border);
     display: flex;
-    padding: 0 24px;
+    padding: 0 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  nav.tabs::-webkit-scrollbar { display: none; }
   nav.tabs button {
     background: none; border: none; color: var(--text-secondary);
-    padding: 12px 20px; font-size: 14px; font-weight: 600;
-    letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+    padding: 11px 16px; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.5px; text-transform: uppercase; cursor: pointer;
     border-bottom: 2px solid transparent; transition: all 0.2s;
+    white-space: nowrap; flex-shrink: 0;
   }
   nav.tabs button.active { color: var(--white); border-bottom-color: var(--accent); }
   nav.tabs button:hover:not(.active) { color: var(--text); }
+  @media (max-width: 480px) {
+    header { padding: 10px 16px; }
+    header img#logo { height: 40px; }
+    header .brand-title { font-size: 18px; }
+    nav.tabs button { padding: 10px 12px; font-size: 11px; }
+  }
   /* ─── Main ─── */
   main { max-width: 1100px; margin: 0 auto; padding: 24px; }
   section.tab-content { display: none; }
@@ -715,6 +734,7 @@
   @keyframes loaderBar { 0%{transform:scaleX(0) translateX(0)} 50%{transform:scaleX(1) translateX(0)} 100%{transform:scaleX(0) translateX(100%)} }
 </style>
 
+<div id="top-bar">
 <header id="admin-header">
   <img id="logo" src="logo.png" alt="Indomitus Padel" onerror="this.style.display='none'">
   <div class="brand">
@@ -730,8 +750,9 @@
   <button data-tab="stats" onclick="switchTab('stats')">Session</button>
   <button data-tab="general" onclick="switchTab('general')">Classement</button>
   <button data-tab="profile" onclick="switchTab('profile')">Mon profil</button>
-  <button data-tab="admin-tab" id="admin-tab-btn" onclick="switchTab('admin-tab')" style="margin-left:auto;">⚙️ Admin</button>
+  <button data-tab="admin-tab" id="admin-tab-btn" onclick="switchTab('admin-tab')">⚙️ Admin</button>
 </nav>
+</div>
 
 <main id="admin-main">
   <!-- ═══ SETUP ═══ -->
@@ -1033,7 +1054,7 @@ function showAuthScreen() {
   document.getElementById('auth-screen').style.display    = 'flex';
   document.getElementById('pending-screen').style.display  = 'none';
   document.getElementById('player-app').style.display      = 'none';
-  document.getElementById('admin-header').style.display    = 'none';
+  document.getElementById('top-bar').style.display    = 'none';
   document.getElementById('main-tabs').style.display       = 'none';
   document.getElementById('admin-main').style.display      = 'none';
   document.getElementById('session-end-bar').style.display = 'none';
@@ -1043,7 +1064,7 @@ function showPendingScreen() {
   document.getElementById('auth-screen').style.display    = 'none';
   document.getElementById('pending-screen').style.display  = 'flex';
   document.getElementById('player-app').style.display      = 'none';
-  document.getElementById('admin-header').style.display    = 'none';
+  document.getElementById('top-bar').style.display    = 'none';
   document.getElementById('main-tabs').style.display       = 'none';
   document.getElementById('admin-main').style.display      = 'none';
 }
@@ -1052,7 +1073,7 @@ function showAdminApp(isOrg = false) {
   document.getElementById('auth-screen').style.display    = 'none';
   document.getElementById('pending-screen').style.display  = 'none';
   document.getElementById('player-app').style.display      = 'none';
-  document.getElementById('admin-header').style.display    = 'flex';
+  document.getElementById('top-bar').style.display    = 'block';
   document.getElementById('main-tabs').style.display       = 'flex';
   document.getElementById('admin-main').style.display      = 'block';
   // Onglet Admin masqué pour les organisateurs
@@ -1086,7 +1107,7 @@ function showPlayerApp() {
   document.getElementById('auth-screen').style.display   = 'none';
   document.getElementById('pending-screen').style.display = 'none';
   document.getElementById('player-app').style.display    = 'block';
-  document.getElementById('admin-header').style.display  = 'none';
+  document.getElementById('top-bar').style.display  = 'none';
   document.getElementById('main-tabs').style.display     = 'none';
   document.getElementById('admin-main').style.display    = 'none';
   document.getElementById('session-end-bar').style.display = 'none';
