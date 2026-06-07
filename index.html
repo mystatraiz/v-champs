@@ -824,6 +824,14 @@
   <section class="tab-content" id="tab-admin-tab">
     <div class="section-title">Administration</div>
 
+    <!-- Mon lien joueur -->
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:14px;">
+        🔗 Mon lien joueur
+      </div>
+      <div id="admin-self-link-content"></div>
+    </div>
+
     <!-- Comptes en attente -->
     <div class="card" style="margin-bottom:16px;">
       <div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:14px;">
@@ -3287,8 +3295,28 @@ function switchTab(tab) {
 }
 
 async function renderAdminTab() {
-  const pendingEl = document.getElementById('admin-tab-pending');
-  const allEl     = document.getElementById('admin-tab-all-profiles');
+  const pendingEl  = document.getElementById('admin-tab-pending');
+  const allEl      = document.getElementById('admin-tab-all-profiles');
+  const selfLinkEl = document.getElementById('admin-self-link-content');
+
+  // ── Mon lien joueur (compte courant) ──
+  const me = currentProfile;
+  if (me && selfLinkEl) {
+    const currentLink = me.linked_player_name;
+    selfLinkEl.innerHTML = `
+      <div style="margin-bottom:8px;font-size:13px;color:var(--text-secondary);">
+        Compte actuellement lié à :
+        <strong style="color:${currentLink?'var(--accent)':'var(--danger)'};">
+          ${currentLink || '⏳ Aucun joueur lié'}
+        </strong>
+      </div>
+      <select id="self-link-select" style="width:100%;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:10px;">
+        <option value="">— Nouveau joueur (utilise le surnom : ${me.nickname}) —</option>
+        ${_knownPlayers.sort().map(n=>`<option value="${n}"${n===currentLink?' selected':''}>${n}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center;" onclick="saveSelfLink()">✓ Enregistrer le lien</button>
+    `;
+  }
 
   // ── Comptes en attente ──
   const { data: pending } = await db.from('profiles').select('*').eq('role','pending').order('created_at',{ascending:false});
@@ -3331,15 +3359,28 @@ async function renderAdminTab() {
     allEl.innerHTML = '<div class="empty-state" style="padding:16px 0;">Aucun profil.</div>';
   } else {
     allEl.innerHTML = `<table class="stats-table" style="width:100%;">
-      <thead><tr><th>Nom</th><th>Surnom</th><th>Rôle</th><th>Joueur lié</th></tr></thead>
+      <thead><tr><th>Nom</th><th>Surnom</th><th>Rôle</th><th>Joueur lié</th><th></th></tr></thead>
       <tbody>${all.map(p => {
         const roleColor = p.role==='admin'?'var(--accent)':p.role==='organisateur'?'#60a5fa':p.role==='player'?'var(--success)':'var(--text-secondary)';
         const roleLabel = p.role==='admin'?'⚙️ Admin':p.role==='organisateur'?'🗂 Orga':p.role==='player'?'🎾 Joueur':'⏳ En attente';
-        return `<tr>
+        return `<tr id="prof-row-${p.id}">
           <td>${p.first_name} ${(p.last_name||'').toUpperCase()}</td>
           <td style="color:var(--accent);">${p.nickname||'—'}</td>
           <td style="color:${roleColor};font-weight:700;">${roleLabel}</td>
           <td style="color:var(--text-secondary);font-size:12px;">${p.linked_player_name||'—'}</td>
+          <td><button class="btn btn-sm" style="padding:4px 8px;font-size:11px;" onclick="toggleProfileLink('${p.id}','${esc(p.linked_player_name||'')}','${esc(p.nickname||'')}')">🔗</button></td>
+        </tr>
+        <tr id="prof-edit-${p.id}" style="display:none;">
+          <td colspan="5" style="padding:8px 4px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="prof-link-select-${p.id}" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:6px 8px;font-size:12px;">
+                <option value="">— Nouveau joueur (surnom) —</option>
+                ${_knownPlayers.sort().map(n=>`<option value="${n}"${n===(p.linked_player_name||'')?'  selected':''}>${n}</option>`).join('')}
+              </select>
+              <button class="btn btn-success btn-sm" style="white-space:nowrap;" onclick="saveProfileLink('${p.id}')">✓ OK</button>
+              <button class="btn btn-sm" style="white-space:nowrap;" onclick="toggleProfileLink('${p.id}')">✕</button>
+            </div>
+          </td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
@@ -3374,6 +3415,32 @@ async function atValidate(profileId, nickname) {
   const label = role==='admin'?'⚙️ Admin':role==='organisateur'?`🗂 Organisateur — lié à "${linkedName}"`:`🎾 Joueur — lié à "${linkedName}"`;
   alert(`✓ Compte validé : ${label}`);
   renderAdminTab(); // rafraîchit les deux sections
+}
+
+// ── Lier son propre compte (admin/orga courant) ──
+async function saveSelfLink() {
+  const sel = document.getElementById('self-link-select');
+  const linkedName = sel?.value || currentProfile?.nickname || null;
+  await db.from('profiles').update({ linked_player_name: linkedName }).eq('id', currentProfile.id);
+  currentProfile.linked_player_name = linkedName;
+  alert(`✓ Lié à "${linkedName || currentProfile?.nickname}"`);
+  renderAdminTab();
+}
+
+// ── Lier n'importe quel profil depuis le tableau ──
+function toggleProfileLink(profileId) {
+  const editRow = document.getElementById(`prof-edit-${profileId}`);
+  if (!editRow) return;
+  editRow.style.display = editRow.style.display === 'none' ? 'table-row' : 'none';
+}
+
+async function saveProfileLink(profileId) {
+  const sel = document.getElementById(`prof-link-select-${profileId}`);
+  const linkedName = sel?.value || null;
+  await db.from('profiles').update({ linked_player_name: linkedName }).eq('id', profileId);
+  // Si c'est notre propre compte, mettre à jour currentProfile aussi
+  if (currentProfile?.id === profileId) currentProfile.linked_player_name = linkedName;
+  renderAdminTab();
 }
 
 function updateHeaderActions() {
