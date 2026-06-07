@@ -284,35 +284,52 @@
   .rank-trend-same { color: var(--muted); }
   .rank-trend-new  { color: var(--accent); font-size: 8px; letter-spacing: 0.5px; }
   /* ─── Side grid (Gauche / Droite player entry) ─── */
-  .side-grid-hdr {
-    display: grid; grid-template-columns: 58px 1fr 1fr; gap: 8px;
-    padding: 4px 0 8px;
-  }
-  .side-hdr-cell {
-    font-size: 10px; font-weight: 700; letter-spacing: 2px;
-    text-transform: uppercase; text-align: center; padding: 4px 0;
-  }
   .side-hdr-gauche { color: #3b82f6; }
   .side-hdr-droite { color: #f97316; }
-  .side-team-row {
-    display: grid; grid-template-columns: 58px 1fr 1fr; gap: 8px;
-    align-items: start; background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 10px 8px; margin-bottom: 8px;
-  }
-  .side-team-label {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+  .team-section { margin-bottom: 12px; }
+  .team-section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
     text-transform: uppercase; color: var(--accent);
-    text-align: center; padding-top: 9px;
+    margin-bottom: 5px; padding-left: 2px;
   }
+  .team-players-row {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 6px;
+    transition: border-color 0.2s;
+  }
+  .team-players-row.row-complete { border-color: var(--accent); }
   .side-cell {
-    position: relative; border-radius: 6px;
+    flex: 1; position: relative; border-radius: 6px;
     transition: background 0.15s, border-color 0.15s;
     border: 2px solid transparent;
   }
   .side-cell.drag-over {
     background: rgba(200,169,110,0.12); border-color: var(--accent);
   }
-  .drag-chip { user-select: none; cursor: grab; }
+  .side-col-lbl {
+    font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; text-align: center;
+    margin-bottom: 3px;
+  }
+  /* Drag handle — 6 dots */
+  .drag-handle-btn {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 6px 4px; cursor: grab; touch-action: none;
+    flex-shrink: 0; user-select: none; opacity: 0.45;
+    align-items: center; justify-content: center;
+    border-radius: 4px; transition: opacity 0.15s, background 0.15s;
+    -webkit-user-select: none;
+  }
+  .drag-handle-btn:hover, .drag-handle-btn:active { opacity: 1; background: var(--border); }
+  .drag-handle-btn .dot-row {
+    display: flex; gap: 3px;
+  }
+  .drag-handle-btn .dot {
+    width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary);
+  }
+  .drag-handle-btn.dragging-active { opacity: 1; background: rgba(200,169,110,0.2); }
+  .drag-chip { user-select: none; }
   .drag-chip.dragging { opacity: 0.4; }
   /* ─── Side stats donuts ─── */
   .side-donuts {
@@ -532,7 +549,7 @@
     .court-btn { width: 80px; height: 80px; font-size: 32px; }
 
     /* Teams grid */
-    .side-grid-hdr, .side-team-row { grid-template-columns: 48px 1fr 1fr; }
+    .team-players-row { padding: 6px 4px; gap: 4px; }
     .team-card { padding: 14px; }
     input[type=text], input[type=number] { padding: 13px 14px; font-size: 16px; }
     .autocomplete-list div { padding: 12px 14px; font-size: 15px; }
@@ -2126,61 +2143,85 @@ function renderTeamsGrid() {
   const grid = document.getElementById('teams-grid');
   grid.innerHTML = '';
 
-  // Header row
-  const hdr = document.createElement('div');
-  hdr.className = 'side-grid-hdr';
-  hdr.innerHTML = `
-    <div></div>
-    <div class="side-hdr-cell side-hdr-gauche">◀ Gauche</div>
-    <div class="side-hdr-cell side-hdr-droite">Droite ▶</div>
-  `;
-  grid.appendChild(hdr);
-
   state.teams.forEach((team, ti) => {
-    const row = document.createElement('div');
-    row.className = 'side-team-row';
-    row.id = `team-row-${ti}`;
-    row.innerHTML = `
-      <div class="side-team-label">Éq.${ti+1}</div>
-      ${[0, 1].map(pi => `
-        <div class="side-cell" id="cell-${ti}-${pi}"
-             data-ti="${ti}" data-pi="${pi}"
-             ondragover="onDragOver(event,${ti},${pi})"
-             ondragleave="onDragLeave(event,${ti},${pi})"
-             ondrop="onDrop(event,${ti},${pi})">
-          <div class="drag-chip" id="chip-${ti}-${pi}"
-               draggable="true"
-               ondragstart="onDragStart(event,${ti},${pi})"
-               ondragend="onDragEnd(event)"
-               ontouchstart="onTouchStart(event,${ti},${pi})"
-               ontouchend="onTouchEnd(event,${ti},${pi})">
-            <div class="player-input-wrap" id="wrap-${ti}-${pi}">
-              <input type="text"
-                id="player-${ti}-${pi}"
-                placeholder="${pi===0?'Gauche':'Droite'}"
-                value="${team.players[pi]||''}"
-                data-team="${ti}" data-player="${pi}"
-                oninput="onPlayerInput(this)"
-                onkeydown="onPlayerKeydown(event,${ti},${pi})"
-                onfocus="showAutocomplete(this)"
-                onblur="hideAutocomplete(${ti},${pi})"
-                autocomplete="off"
-              >
-              <div class="autocomplete-list" id="ac-${ti}-${pi}" style="display:none;"></div>
-              <div class="input-error-msg" id="err-${ti}-${pi}">Déjà dans une autre équipe</div>
-            </div>
+    const section = document.createElement('div');
+    section.className = 'team-section';
+    section.id = `team-row-${ti}`;
+    const complete = team.players[0]?.trim() && team.players[1]?.trim();
+    section.innerHTML = `
+      <div class="team-section-label">Équipe ${ti + 1}</div>
+      <div class="team-players-row${complete ? ' row-complete' : ''}" id="players-row-${ti}">
+
+        <!-- Handle gauche -->
+        <div class="drag-handle-btn" id="handle-${ti}-0"
+             draggable="true"
+             ondragstart="onDragStart(event,${ti},0)"
+             ondragend="onDragEnd(event)"
+             ontouchstart="onHandleTouchStart(event,${ti},0)"
+             ontouchmove="onHandleTouchMove(event)"
+             ontouchend="onHandleTouchEnd(event)">
+          <div class="dot-row"><div class="dot"></div><div class="dot"></div></div>
+          <div class="dot-row"><div class="dot"></div><div class="dot"></div></div>
+          <div class="dot-row"><div class="dot"></div><div class="dot"></div></div>
+        </div>
+
+        <!-- Gauche cell -->
+        <div class="side-cell" id="cell-${ti}-0" data-ti="${ti}" data-pi="0"
+             ondragover="onDragOver(event,${ti},0)"
+             ondragleave="onDragLeave(event,${ti},0)"
+             ondrop="onDrop(event,${ti},0)">
+          <div class="side-col-lbl side-hdr-gauche">◀ Gauche</div>
+          <div class="player-input-wrap" id="wrap-${ti}-0">
+            <input type="text" id="player-${ti}-0" placeholder="Gauche"
+              value="${team.players[0]||''}" data-team="${ti}" data-player="0"
+              oninput="onPlayerInput(this)" onkeydown="onPlayerKeydown(event,${ti},0)"
+              onfocus="showAutocomplete(this)" onblur="hideAutocomplete(${ti},0)"
+              autocomplete="off">
+            <div class="autocomplete-list" id="ac-${ti}-0" style="display:none;"></div>
+            <div class="input-error-msg" id="err-${ti}-0">Déjà dans une autre équipe</div>
           </div>
         </div>
-      `).join('')}
+
+        <!-- Droite cell -->
+        <div class="side-cell" id="cell-${ti}-1" data-ti="${ti}" data-pi="1"
+             ondragover="onDragOver(event,${ti},1)"
+             ondragleave="onDragLeave(event,${ti},1)"
+             ondrop="onDrop(event,${ti},1)">
+          <div class="side-col-lbl side-hdr-droite">Droite ▶</div>
+          <div class="player-input-wrap" id="wrap-${ti}-1">
+            <input type="text" id="player-${ti}-1" placeholder="Droite"
+              value="${team.players[1]||''}" data-team="${ti}" data-player="1"
+              oninput="onPlayerInput(this)" onkeydown="onPlayerKeydown(event,${ti},1)"
+              onfocus="showAutocomplete(this)" onblur="hideAutocomplete(${ti},1)"
+              autocomplete="off">
+            <div class="autocomplete-list" id="ac-${ti}-1" style="display:none;"></div>
+            <div class="input-error-msg" id="err-${ti}-1">Déjà dans une autre équipe</div>
+          </div>
+        </div>
+
+        <!-- Handle droite -->
+        <div class="drag-handle-btn" id="handle-${ti}-1"
+             draggable="true"
+             ondragstart="onDragStart(event,${ti},1)"
+             ondragend="onDragEnd(event)"
+             ontouchstart="onHandleTouchStart(event,${ti},1)"
+             ontouchmove="onHandleTouchMove(event)"
+             ontouchend="onHandleTouchEnd(event)">
+          <div class="dot-row"><div class="dot"></div><div class="dot"></div></div>
+          <div class="dot-row"><div class="dot"></div><div class="dot"></div></div>
+          <div class="dot-row"><div class="dot"></div><div class="dot"></div></div>
+        </div>
+
+      </div>
     `;
-    grid.appendChild(row);
+    grid.appendChild(section);
   });
   checkAllPlayersEntered();
 }
 
-// ─── Drag-and-drop (desktop + touch) ───
-let _dragSrc = null;
-let _touchSrc = null;
+// ─── Drag-and-drop ───
+let _dragSrc  = null; // {ti, pi}
+let _touchSrc = null; // {ti, pi}
 
 function swapPlayers(ti1, pi1, ti2, pi2) {
   if (ti1 === ti2 && pi1 === pi2) return;
@@ -2192,26 +2233,27 @@ function swapPlayers(ti1, pi1, ti2, pi2) {
   checkAllPlayersEntered();
 }
 
+// Desktop HTML5 DnD — draggable is the handle
 function onDragStart(e, ti, pi) {
   _dragSrc = {ti, pi};
   e.dataTransfer.effectAllowed = 'move';
-  setTimeout(() => { const c = document.getElementById(`chip-${ti}-${pi}`); if (c) c.classList.add('dragging'); }, 0);
+  setTimeout(() => document.getElementById(`handle-${ti}-${pi}`)?.classList.add('dragging-active'), 0);
 }
 function onDragEnd(e) {
-  document.querySelectorAll('.drag-chip').forEach(c => c.classList.remove('dragging'));
+  document.querySelectorAll('.drag-handle-btn').forEach(h => h.classList.remove('dragging-active'));
   document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
   _dragSrc = null;
 }
 function onDragOver(e, ti, pi) {
+  if (!_dragSrc) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
   document.getElementById(`cell-${ti}-${pi}`)?.classList.add('drag-over');
 }
 function onDragLeave(e, ti, pi) {
-  if (!e.currentTarget.contains(e.relatedTarget)) {
+  if (!e.currentTarget.contains(e.relatedTarget))
     document.getElementById(`cell-${ti}-${pi}`)?.classList.remove('drag-over');
-  }
 }
 function onDrop(e, ti, pi) {
   e.preventDefault();
@@ -2221,26 +2263,32 @@ function onDrop(e, ti, pi) {
   _dragSrc = null;
 }
 
-// Touch drag-and-drop (only when touching the handle, not the input)
-function onTouchStart(e, ti, pi) {
-  // Don't start drag when touching the text input
-  if (e.target.tagName === 'INPUT') return;
+// Touch DnD — via handle buttons
+function onHandleTouchStart(e, ti, pi) {
+  e.preventDefault(); // empêche le scroll pendant le drag
   _touchSrc = {ti, pi};
-  _touchSrc.moved = false;
-  document.getElementById(`chip-${ti}-${pi}`)?.classList.add('dragging');
+  document.getElementById(`handle-${ti}-${pi}`)?.classList.add('dragging-active');
 }
-function onTouchEnd(e, ti, pi) {
-  document.querySelectorAll('.drag-chip').forEach(c => c.classList.remove('dragging'));
+function onHandleTouchMove(e) {
+  if (!_touchSrc) return;
+  const t = e.touches[0];
+  // Highlight la cible potentielle
+  document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  el?.closest('.side-cell')?.classList.add('drag-over');
+}
+function onHandleTouchEnd(e) {
+  document.querySelectorAll('.drag-handle-btn').forEach(h => h.classList.remove('dragging-active'));
   document.querySelectorAll('.side-cell').forEach(c => c.classList.remove('drag-over'));
   if (!_touchSrc) return;
   const src = _touchSrc;
   _touchSrc = null;
-  const touch = e.changedTouches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  const targetCell = el?.closest('.side-cell');
-  if (targetCell) {
-    const dti = +targetCell.dataset.ti, dpi = +targetCell.dataset.pi;
-    if (dti !== src.ti || dpi !== src.pi) swapPlayers(src.ti, src.pi, dti, dpi);
+  const t = e.changedTouches[0];
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const target = el?.closest('.side-cell');
+  if (target) {
+    const dti = +target.dataset.ti, dpi = +target.dataset.pi;
+    swapPlayers(src.ti, src.pi, dti, dpi);
   }
 }
 
@@ -2254,12 +2302,11 @@ function onPlayerInput(input) {
 }
 
 function updateTeamNameDisplay(ti) {
-  // Highlight the row when both players are filled
-  const row = document.getElementById(`team-row-${ti}`);
+  const row = document.getElementById(`players-row-${ti}`);
   if (!row) return;
   const team = state.teams[ti];
   const bothFilled = team.players[0]?.trim() && team.players[1]?.trim();
-  row.style.borderColor = bothFilled ? 'var(--accent)' : '';
+  row.classList.toggle('row-complete', !!bothFilled);
 }
 
 function onPlayerKeydown(e, ti, pi) {
