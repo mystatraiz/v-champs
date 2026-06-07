@@ -3893,8 +3893,49 @@ async function deletePlannedTournament(id) {
 
 function updateHeaderActions() {
   const bar = document.getElementById('header-actions');
-  // Nouveau tournoi is now in the Tournoi tab — only keep logout here
-  bar.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="doLogout()">⎋</button>`;
+  const canCancel = state.sessionStarted && !state.sessionFinished;
+  bar.innerHTML = `
+    ${canCancel ? `<button class="btn btn-sm" onclick="cancelSession()"
+      style="background:none;border:1px solid var(--danger);color:var(--danger);font-size:12px;padding:5px 10px;border-radius:6px;font-weight:700;letter-spacing:0.5px;">
+      ✕ Annuler
+    </button>` : ''}
+    <button class="btn btn-secondary btn-sm" onclick="doLogout()">⎋</button>
+  `;
+}
+
+// ═══════════════════════════════════════════════════
+//  CANCEL SESSION (reset sans archivage)
+// ═══════════════════════════════════════════════════
+function cancelSession() {
+  const hasMatches = state.matches.some(m => m.status === 'finished');
+  const msg = hasMatches
+    ? 'Annuler la session en cours ?\n\nLes matchs déjà joués ne seront PAS enregistrés dans l\'historique.\nCette action est irréversible.'
+    : 'Annuler la session en cours ?\n\nLes joueurs entrés seront effacés.\nCette action est irréversible.';
+  if (!confirm(msg)) return;
+
+  // Arrêt des timers si actifs
+  try { stopTimers(); } catch(e) {}
+  try { clearInterval(_warmupInterval); _warmupInterval = null; } catch(e) {}
+
+  // Reset complet de l'état — sans archiver
+  db.from('app_state').delete().eq('key', 'current_session').then();
+  state = {
+    courts: 2, teams: [], matches: [], matchCounter: 0, roundNum: 0,
+    activeMatches: [], sessionStarted: false, sessionFinished: false,
+    warmupStart: null,
+    pairNameMap: state.pairNameMap
+  };
+
+  // Réinitialiser l'affichage
+  setDisplay('session-end-bar', 'none');
+  setDisplay('phase-players', 'none');
+  setDisplay('phase-matches', 'none');
+  setDisplay('warmup-section', 'none');
+  renderTournamentSetup();
+  renderUpcomingTournaments();
+  switchTab('tournament');
+  updateHeaderActions();
+  saveState();
 }
 
 // ═══════════════════════════════════════════════════
