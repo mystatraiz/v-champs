@@ -4329,7 +4329,7 @@ function shareToWhatsApp(id) {
     : `🟢 *${free} place${free > 1 ? 's' : ''} disponible${free > 1 ? 's' : ''}*`;
 
   const lines = [
-    `🎾 *Mini Tournoi à 8*`,
+    `🎾 *Mini Tournoi à 8${pt.label ? ` "${pt.label}"` : ''}*`,
     pt.label ? `_${pt.label}_` : null,
     ``,
     `📅 *${dateFmt}*`,
