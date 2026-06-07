@@ -2055,8 +2055,8 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
     ${matchRows.length ? `
     <div class="modal-sep"></div>
     <div class="modal-history">
-      <div class="history-label">Historique des matchs</div>
-      ${matchRows.join('')}
+      <div class="history-label">5 derniers matchs</div>
+      ${matchRows.slice(0, 5).join('')}
     </div>` : '<div class="empty-state" style="padding:24px;">Aucun match joué.</div>'}
   `;
 
@@ -2145,7 +2145,7 @@ function switchModalTab(tab) {
 function showPlayerModal(playerName) { showPlayerDetail(playerName, 'stats'); }
 
 // Alias — classement opens on Palmarès tab by default
-function showVChampsPlayerDetail(playerName) { showPlayerDetail(playerName, 'palmares'); }
+function showVChampsPlayerDetail(playerName) { showPlayerDetail(playerName, 'stats'); }
 
 // Build aggregated player stats from all sessions (history + optional current)
 function buildAllPlayerStats(includeCurrent = true) {
