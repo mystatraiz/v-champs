@@ -1556,6 +1556,7 @@ async function loadFromSupabase() {
         db.from('app_state').select('value').eq('key','current_session').maybeSingle(),
         db.from('app_state').select('value').eq('key','session_history').maybeSingle(),
         db.from('app_state').select('value').eq('key','planned_tournaments').maybeSingle(),
+        db.from('app_state').select('value').eq('key','scores_reset_at').maybeSingle(),
         db.from('pair_names').select('pair_key,team_name'),
         db.from('known_players').select('name'),
         db.from('player_session_scores').select('*')
@@ -1563,7 +1564,7 @@ async function loadFromSupabase() {
       timeout.then(() => null)
     ]);
     if (!result) { console.warn('loadFromSupabase timeout'); return; }
-    const [sd, hd, ptd, pd, kd, psd] = result;
+    const [sd, hd, ptd, rsd, pd, kd, psd] = result;
     if (sd.data?.value) {
       state = sd.data.value;
       if (!state.pairNameMap) state.pairNameMap = {};
@@ -1572,7 +1573,10 @@ async function loadFromSupabase() {
     if (ptd.data?.value) _plannedTournaments = ptd.data.value;
     if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
     if (kd.data) _knownPlayers = kd.data.map(r => r.name);
-    if (psd?.data) _playerSessionScores = psd.data;
+    if (psd?.data) {
+      const resetAt = rsd?.data?.value ? new Date(rsd.data.value).getTime() : 0;
+      _playerSessionScores = resetAt ? psd.data.filter(r => new Date(r.created_at).getTime() > resetAt) : psd.data;
+    }
   } catch(e) {
     console.error('Supabase load error', e);
   }
@@ -3970,8 +3974,8 @@ async function saveProfileLink(profileId) {
 
 async function resetAllScores() {
   if (!confirm('Remettre tout le classement V-Champs à zéro ? Cette action est irréversible.')) return;
-  const { error } = await db.from('player_session_scores').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  if (error) { alert('Erreur : ' + error.message); return; }
+  const now = new Date().toISOString();
+  await db.from('app_state').upsert({ key: 'scores_reset_at', value: now, updated_at: now });
   await db.from('app_state').delete().in('key', ['session_history', 'current_session']);
   _playerSessionScores = [];
   _history = [];
