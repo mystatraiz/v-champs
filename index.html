@@ -4047,7 +4047,8 @@ function renderUpcomingTournaments() {
       ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:9px;padding:0 4px;margin-left:6px;">${pendingJoin.length}</span>`
       : '';
     return `
-    <div style="background:var(--card);border:1px solid ${isPast?'var(--border)':allReady?'var(--success)':'var(--muted)'};border-radius:var(--radius);margin-bottom:8px;opacity:${isPast?0.55:1};overflow:hidden;">
+    <div style="background:var(--card);border:1px solid ${isPast?'var(--border)':allReady?'var(--success)':'var(--muted)'};border-radius:var(--radius);margin-bottom:8px;opacity:${isPast?0.55:1};overflow:hidden;${!isPast?'cursor:pointer;':''}"
+         ${!isPast ? `onclick="openPlannedTournament('${t.id}')"` : ''}>
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;color:${isPast?'var(--text-secondary)':'var(--white)'};display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
@@ -4058,12 +4059,8 @@ function renderUpcomingTournaments() {
             ${total > 0 ? `${filled}/${total} joueurs` : 'Aucun joueur'}
           </div>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;" onclick="event.stopPropagation()">
           ${!isPast ? `
-          <button onclick="openPlannedTournament('${t.id}')"
-            style="background:var(--dark);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:700;padding:5px 9px;border-radius:5px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;">
-            ✏️ Joueurs
-          </button>
           <button onclick="shareToWhatsApp('${t.id}')"
             title="Partager sur WhatsApp"
             style="background:#25D366;border:none;color:#fff;font-size:13px;font-weight:800;padding:5px 10px;border-radius:5px;cursor:pointer;white-space:nowrap;">
