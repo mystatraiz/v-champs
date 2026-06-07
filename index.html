@@ -722,7 +722,9 @@
     <div class="brand-sub">Indomitus Padel · Tournoi</div>
   </div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;" id="header-actions">
-    <button class="notif-bell" id="notif-bell" onclick="openAdminPanel()" style="display:none;">🔔<span class="notif-count" id="notif-count" style="display:none;">0</span></button>
+    <button class="btn btn-secondary btn-sm" onclick="openAdminPanel()" id="accounts-btn" style="position:relative;padding-right:10px;">
+      👤 Comptes<span id="notif-count" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;display:none;align-items:center;justify-content:center;line-height:1;"></span>
+    </button>
   </div>
 </header>
 
@@ -1013,7 +1015,7 @@ function showAdminApp() {
   document.getElementById('admin-header').style.display    = 'flex';
   document.getElementById('main-tabs').style.display       = 'flex';
   document.getElementById('admin-main').style.display      = 'block';
-  document.getElementById('notif-bell').style.display      = 'flex';
+  // accounts-btn always visible for admin (no toggle needed)
   if (!state.sessionStarted) {
     document.getElementById('setup-screen').style.display  = 'block';
     document.getElementById('phase-players').style.display = 'none';
@@ -1182,13 +1184,16 @@ function renderPlayerProfile() {
 
 // ─── Admin notifications ───
 async function loadAdminNotifications() {
-  const { data } = await db.from('notifications').select('*').eq('read', false).order('created_at', {ascending:false});
-  const bell = document.getElementById('notif-bell');
-  const count = document.getElementById('notif-count');
-  if (!data?.length) { bell.style.display='none'; return; }
-  bell.style.display = 'flex';
-  count.style.display = 'flex';
-  count.textContent = data.length;
+  const { data: pending } = await db.from('profiles').select('id').eq('role', 'pending');
+  const badge = document.getElementById('notif-count');
+  if (!badge) return;
+  const n = pending?.length || 0;
+  if (n > 0) {
+    badge.textContent = n;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 async function openAdminPanel() {
@@ -3267,9 +3272,7 @@ function updateHeaderActions() {
   }
   html += `<button class="btn btn-secondary btn-sm" onclick="doLogout()">⎋</button>`;
   bar.innerHTML = html;
-  // Keep bell visible for admin
-  const bell = document.getElementById('notif-bell');
-  if (currentProfile?.role === 'admin') bell.style.display = 'flex';
+  // accounts-btn is always visible in admin header — nothing to do here
 }
 
 // ═══════════════════════════════════════════════════
