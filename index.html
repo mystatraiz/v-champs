@@ -3381,7 +3381,7 @@ async function renderAdminTab() {
     allEl.innerHTML = '<div class="empty-state" style="padding:16px 0;">Aucun profil.</div>';
   } else {
     allEl.innerHTML = `<table class="stats-table" style="width:100%;">
-      <thead><tr><th>Nom</th><th>Surnom</th><th>Rôle</th><th>Joueur lié</th><th></th></tr></thead>
+      <thead><tr><th>Nom</th><th>Surnom</th><th>Rôle</th><th>Joueur lié</th></tr></thead>
       <tbody>${all.map(p => {
         const roleColor = p.role==='admin'?'var(--accent)':p.role==='organisateur'?'#60a5fa':p.role==='player'?'var(--success)':'var(--text-secondary)';
         const roleLabel = p.role==='admin'?'⚙️ Admin':p.role==='organisateur'?'🗂 Orga':p.role==='player'?'🎾 Joueur':'⏳ En attente';
@@ -3389,17 +3389,19 @@ async function renderAdminTab() {
           <td>${p.first_name} ${(p.last_name||'').toUpperCase()}</td>
           <td style="color:var(--accent);">${p.nickname||'—'}</td>
           <td style="color:${roleColor};font-weight:700;">${roleLabel}</td>
-          <td style="color:var(--text-secondary);font-size:12px;">${p.linked_player_name||'—'}</td>
-          <td><button class="btn btn-sm" style="padding:4px 8px;font-size:11px;" onclick="toggleProfileLink('${p.id}','${esc(p.linked_player_name||'')}','${esc(p.nickname||'')}')">🔗</button></td>
+          <td>
+            <span style="color:var(--text-secondary);font-size:12px;">${p.linked_player_name||'—'}</span>
+            <button class="btn btn-sm" style="padding:2px 6px;font-size:11px;margin-left:4px;vertical-align:middle;" onclick="toggleProfileLink('${p.id}')">🔗</button>
+          </td>
         </tr>
         <tr id="prof-edit-${p.id}" style="display:none;">
-          <td colspan="5" style="padding:8px 4px;">
+          <td colspan="4" style="padding:8px 4px;">
             <div style="display:flex;gap:8px;align-items:center;">
               <select id="prof-link-select-${p.id}" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:6px 8px;font-size:12px;">
                 <option value="">— Nouveau joueur (surnom) —</option>
                 ${_knownPlayers.sort().map(n=>`<option value="${n}"${n===(p.linked_player_name||'')?'  selected':''}>${n}</option>`).join('')}
               </select>
-              <button class="btn btn-success btn-sm" style="white-space:nowrap;" onclick="saveProfileLink('${p.id}')">✓ OK</button>
+              <button class="btn btn-success btn-sm" style="white-space:nowrap;" onclick="saveProfileLink('${p.id}')">✓</button>
               <button class="btn btn-sm" style="white-space:nowrap;" onclick="toggleProfileLink('${p.id}')">✕</button>
             </div>
           </td>
