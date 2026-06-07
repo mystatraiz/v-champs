@@ -838,8 +838,11 @@
     <div id="phase-players" style="display:none;">
       <div class="section-title">Entrée des joueurs</div>
       <div class="teams-grid" id="teams-grid"></div>
-      <div style="margin-top:24px;">
-        <button class="btn btn-primary btn-lg" onclick="startSession()" id="launch-session-btn" disabled>
+      <div style="margin-top:24px;display:flex;gap:12px;">
+        <button class="btn btn-secondary btn-lg" onclick="cancelSession()" style="flex:0 0 auto;">
+          ← Retour
+        </button>
+        <button class="btn btn-primary btn-lg" onclick="startSession()" id="launch-session-btn" disabled style="flex:1;">
           Lancer la session →
         </button>
       </div>
