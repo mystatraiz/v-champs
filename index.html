@@ -358,6 +358,20 @@
 
   /* Section separator */
   .modal-sep { height: 1px; background: var(--border); margin: 14px 16px; }
+  /* ─── Modal inner tabs ─── */
+  .modal-inner-tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+    margin: 8px 0 0; padding: 0 16px;
+  }
+  .modal-inner-tabs button {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--text-secondary); font-size: 13px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 10px 16px; cursor: pointer; transition: all 0.2s;
+  }
+  .modal-inner-tabs button.active { color: var(--white); border-bottom-color: var(--accent); }
+  .modal-tab-content { display: none; }
+  .modal-tab-content.active { display: block; }
 
   /* History */
   .modal-history { padding: 0 16px; }
@@ -1707,126 +1721,220 @@ function renderCombinedRanking(highlightPlayer) {
   </div>`;
 }
 
-function showVChampsPlayerDetail(playerName) {
-  const rankings = computeGlobalRankings();
-  const key = playerName.toLowerCase().trim();
-  // Fusionner toutes les variantes de nom pour ce joueur
-  const variants = rankings.filter(p => p.name.toLowerCase().trim() === key);
-  let player = null;
-  if (variants.length > 0) {
-    const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
-    const allPerfs   = variants.flatMap(v => v.allPerformances);
-    const validPerfs = allPerfs.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
-    const retained   = [...validPerfs].sort((a, b) => b.points_earned - a.points_earned).slice(0, 8);
-    player = {
-      name:             playerName,
-      score:            retained.reduce((s, p) => s + p.points_earned, 0),
-      validCount:       validPerfs.length,
-      retainedCount:    retained.length,
-      bestPerformance:  retained[0]?.points_earned ?? 0,
-      oldestRetainedDate: retained[retained.length - 1]?.created_at ?? null,
-      status:           validPerfs.length >= 4 ? 'active' : 'inactive',
-      allPerformances:  allPerfs
-    };
-  }
+// ── Unified player detail modal (Stats + Palmarès) ──────────────────────────
+function showPlayerDetail(playerName, defaultTab = 'stats') {
   const modal = document.getElementById('player-modal');
 
-  if (!player) {
-    modal.querySelector('.modal').innerHTML = `
-      <div class="modal-drag"></div>
-      <div class="modal-header">
-        <div><div class="modal-title">${playerName}</div></div>
-        <button class="modal-close" onclick="forceClosePlayerModal()">✕</button>
-      </div>
-      <div class="empty-state">Aucune donnée V-Champs.</div>`;
-    modal.classList.add('open');
-    return;
-  }
+  // ── Build Stats data (match history) ──
+  const allStats = buildAllPlayerStats(true);
+  // case-insensitive lookup
+  const psKey = Object.keys(allStats).find(k => k.toLowerCase().trim() === playerName.toLowerCase().trim()) || playerName;
+  const ps = allStats[psKey] || null;
+  const team = state.teams.find(t => t.players.some(p => p?.toLowerCase().trim() === playerName.toLowerCase().trim()));
 
+  const sessions = [...getHistory()];
+  if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+
+  const partnerStats = {}, oppStats = {}, matchRows = [];
+  sessions.forEach(session => {
+    session.matches.forEach(m => {
+      const t1 = session.teams.find(t => t.id === m.team1Id);
+      const t2 = session.teams.find(t => t.id === m.team2Id);
+      if (!t1 || !t2) return;
+      const myTeam  = t1.players.some(p => p?.toLowerCase().trim() === playerName.toLowerCase().trim()) ? t1
+                    : t2.players.some(p => p?.toLowerCase().trim() === playerName.toLowerCase().trim()) ? t2 : null;
+      if (!myTeam) return;
+      const oppTeam = myTeam === t1 ? t2 : t1;
+      const myScore = myTeam === t1 ? m.score1 : m.score2;
+      const oppScore= myTeam === t1 ? m.score2 : m.score1;
+      let myJ = myScore, oppJ = oppScore;
+      if (m.scoreType === 'sets' && m.sets) {
+        myJ  = myTeam === t1 ? m.sets.reduce((s,r)=>s+r[0],0) : m.sets.reduce((s,r)=>s+r[1],0);
+        oppJ = myTeam === t1 ? m.sets.reduce((s,r)=>s+r[1],0) : m.sets.reduce((s,r)=>s+r[0],0);
+      }
+      const won = myScore > oppScore, draw = myScore === oppScore;
+      myTeam.players.filter(p => p && p.toLowerCase().trim() !== playerName.toLowerCase().trim()).forEach(partner => {
+        if (!partnerStats[partner]) partnerStats[partner] = {wins:0,losses:0,draws:0,played:0};
+        partnerStats[partner].played++;
+        if (won) partnerStats[partner].wins++;
+        else if (!draw) partnerStats[partner].losses++;
+        else partnerStats[partner].draws++;
+      });
+      oppTeam.players.filter(p => p && p.trim()).forEach(opp => {
+        if (!oppStats[opp]) oppStats[opp] = {wins:0,losses:0,jFor:0,jAgainst:0};
+        oppStats[opp].jFor += myJ; oppStats[opp].jAgainst += oppJ;
+        if (won) oppStats[opp].wins++;
+        else if (!draw) oppStats[opp].losses++;
+      });
+      matchRows.unshift(`
+        <div class="history-item">
+          <span style="width:20px;font-size:12px;font-weight:700;color:${won?'var(--success)':draw?'var(--text-secondary)':'var(--danger)'}">${won?'V':draw?'N':'D'}</span>
+          <span style="flex:1;font-size:13px;">${myTeam.players.filter(p=>p).join(' / ')} vs ${oppTeam.players.filter(p=>p).join(' / ')}</span>
+          <span style="color:var(--text-secondary);font-size:13px;">${myScore}:${oppScore}</span>
+        </div>`);
+    });
+  });
+
+  const pe = Object.entries(partnerStats).filter(([,v])=>v.played>=1).sort((a,b)=>(b[1].wins/b[1].played)-(a[1].wins/a[1].played));
+  const best = pe[0], worst = pe[pe.length-1];
+  const oe = Object.entries(oppStats).filter(([,v])=>v.wins+v.losses>0);
+  const victim  = oe.length ? [...oe].sort((a,b)=>(b[1].wins-b[1].losses)-(a[1].wins-a[1].losses))[0] : null;
+  const nemesis = oe.length ? [...oe].sort((a,b)=>(b[1].losses-b[1].wins)-(a[1].losses-a[1].wins))[0] : null;
+
+  const played = ps?ps.played:0, wins=ps?ps.wins:0, losses=ps?ps.losses:0, draws=ps?(ps.draws||0):0;
+  const winRate = played ? Math.round(wins/played*100) : 0;
+  const wr_color = winRate>=60?'var(--success)':winRate>=40?'var(--accent)':'var(--danger)';
+
+  const statsHTML = `
+    <div class="stats-hero" style="padding:14px 16px 0;">
+      <div class="donut-wrap">
+        ${svgDonutTriple(wins, draws, losses, 100, 10)}
+        <div class="donut-label">
+          <span class="donut-pct" style="color:${wr_color}">${winRate}%</span>
+          <span class="donut-sub">WIN</span>
+        </div>
+      </div>
+      <div class="stats-pills">
+        <div class="stat-pill"><span class="stat-pill-label">MATCHS</span><span class="stat-pill-val">${played}</span></div>
+        <div class="stat-pill"><span class="stat-pill-label">VICTOIRES</span><span class="stat-pill-val" style="color:var(--success)">${wins}</span></div>
+        <div class="stat-pill"><span class="stat-pill-label">NULS</span><span class="stat-pill-val" style="color:#888">${draws}</span></div>
+        <div class="stat-pill"><span class="stat-pill-label">DÉFAITES</span><span class="stat-pill-val" style="color:var(--danger)">${losses}</span></div>
+      </div>
+    </div>
+    ${pe.length ? `
+    <div class="modal-sep"></div>
+    <div class="partner-section">
+      ${best ? `<div class="partner-card best">
+        <div class="partner-card-header"><span class="partner-card-icon">🏆</span><span class="partner-card-title">Meilleur partenaire</span></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="partner-card-name">${best[0]}</span>
+          <span style="font-size:18px;font-weight:800;color:var(--success)">${Math.round(best[1].wins/best[1].played*100)}%</span>
+        </div>
+        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(best[1].wins/best[1].played*100)}%;background:var(--success)"></div></div>
+        <div class="partner-stats-row"><span>${best[1].wins}V · ${best[1].losses}D · ${best[1].played}M</span></div>
+      </div>` : ''}
+      ${worst && worst[0] !== best?.[0] ? `<div class="partner-card worst">
+        <div class="partner-card-header"><span class="partner-card-icon">💀</span><span class="partner-card-title">Pire partenaire</span></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="partner-card-name">${worst[0]}</span>
+          <span style="font-size:18px;font-weight:800;color:var(--danger)">${Math.round(worst[1].wins/worst[1].played*100)}%</span>
+        </div>
+        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(worst[1].wins/worst[1].played*100)}%;background:var(--danger)"></div></div>
+        <div class="partner-stats-row"><span>${worst[1].wins}V · ${worst[1].losses}D · ${worst[1].played}M</span></div>
+      </div>` : ''}
+    </div>` : ''}
+    ${oe.length ? `
+    <div class="modal-sep"></div>
+    <div class="opp-section">
+      ${victim ? `<div class="opp-card victim">
+        <div class="opp-card-header"><span style="font-size:16px;">🎯</span><span class="opp-card-title">Victime</span></div>
+        <div class="opp-body">
+          <div style="flex:1;"><div class="opp-name">${victim[0]}</div><div class="opp-sub">${victim[1].wins}V / ${victim[1].losses}D · ${victim[1].jFor}J marqués</div></div>
+          ${svgBalance(victim[1].jFor, victim[1].jAgainst, 60, 7)}
+        </div>
+      </div>` : ''}
+      ${nemesis && nemesis[0] !== victim?.[0] ? `<div class="opp-card nemesis">
+        <div class="opp-card-header"><span style="font-size:16px;">😈</span><span class="opp-card-title">Némésis</span></div>
+        <div class="opp-body">
+          <div style="flex:1;"><div class="opp-name">${nemesis[0]}</div><div class="opp-sub">${nemesis[1].losses}D / ${nemesis[1].wins}V · ${nemesis[1].jAgainst}J encaissés</div></div>
+          ${svgBalance(nemesis[1].jFor, nemesis[1].jAgainst, 60, 7)}
+        </div>
+      </div>` : ''}
+    </div>` : ''}
+    ${matchRows.length ? `
+    <div class="modal-sep"></div>
+    <div class="modal-history">
+      <div class="history-label">Historique des matchs</div>
+      ${matchRows.join('')}
+    </div>` : '<div class="empty-state" style="padding:24px;">Aucun match joué.</div>'}
+  `;
+
+  // ── Build Palmarès data (V-Champs) ──
+  const rankings = computeGlobalRankings();
+  const key = playerName.toLowerCase().trim();
+  const variants = rankings.filter(p => p.name.toLowerCase().trim() === key);
   const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
-  const validPerfs = player.allPerformances.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
-  const sortedValid = [...validPerfs].sort((a, b) => b.points_earned - a.points_earned);
-  const retained = sortedValid.slice(0, 8);
-  const retainedIds = new Set(retained.map(r => r.session_id));
-  const notRetained = sortedValid.slice(8);
-  const expired = player.allPerformances
-    .filter(p => new Date(p.created_at).getTime() < cutoffMs)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  let palmaresHTML = '<div class="empty-state" style="padding:24px;">Aucune session V-Champs enregistrée.</div>';
 
-  function perfRow(r, dimmed) {
-    const expireTs = new Date(r.created_at).getTime() + 180 * 24 * 60 * 60 * 1000;
-    const daysLeft = Math.max(0, Math.ceil((expireTs - Date.now()) / (24 * 60 * 60 * 1000)));
-    const dateStr = new Date(r.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' });
-    const posClass = `perf-pos-${r.position}`;
-    const c = r.coefficient;
-    const coeffColor = c > 1 ? 'var(--success)' : c < 1 ? 'var(--danger)' : 'var(--text-secondary)';
-    const isExpired = dimmed === 'expired';
-    return `<div class="perf-item" style="${dimmed?'opacity:0.45':''}">
-      <div class="perf-pos ${posClass}">${r.position}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;">${dateStr}</div>
-        <div style="font-size:11px;color:var(--text-secondary);">${positionLabel(r.position)} · <span style="color:${coeffColor}">×${c.toFixed(2)}</span> · base ${r.base_points}pts</div>
+  if (variants.length > 0) {
+    const allPerfs   = variants.flatMap(v => v.allPerformances);
+    const validPerfs = allPerfs.filter(p => new Date(p.created_at).getTime() >= cutoffMs);
+    const sortedValid= [...validPerfs].sort((a, b) => b.points_earned - a.points_earned);
+    const retained   = sortedValid.slice(0, 8);
+    const notRetained= sortedValid.slice(8);
+    const expired    = allPerfs.filter(p => new Date(p.created_at).getTime() < cutoffMs)
+                              .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    const score = retained.reduce((s,p) => s + p.points_earned, 0);
+    const statusBadge = validPerfs.length >= 4
+      ? '<span class="badge badge-active">Actif</span>'
+      : '<span class="badge badge-inactive">Inactif</span>';
+
+    function perfRow(r, dimmed) {
+      const expireTs = new Date(r.created_at).getTime() + 180*24*60*60*1000;
+      const daysLeft = Math.max(0, Math.ceil((expireTs - Date.now())/(24*60*60*1000)));
+      const dateStr  = new Date(r.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      const posClass = `perf-pos-${r.position}`;
+      const c = r.coefficient;
+      const coeffColor = c>1?'var(--success)':c<1?'var(--danger)':'var(--text-secondary)';
+      const isExpired = dimmed === 'expired';
+      return `<div class="perf-item" style="${dimmed?'opacity:0.45':''}">
+        <div class="perf-pos ${posClass}">${r.position}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${dateStr}</div>
+          <div style="font-size:11px;color:var(--text-secondary);">${positionLabel(r.position)} · <span style="color:${coeffColor}">×${c.toFixed(2)}</span> · base ${r.base_points}pts</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:16px;font-weight:800;${isExpired?'color:var(--text-secondary)':''}">${r.points_earned} pts</div>
+          <div style="font-size:10px;color:var(--muted);">${isExpired?'Expirée':daysLeft+'j restants'}</div>
+        </div>
+      </div>`;
+    }
+
+    palmaresHTML = `
+      <div style="display:flex;gap:8px;padding:14px 16px 0;flex-wrap:wrap;">
+        <div class="stat-pill" style="flex:1;min-width:90px;"><span class="stat-pill-label">SCORE</span><span class="stat-pill-val">${score}</span></div>
+        <div class="stat-pill" style="flex:1;min-width:90px;"><span class="stat-pill-label">SESSIONS</span><span class="stat-pill-val">${validPerfs.length}</span></div>
+        <div class="stat-pill" style="flex:1;min-width:90px;"><span class="stat-pill-label">MEILLEURE</span><span class="stat-pill-val" style="color:var(--accent)">${retained[0]?.points_earned ?? 0}</span></div>
       </div>
-      <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:16px;font-weight:800;${isExpired?'color:var(--text-secondary)':''}">${r.points_earned} pts</div>
-        <div style="font-size:10px;color:var(--muted);">${isExpired ? 'Expirée' : daysLeft + 'j restants'}</div>
-      </div>
-    </div>`;
+      <div style="padding:6px 16px 0;font-size:12px;color:var(--text-secondary);">Statut : ${statusBadge}</div>
+      ${retained.length ? `<div class="modal-sep"></div><div class="modal-history"><div class="history-label">Retenues (${retained.length}/8)</div>${retained.map(r=>perfRow(r,false)).join('')}</div>` : ''}
+      ${notRetained.length ? `<div class="modal-sep"></div><div class="modal-history"><div class="history-label" style="color:var(--muted);">Non retenues (${notRetained.length})</div>${notRetained.map(r=>perfRow(r,'dim')).join('')}</div>` : ''}
+      ${expired.length ? `<div class="modal-sep"></div><div class="modal-history"><div class="history-label" style="color:var(--muted);">Expirées (${expired.length})</div>${expired.map(r=>perfRow(r,'expired')).join('')}</div>` : ''}
+    `;
   }
 
-  const statusBadge = player.status === 'active'
-    ? '<span class="badge badge-active">Actif</span>'
-    : '<span class="badge badge-inactive">Inactif</span>';
-
+  // ── Render modal ──
   modal.querySelector('.modal').innerHTML = `
     <div class="modal-drag"></div>
     <div class="modal-header">
       <div>
         <div class="modal-title">${playerName}</div>
-        <div class="modal-subtitle">${player.score} pts V-Champs &nbsp;${statusBadge}</div>
+        ${team ? `<div class="modal-subtitle">Session en cours avec ${team.players.filter(p=>p&&p.toLowerCase().trim()!==playerName.toLowerCase().trim()).join(' / ')}</div>` : ''}
       </div>
       <button class="modal-close" onclick="forceClosePlayerModal()" style="touch-action:manipulation;">✕</button>
     </div>
-
-    <div style="display:flex;gap:8px;padding:12px 20px 0;flex-wrap:wrap;">
-      <div class="stat-pill" style="flex:1;min-width:90px;">
-        <span class="stat-pill-label">SCORE</span>
-        <span class="stat-pill-val">${player.score}</span>
-      </div>
-      <div class="stat-pill" style="flex:1;min-width:90px;">
-        <span class="stat-pill-label">SESSIONS VALIDES</span>
-        <span class="stat-pill-val">${player.validCount}</span>
-      </div>
-      <div class="stat-pill" style="flex:1;min-width:90px;">
-        <span class="stat-pill-label">MEILLEURE</span>
-        <span class="stat-pill-val" style="color:var(--accent)">${player.bestPerformance}</span>
-      </div>
+    <div class="modal-inner-tabs">
+      <button id="mtab-stats"    class="${defaultTab==='stats'?'active':''}"    onclick="switchModalTab('stats')">Stats</button>
+      <button id="mtab-palmares" class="${defaultTab==='palmares'?'active':''}" onclick="switchModalTab('palmares')">Palmarès</button>
     </div>
-
-    ${retained.length ? `
-    <div class="modal-sep"></div>
-    <div class="modal-history">
-      <div class="history-label">Retenues (${retained.length}/8)</div>
-      ${retained.map(r => perfRow(r, false)).join('')}
-    </div>` : ''}
-
-    ${notRetained.length ? `
-    <div class="modal-sep"></div>
-    <div class="modal-history">
-      <div class="history-label" style="color:var(--muted);">Non retenues (${notRetained.length})</div>
-      ${notRetained.map(r => perfRow(r, 'dim')).join('')}
-    </div>` : ''}
-
-    ${expired.length ? `
-    <div class="modal-sep"></div>
-    <div class="modal-history">
-      <div class="history-label" style="color:var(--muted);">Expirées (${expired.length})</div>
-      ${expired.map(r => perfRow(r, 'expired')).join('')}
-    </div>` : ''}
+    <div id="modal-stats-content"    class="modal-tab-content ${defaultTab==='stats'?'active':''}">${statsHTML}</div>
+    <div id="modal-palmares-content" class="modal-tab-content ${defaultTab==='palmares'?'active':''}">${palmaresHTML}</div>
   `;
-
   modal.classList.add('open');
 }
+
+function switchModalTab(tab) {
+  document.querySelectorAll('.modal-inner-tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`mtab-${tab}`)?.classList.add('active');
+  document.getElementById(`modal-${tab}-content`)?.classList.add('active');
+}
+
+// Kept for backward compat — both now open the unified modal
+function showPlayerModal(playerName) { showPlayerDetail(playerName, 'stats'); }
+
+// Alias — classement opens on Palmarès tab by default
+function showVChampsPlayerDetail(playerName) { showPlayerDetail(playerName, 'palmares'); }
 
 // Build aggregated player stats from all sessions (history + optional current)
 function buildAllPlayerStats(includeCurrent = true) {
@@ -3097,7 +3205,10 @@ function svgBalance(jFor, jAgainst, size=56, sw=7) {
 // ═══════════════════════════════════════════════════
 //  PLAYER MODAL
 // ═══════════════════════════════════════════════════
-function showPlayerModal(playerName) {
+function _showPlayerModal_DEPRECATED(playerName) {
+  // This function is replaced by showPlayerDetail() — kept to avoid parse errors
+  showPlayerDetail(playerName, 'stats');
+  return;
   const modal = document.getElementById('player-modal');
 
   const allStats = buildAllPlayerStats(true);
