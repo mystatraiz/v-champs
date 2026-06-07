@@ -52,10 +52,8 @@
     align-items: center;
     gap: 16px;
   }
-  /* Le header du player-app reste sticky individuellement (hors top-bar) */
-  #player-app header {
-    position: sticky; top: 0; z-index: 100;
-  }
+  /* player-top-bar gère le sticky pour la vue joueur */
+  #player-top-bar { background: var(--dark); }
   header img#logo { height: 52px; filter: invert(1) brightness(1.1); opacity: 1; }
   header .brand { display: flex; flex-direction: column; }
   header .brand-title { font-size: 22px; font-weight: 700; letter-spacing: 3px; color: var(--white); }
@@ -701,17 +699,19 @@
 
 <!-- ═══ PLAYER APP ═══ -->
 <div id="player-app">
-  <header style="background:var(--dark);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;">
-    <img src="logo.png" style="height:36px;filter:invert(1);" onerror="this.style.display='none'">
-    <span style="font-size:16px;font-weight:700;letter-spacing:2px;color:var(--white);">V-CHAMPS</span>
-    <div style="margin-left:auto;">
-      <button class="btn btn-secondary btn-sm" onclick="doLogout()">Déconnexion</button>
-    </div>
-  </header>
-  <nav style="background:var(--dark);border-bottom:1px solid var(--border);display:flex;padding:0 24px;">
-    <button class="active" id="ptab-classement" onclick="switchPlayerTab('classement')" style="background:none;border:none;color:var(--text-secondary);padding:12px 20px;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--white);">Classement</button>
-    <button id="ptab-profil" onclick="switchPlayerTab('profil')" style="background:none;border:none;color:var(--text-secondary);padding:12px 20px;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;">Mon profil</button>
-  </nav>
+  <div id="player-top-bar" style="position:sticky;top:0;z-index:100;background:var(--dark);">
+    <header style="background:var(--dark);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;">
+      <img src="logo.png" style="height:36px;filter:invert(1);" onerror="this.style.display='none'">
+      <span style="font-size:16px;font-weight:700;letter-spacing:2px;color:var(--white);">V-CHAMPS</span>
+      <div style="margin-left:auto;">
+        <button class="btn btn-secondary btn-sm" onclick="doLogout()">Déconnexion</button>
+      </div>
+    </header>
+    <nav class="tabs">
+      <button data-ptab="classement" class="active" id="ptab-classement" onclick="switchPlayerTab('classement')">Classement</button>
+      <button data-ptab="profil" id="ptab-profil" onclick="switchPlayerTab('profil')">Mon profil</button>
+    </nav>
+  </div>
   <main style="max-width:600px;margin:0 auto;padding:16px;">
     <!-- Classement tab -->
     <div id="player-classement">
@@ -1119,11 +1119,9 @@ function showPlayerApp() {
 function switchPlayerTab(tab) {
   document.getElementById('player-classement').style.display = tab==='classement' ? 'block' : 'none';
   document.getElementById('player-profil').style.display     = tab==='profil'     ? 'block' : 'none';
-  const tabs = document.querySelectorAll('#player-app nav button');
-  tabs[0].style.borderBottomColor = tab==='classement' ? 'var(--accent)' : 'transparent';
-  tabs[0].style.color = tab==='classement' ? 'var(--white)' : 'var(--text-secondary)';
-  tabs[1].style.borderBottomColor = tab==='profil' ? 'var(--accent)' : 'transparent';
-  tabs[1].style.color = tab==='profil' ? 'var(--white)' : 'var(--text-secondary)';
+  document.querySelectorAll('#player-app nav.tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.ptab === tab);
+  });
 }
 
 function renderPlayerClassement() {
