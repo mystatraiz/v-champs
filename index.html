@@ -4363,9 +4363,6 @@ function shareToWhatsApp(id) {
     ...playerLines,
     ``,
     spotsLine,
-    ``,
-    `👇 Rejoins-nous !`,
-    getJoinUrl(id)
   ].filter(l => l !== null).join('\n');
 
   window.open('https://wa.me/?text=' + encodeURIComponent(lines), '_blank');
