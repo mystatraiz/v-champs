@@ -3815,6 +3815,7 @@ function switchTab(tab) {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
   document.getElementById(`tab-${tab}`).classList.add('active');
+  if (tab === 'tournament') renderTournamentSetup();
   if (tab === 'stats')     renderSessionStats();
   if (tab === 'general')   renderGeneralStats();
   if (tab === 'admin-tab') renderAdminTab();
