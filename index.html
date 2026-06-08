@@ -994,6 +994,13 @@
           <div id="match-history-list"><div class="empty-state">Aucun match terminé</div></div>
         </div>
       </div>
+
+      <!-- Bouton visible uniquement quand session terminée -->
+      <div id="new-tournament-bar" style="display:none;margin-top:24px;padding-bottom:16px;">
+        <button class="btn btn-primary btn-lg" onclick="initTournament()" style="width:100%;max-width:360px;justify-content:center;">
+          + Nouveau tournoi
+        </button>
+      </div>
     </div>
 
   </section>
@@ -2794,6 +2801,7 @@ function renderMatchPhase() {
   }
 
   // La section "proposer" n'existe plus dans le nouveau flow automatique
+  setDisplay('new-tournament-bar', state.sessionFinished ? 'block' : 'none');
 
   renderMatchHistory();
   renderStats();
@@ -3097,8 +3105,7 @@ function confirmEndSession() {
   document.getElementById('proposed-section').style.display = 'none';
   updateHeaderActions();
   renderMatchPhase();
-  switchTab('general');
-  renderGeneralStats();
+  switchTab('tournament');
 }
 
 // ═══════════════════════════════════════════════════
@@ -3466,8 +3473,7 @@ function autoEndSession() {
   document.getElementById('session-end-bar').style.display = 'none';
   updateHeaderActions();
   renderMatchPhase();
-  switchTab('general');
-  renderGeneralStats();
+  switchTab('tournament');
 }
 
 // ═══════════════════════════════════════════════════
@@ -3997,18 +4003,20 @@ function renderTournamentSetup() {
   setDisplay('phase-matches', (state.sessionStarted && !finished && state.warmupStart) ? 'block' : 'none');
 
   // Simpler state-driven version
-  if (!state.sessionStarted || finished) {
+  if (finished) {
+    // Session terminée : garder les résultats visibles jusqu'au prochain tournoi
+    setDisplay('setup-screen', 'none');
+    setDisplay('phase-players', 'none');
+    setDisplay('phase-matches', 'block');
+    setDisplay('new-tournament-bar', 'block');
+  } else if (!state.sessionStarted) {
     setDisplay('setup-screen', 'block');
     setDisplay('phase-players', 'none');
     setDisplay('phase-matches', 'none');
-    // Enable/disable button
-    const btn = document.getElementById('start-btn');
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = finished ? '+ Nouveau tournoi' : '+ Nouveau tournoi';
-    }
+    setDisplay('new-tournament-bar', 'none');
   } else {
     setDisplay('setup-screen', 'none');
+    setDisplay('new-tournament-bar', 'none');
     // phase-players and phase-matches are managed by initTournament/startSession
   }
 }
