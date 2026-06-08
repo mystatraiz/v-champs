@@ -4046,21 +4046,24 @@ async function loadPlannedTournaments() {
 }
 
 // Maintient toujours 4 tournois lundi/mardi 12:30 niveau 6/7 à venir
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 async function autoFillRecurringTournaments() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   // Tournois récurrents à venir (lundi=1, mardi=2, 12:30, 6/7)
+  // Utilise la date locale pour éviter le décalage UTC
   const upcoming = _plannedTournaments.filter(t => {
-    const d = new Date(t.date); d.setHours(0,0,0,0);
+    const d = new Date(t.date + 'T00:00:00'); // force interprétation locale
     return d >= today && t.time === '12:30' && t.label === '6/7' && (d.getDay() === 1 || d.getDay() === 2);
   });
 
-  if (upcoming.length >= 4) return; // déjà 4 ou plus, rien à faire
+  if (upcoming.length >= 4) return;
 
-  // Trouver les dates existantes pour éviter les doublons
   const existingDates = new Set(_plannedTournaments.map(t => t.date));
 
-  // Générer les prochains lundis et mardis
   let added = 0;
   const needed = 4 - upcoming.length;
   const cursor = new Date(today);
@@ -4070,7 +4073,7 @@ async function autoFillRecurringTournaments() {
     safety++;
     const day = cursor.getDay();
     if (day === 1 || day === 2) {
-      const dateStr = cursor.toISOString().slice(0, 10);
+      const dateStr = localDateStr(cursor); // date locale, pas UTC
       if (!existingDates.has(dateStr)) {
         _plannedTournaments.push({
           id: 'pt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
