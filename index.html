@@ -3986,6 +3986,9 @@ async function resetAllScores() {
 
 // ─── Tournament tab display ─────────────────────────────────────────────────
 function renderTournamentSetup() {
+  // En mode édition de tournoi planifié, ne pas toucher aux phases
+  if (state.plannedTournamentId) return;
+
   const active = state.sessionStarted && !state.sessionFinished;
   const finished = state.sessionFinished;
 
