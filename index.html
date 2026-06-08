@@ -1578,6 +1578,7 @@ async function loadFromSupabase() {
     }
     if (hd.data?.value)  _history = hd.data.value;
     if (ptd.data?.value) _plannedTournaments = ptd.data.value;
+    await autoFillRecurringTournaments();
     if (pd.data) pd.data.forEach(r => { state.pairNameMap[r.pair_key] = r.team_name; });
     if (kd.data) _knownPlayers = kd.data.map(r => r.name);
     if (psd?.data) {
