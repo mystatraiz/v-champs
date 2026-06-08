@@ -4067,6 +4067,7 @@ async function autoFillRecurringTournaments() {
   let added = 0;
   const needed = 4 - upcoming.length;
   const cursor = new Date(today);
+  cursor.setDate(cursor.getDate() + 1); // on commence à demain, jamais à aujourd'hui
   let safety = 0;
 
   while (added < needed && safety < 60) {
