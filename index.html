@@ -3228,11 +3228,23 @@ function computeSessionPointsLive(sortedTeamStats) {
 
 function renderSessionStats() {
   const container = document.getElementById('stats-content');
-  if (!state.sessionStarted) {
+
+  // Source : session en cours, ou dernière session de l'historique
+  let teams, matches, isArchived = false;
+  if (state.sessionStarted) {
+    teams = state.teams;
+    matches = state.matches.filter(m => m.status === 'finished');
+  } else if (_history.length > 0) {
+    const last = _history[_history.length - 1];
+    teams = last.teams;
+    matches = last.matches;
+    isArchived = true;
+  } else {
     container.innerHTML = '<div class="empty-state">Lancez une session pour voir les statistiques.</div>';
     return;
   }
-  const finished = state.matches.filter(m => m.status === 'finished');
+
+  const finished = matches;
   if (!finished.length) {
     container.innerHTML = '<div class="empty-state">Aucun match terminé pour l\'instant.</div>';
     return;
@@ -3240,7 +3252,7 @@ function renderSessionStats() {
 
   // Stats par équipe pour cette session
   const teamMap = {};
-  state.teams.forEach(t => {
+  teams.forEach(t => {
     teamMap[t.id] = { team: t, wins:0, losses:0, draws:0, jFor:0, jAgainst:0, played:0 };
   });
   finished.forEach(m => {
@@ -3295,7 +3307,13 @@ function renderSessionStats() {
     </div>`;
   }).join('');
 
+  const archivedBanner = isArchived ? `
+    <div style="text-align:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-secondary);padding:8px 0 4px;">
+      📋 Dernière session terminée
+    </div>` : '';
+
   container.innerHTML = `
+    ${archivedBanner}
     <div class="section-title">Classement équipes</div>
     <div class="card stats-table-wrap" style="padding:0;overflow:hidden;margin-bottom:20px;">
       <table class="stats-table">
