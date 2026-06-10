@@ -274,6 +274,8 @@
   .rank-3 { background: #8B6914; color: var(--white); }
   .rank-other { background: var(--border); color: var(--text-secondary); }
   /* ─── Trend arrows ─── */
+  tr.ranking-extra { display: none; }
+  tr.ranking-extra.expanded { display: table-row; }
   .rank-trend {
     font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
     text-align: center; margin-top: 3px; white-space: nowrap;
@@ -1838,11 +1840,11 @@ function computeAllSideStats() {
 }
 
 function toggleRankingExpand() {
-  const body = document.getElementById('ranking-rest-body');
+  const rows = document.querySelectorAll('tr.ranking-extra');
   const btn  = document.getElementById('ranking-expand-btn');
-  if (!body) return;
-  const expanded = body.style.display !== 'none';
-  body.style.display = expanded ? 'none' : '';
+  if (!rows.length) return;
+  const expanded = rows[0].classList.contains('expanded');
+  rows.forEach(r => r.classList.toggle('expanded', !expanded));
   if (btn) btn.innerHTML = expanded ? `▼ Voir tout` : `▲ Réduire`;
 }
 
@@ -1922,7 +1924,7 @@ function renderCombinedRanking(highlightPlayer) {
   };
 
   const top8  = combined.slice(0, 8).map((p, i) => makeRow(p, i)).join('');
-  const rest  = combined.slice(8).map((p, i) => makeRow(p, i + 8)).join('');
+  const rest  = combined.slice(8).map((p, i) => makeRow(p, i + 8).replace('<tr ', '<tr class="ranking-extra" ')).join('');
   const expandBtn = rest ? `
     <div style="text-align:center;padding:10px;">
       <button id="ranking-expand-btn" onclick="toggleRankingExpand()"
@@ -1980,8 +1982,7 @@ function renderCombinedRanking(highlightPlayer) {
           <th>#</th><th>Joueur</th><th>Score</th>
           <th>M</th><th>V</th><th>D</th><th>N</th><th>+/-</th>
         </tr></thead>
-        <tbody>${top8}</tbody>
-        <tbody id="ranking-rest-body" style="display:none;">${rest}</tbody>
+        <tbody>${top8}${rest}</tbody>
       </table>
       ${expandBtn}
     </div>
