@@ -2059,7 +2059,8 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
     });
   });
 
-  const pe = Object.entries(partnerStats).filter(([,v])=>v.played>=1).sort((a,b)=>(b[1].wins/b[1].played)-(a[1].wins/a[1].played));
+  const partnerScore = v => (v.wins + v.draws * 0.5) / v.played;
+  const pe = Object.entries(partnerStats).filter(([,v])=>v.played>=1).sort((a,b)=>partnerScore(b[1])-partnerScore(a[1]));
   const best = pe[0], worst = pe[pe.length-1];
   const oe = Object.entries(oppStats).filter(([,v])=>v.wins+v.losses>0);
   const victim  = oe.length ? [...oe].sort((a,b)=>(b[1].wins-b[1].losses)-(a[1].wins-a[1].losses))[0] : null;
@@ -2088,7 +2089,7 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
             </div>
           </div>
           <div class="side-donut-lbl side-donut-gauche">◀ Gauche</div>
-          <div class="side-donut-sub">${g.wins}V · ${g.losses}D · ${g.played}M</div>
+          <div class="side-donut-sub">${g.wins}V · ${g.draws||0}N · ${g.losses}D</div>
         </div>
         <div style="display:flex;align-items:center;color:var(--muted);font-size:18px;font-weight:700;padding-bottom:24px;">|</div>
         <div class="side-donut-item">
@@ -2099,7 +2100,7 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
             </div>
           </div>
           <div class="side-donut-lbl side-donut-droite">Droite ▶</div>
-          <div class="side-donut-sub">${d.wins}V · ${d.losses}D · ${d.played}M</div>
+          <div class="side-donut-sub">${d.wins}V · ${d.draws||0}N · ${d.losses}D</div>
         </div>
       </div>
     </div>`;
@@ -2129,19 +2130,19 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
         <div class="partner-card-header"><span class="partner-card-icon">🏆</span><span class="partner-card-title">Meilleur partenaire</span></div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="partner-card-name">${best[0]}</span>
-          <span style="font-size:18px;font-weight:800;color:var(--success)">${Math.round(best[1].wins/best[1].played*100)}%</span>
+          <span style="font-size:18px;font-weight:800;color:var(--success)">${Math.round(partnerScore(best[1])*100)}%</span>
         </div>
-        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(best[1].wins/best[1].played*100)}%;background:var(--success)"></div></div>
-        <div class="partner-stats-row"><span>${best[1].wins}V · ${best[1].losses}D · ${best[1].played}M</span></div>
+        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(partnerScore(best[1])*100)}%;background:var(--success)"></div></div>
+        <div class="partner-stats-row"><span>${best[1].wins}V · ${best[1].draws||0}N · ${best[1].losses}D · ${best[1].played}M</span></div>
       </div>` : ''}
       ${worst && worst[0] !== best?.[0] ? `<div class="partner-card worst">
         <div class="partner-card-header"><span class="partner-card-icon">💀</span><span class="partner-card-title">Pire partenaire</span></div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="partner-card-name">${worst[0]}</span>
-          <span style="font-size:18px;font-weight:800;color:var(--danger)">${Math.round(worst[1].wins/worst[1].played*100)}%</span>
+          <span style="font-size:18px;font-weight:800;color:var(--danger)">${Math.round(partnerScore(worst[1])*100)}%</span>
         </div>
-        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(worst[1].wins/worst[1].played*100)}%;background:var(--danger)"></div></div>
-        <div class="partner-stats-row"><span>${worst[1].wins}V · ${worst[1].losses}D · ${worst[1].played}M</span></div>
+        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(partnerScore(worst[1])*100)}%;background:var(--danger)"></div></div>
+        <div class="partner-stats-row"><span>${worst[1].wins}V · ${worst[1].draws||0}N · ${worst[1].losses}D · ${worst[1].played}M</span></div>
       </div>` : ''}
     </div>` : ''}
     ${oe.length ? `
@@ -3793,8 +3794,9 @@ function _showPlayerModal_DEPRECATED(playerName) {
   });
 
   // ── Partners ──
+  const partnerScore2 = v => (v.wins + (v.draws||0) * 0.5) / v.played;
   const pe = Object.entries(partnerStats).filter(([,v])=>v.played>=1);
-  pe.sort((a,b)=>(b[1].wins/b[1].played)-(a[1].wins/a[1].played));
+  pe.sort((a,b)=>partnerScore2(b[1])-partnerScore2(a[1]));
   const best  = pe[0];
   const worst = pe[pe.length-1];
 
@@ -3863,10 +3865,10 @@ function _showPlayerModal_DEPRECATED(playerName) {
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="partner-card-name">${best[0]}</span>
-          <span style="font-size:18px;font-weight:800;color:var(--success)">${Math.round(best[1].wins/best[1].played*100)}%</span>
+          <span style="font-size:18px;font-weight:800;color:var(--success)">${Math.round(partnerScore2(best[1])*100)}%</span>
         </div>
-        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(best[1].wins/best[1].played*100)}%;background:var(--success)"></div></div>
-        <div class="partner-stats-row"><span>${best[1].wins}V · ${best[1].losses}D · ${best[1].played}M</span></div>
+        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(partnerScore2(best[1])*100)}%;background:var(--success)"></div></div>
+        <div class="partner-stats-row"><span>${best[1].wins}V · ${best[1].draws||0}N · ${best[1].losses}D · ${best[1].played}M</span></div>
       </div>` : ''}
       ${worst && worst[0] !== best?.[0] ? `
       <div class="partner-card worst">
@@ -3876,10 +3878,10 @@ function _showPlayerModal_DEPRECATED(playerName) {
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="partner-card-name">${worst[0]}</span>
-          <span style="font-size:18px;font-weight:800;color:var(--danger)">${Math.round(worst[1].wins/worst[1].played*100)}%</span>
+          <span style="font-size:18px;font-weight:800;color:var(--danger)">${Math.round(partnerScore2(worst[1])*100)}%</span>
         </div>
-        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(worst[1].wins/worst[1].played*100)}%;background:var(--danger)"></div></div>
-        <div class="partner-stats-row"><span>${worst[1].wins}V · ${worst[1].losses}D · ${worst[1].played}M</span></div>
+        <div class="partner-bar-wrap"><div class="partner-bar-fill" style="width:${Math.round(partnerScore2(worst[1])*100)}%;background:var(--danger)"></div></div>
+        <div class="partner-stats-row"><span>${worst[1].wins}V · ${worst[1].draws||0}N · ${worst[1].losses}D · ${worst[1].played}M</span></div>
       </div>` : ''}
     </div>` : ''}
 
