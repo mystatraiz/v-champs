@@ -3384,6 +3384,23 @@ function renderSessionStats() {
     </tr>`;
   }).join('');
 
+  // Récap des matchs
+  const matchRecapRows = finished.map(m => {
+    const t1 = teams.find(t => t.id === m.team1Id);
+    const t2 = teams.find(t => t.id === m.team2Id);
+    if (!t1 || !t2) return '';
+    const p1 = t1.players.filter(p=>p&&p.trim()).join(' / ');
+    const p2 = t2.players.filter(p=>p&&p.trim()).join(' / ');
+    const w1 = m.score1 > m.score2, w2 = m.score2 > m.score1;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #2a2a2a;font-size:13px;">
+      <span style="flex:1;text-align:right;font-weight:${w1?'700':'400'};color:${w1?'var(--text)':'var(--text-secondary)'};">${esc(p1)}</span>
+      <span style="font-weight:800;font-size:14px;color:${w1?'var(--success)':w2?'var(--danger)':'var(--text-secondary)'};">${m.score1}</span>
+      <span style="color:var(--muted);font-size:11px;">–</span>
+      <span style="font-weight:800;font-size:14px;color:${w2?'var(--success)':w1?'var(--danger)':'var(--text-secondary)'};">${m.score2}</span>
+      <span style="flex:1;text-align:left;font-weight:${w2?'700':'400'};color:${w2?'var(--text)':'var(--text-secondary)'};">${esc(p2)}</span>
+    </div>`;
+  }).join('');
+
   // Points V-Champs individuels
   const playerPts = computeSessionPointsLive(sorted);
   const playerRows = playerPts.map((p, i) => {
@@ -3409,7 +3426,9 @@ function renderSessionStats() {
         <tbody>${teamRows}</tbody>
       </table>
     </div>
-    <div class="section-title">Points V-Champs · session</div>
+    <div class="section-title">Récap des matchs</div>
+    <div class="card" style="padding:0 14px;">${matchRecapRows}</div>
+    <div class="section-title" style="margin-top:20px;">Points V-Champs · session</div>
     <div class="card" style="padding:8px 16px;">${playerRows}</div>
   `;
 }
