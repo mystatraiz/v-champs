@@ -2340,7 +2340,10 @@ function showPlayerSetup() {
   document.getElementById('phase-players').style.display = 'block';
   document.getElementById('phase-matches').style.display = 'none';
   document.getElementById('session-end-bar').style.display = 'none';
-  switchTab('tournament');
+  // Activer l'onglet Tournoi sans appeler renderTournamentSetup() qui cacherait phase-players
+  document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'tournament'));
+  document.getElementById('tab-tournament').classList.add('active');
   renderTeamsGrid();
   updateHeaderActions();
 }
