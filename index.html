@@ -4776,6 +4776,15 @@ async function saveDraftPlayers() {
   const id = state.plannedTournamentId;
   const pt = _plannedTournaments.find(t => t.id === id);
   if (pt) {
+    // If still on phase 1 (subphase-list visible), sync participants → teams sequentially
+    const listVisible = document.getElementById('subphase-list')?.style.display !== 'none';
+    if (listVisible && state.participants && state.participants.some(p => p.trim())) {
+      state.participants.forEach((name, i) => {
+        const ti = Math.floor(i / 2);
+        const pi = i % 2;
+        if (state.teams[ti]) state.teams[ti].players[pi] = name || '';
+      });
+    }
     pt.teams = JSON.parse(JSON.stringify(state.teams));
     const {filled, total} = _plannedPlayerCount(pt);
     pt.status = filled === total && total > 0 ? 'ready' : 'draft';
