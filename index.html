@@ -1410,7 +1410,7 @@ function playerRankTable(list, type) {
 function buildTeamStats() {
   const allTeams={};
   const sessions=[...getHistory()];
-  if(state.sessionStarted) sessions.push({teams:state.teams,matches:state.matches.filter(m=>m.status==='finished')});
+  if(state.sessionStarted && !state.sessionFinished) sessions.push({teams:state.teams,matches:state.matches.filter(m=>m.status==='finished')});
   sessions.forEach(session=>{
     session.matches.forEach(m=>{
       const t1=session.teams.find(t=>t.id===m.team1Id), t2=session.teams.find(t=>t.id===m.team2Id);
@@ -1869,7 +1869,7 @@ function rankTrendHtml(currRank, prevRank, isNew) {
 function computeAllSideStats() {
   const sideMap = {};
   const sessions = [..._history];
-  if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+  if (state.sessionStarted && !state.sessionFinished) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
   sessions.forEach(session => {
     session.matches.forEach(m => {
       const t1 = session.teams.find(t => t.id === m.team1Id);
@@ -2054,7 +2054,7 @@ function showPlayerDetail(playerName, defaultTab = 'stats') {
   const team = state.teams.find(t => t.players.some(p => p?.toLowerCase().trim() === playerName.toLowerCase().trim()));
 
   const sessions = [...getHistory()];
-  if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+  if (state.sessionStarted && !state.sessionFinished) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
 
   const partnerStats = {}, oppStats = {}, matchRows = [];
   const sideStats = {
@@ -2314,7 +2314,7 @@ function showVChampsPlayerDetail(playerName) { showPlayerDetail(playerName, 'sta
 // Build aggregated player stats from all sessions (history + optional current)
 function buildAllPlayerStats(includeCurrent = true) {
   const sessions = [..._history];
-  if (includeCurrent && state.sessionStarted) {
+  if (includeCurrent && state.sessionStarted && !state.sessionFinished) {
     sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
   }
   const stats = {}; // playerName → {wins, losses, draws, jFor, jAgainst, played, sessions:[{date,teamName}]}
@@ -4143,7 +4143,7 @@ function _showPlayerModal_DEPRECATED(playerName) {
   const team = state.teams.find(t => t.players.includes(playerName));
 
   const sessions = [...getHistory()];
-  if (state.sessionStarted) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
+  if (state.sessionStarted && !state.sessionFinished) sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
 
   // ── Build partner & opponent stats ──
   const partnerStats = {}; // partner → {wins,losses,draws,played}
