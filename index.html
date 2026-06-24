@@ -1657,8 +1657,10 @@ async function loadFromSupabase() {
 function getHistory() { return _history; }
 
 function archiveCurrentSession() {
+  if (state.sessionArchivedAt) return; // already archived — prevent double entry in _history
   if (!state.sessionStarted || !state.matches.some(m => m.status === 'finished')) return;
-  const sessionId = new Date().toISOString();
+  state.sessionArchivedAt = new Date().toISOString();
+  const sessionId = state.sessionArchivedAt;
   const sessionEntry = {
     date: sessionId,
     teams: JSON.parse(JSON.stringify(state.teams)),
@@ -2371,6 +2373,7 @@ function initTournament() {
   state.roundNum = 0;
   state.sessionStarted = false;
   state.sessionFinished = false;
+  state.sessionArchivedAt = null;
   state.participants = Array(8).fill('');
   state.waitingList = [];
 
