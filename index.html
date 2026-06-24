@@ -921,20 +921,16 @@
   <!-- ── Phase 0 : aucun tournoi actif ── -->
   <div id="setup-screen">
     <img src="logo.png" alt="Indomitus Padel" class="hero-logo">
-    <button class="btn btn-primary btn-lg" onclick="initTournament()" id="start-btn" style="width:100%;max-width:320px;justify-content:center;">
-      + Nouveau tournoi
-    </button>
 
     <!-- Prochains tournois -->
-    <div id="upcoming-section" style="margin-top:32px;text-align:left;max-width:480px;margin-left:auto;margin-right:auto;">
+    <div id="upcoming-section" style="margin-top:16px;text-align:left;max-width:480px;margin-left:auto;margin-right:auto;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-secondary);">📅 Prochains tournois</div>
         <button class="btn btn-sm" onclick="openAddTournament()" style="font-size:11px;padding:4px 10px;">+ Ajouter</button>
       </div>
-      <div id="upcoming-list"><div class="empty-state" style="padding:16px 0;">Aucun tournoi planifié.</div></div>
 
-      <!-- Formulaire ajout (caché par défaut) -->
-      <div id="add-tournament-form" style="display:none;margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+      <!-- Formulaire ajout (caché par défaut, au-dessus de la liste) -->
+      <div id="add-tournament-form" style="display:none;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">Nouveau tournoi planifié</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           <input type="date" id="pt-date" style="flex:1;background:var(--dark);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 10px;font-size:13px;">
@@ -955,6 +951,8 @@
           <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="closeAddTournament()">Annuler</button>
         </div>
       </div>
+
+      <div id="upcoming-list"><div class="empty-state" style="padding:16px 0;">Aucun tournoi planifié.</div></div>
     </div>
   </div>
 
