@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="V-Champs">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   :root {
     --black: #0a0a0a;
@@ -1060,6 +1061,10 @@
 
   <!-- ═══ STATS TAB (session actuelle) ═══ -->
   <section class="tab-content" id="tab-stats">
+    <div id="session-share-bar" style="display:none;gap:10px;margin-bottom:16px;">
+      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareSessionResultsText()">💬 Partager (texte)</button>
+      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareSessionResultsImage()">📸 Partager (image)</button>
+    </div>
     <div id="stats-content">
       <div class="empty-state">Lancez une session pour voir les statistiques.</div>
     </div>
@@ -1067,6 +1072,10 @@
 
   <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
+    <div id="ranking-share-bar" style="display:none;gap:10px;margin-bottom:16px;">
+      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareRankingText()">💬 Partager (texte)</button>
+      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareRankingImage()">📸 Partager (image)</button>
+    </div>
     <div id="sub-classement"></div>
   </section>
 
@@ -1906,7 +1915,7 @@ function toggleRankingExpand() {
   if (btn) btn.innerHTML = expanded ? `▼ Voir tout` : `▲ Réduire`;
 }
 
-function renderCombinedRanking(highlightPlayer) {
+function computeCombinedRanking() {
   const rankings   = computeGlobalRankings();
   const matchStats = buildAllPlayerStats(true);
 
@@ -1916,16 +1925,11 @@ function renderCombinedRanking(highlightPlayer) {
     const key = name.toLowerCase().trim();
     if (!seen.has(key)) seen.set(key, name);
   });
-  if (!seen.size) {
-    return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
-  }
+  if (!seen.size) return [];
 
-  const cutoffMs   = Date.now() - 180 * 24 * 60 * 60 * 1000;
-  const prevRankMap = computePrevRankMap(cutoffMs);
-  // Quand il n'y a qu'une seule session toutes les entrées sont « NEW »
-  const hasPrevData = prevRankMap.size > 0;
+  const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
 
-  const combined = [...seen.entries()].map(([key, name]) => {
+  return [...seen.entries()].map(([key, name]) => {
     // V-Champs : fusionner TOUTES les variantes de nom (ex: "Jean Louis" + "Jean-Louis")
     const vcVariants = rankings.filter(r => r.name.toLowerCase().trim() === key);
     const allPerfs   = vcVariants.flatMap(r => r.allPerformances);
@@ -1961,6 +1965,18 @@ function renderCombinedRanking(highlightPlayer) {
     };
   }).filter(p => p.sessions >= 1 || p.m >= 1)
     .sort((a, b) => b.score - a.score || b.m - a.m);
+}
+
+function renderCombinedRanking(highlightPlayer) {
+  const combined = computeCombinedRanking();
+  if (!combined.length) {
+    return '<div class="empty-state">Le classement apparaîtra après la première session terminée.</div>';
+  }
+
+  const cutoffMs   = Date.now() - 180 * 24 * 60 * 60 * 1000;
+  const prevRankMap = computePrevRankMap(cutoffMs);
+  // Quand il n'y a qu'une seule session toutes les entrées sont « NEW »
+  const hasPrevData = prevRankMap.size > 0;
 
   const makeRow = (p, i) => {
     const rc       = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
@@ -3738,10 +3754,12 @@ function renderSessionStats() {
     isArchived = true;
   } else {
     container.innerHTML = '<div class="empty-state">Lancez une session pour voir les statistiques.</div>';
+    setDisplay('session-share-bar', 'none');
     return;
   }
 
   const finished = matches;
+  setDisplay('session-share-bar', finished.length ? 'flex' : 'none');
   if (!finished.length) {
     container.innerHTML = '<div class="empty-state">Aucun match terminé pour l\'instant.</div>';
     return;
@@ -3842,6 +3860,127 @@ function renderSessionStats() {
   `;
 }
 
+// ═══════════════════════════════════════════════════
+//  PARTAGE WHATSAPP (texte + image)
+// ═══════════════════════════════════════════════════
+function openWhatsAppText(text) {
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+async function shareElementAsImage(elementId, filename, shareTitle) {
+  const el = document.getElementById(elementId);
+  if (!el || typeof html2canvas === 'undefined') {
+    alert('Capture indisponible pour le moment.');
+    return;
+  }
+  try {
+    const canvas = await html2canvas(el, { backgroundColor: '#0d0d0d', scale: 2, useCORS: true });
+    canvas.toBlob(async (blob) => {
+      if (!blob) { alert('Erreur lors de la capture.'); return; }
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: shareTitle }); }
+        catch(e) { /* annulé par l'utilisateur */ }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        alert('Image téléchargée — partage-la manuellement sur WhatsApp.');
+      }
+    }, 'image/png');
+  } catch(e) {
+    console.error('Screenshot failed:', e);
+    alert('Erreur lors de la capture.');
+  }
+}
+
+function buildSessionShareText() {
+  let teams, matches, dateRef;
+  if (state.sessionStarted) {
+    teams = state.teams;
+    matches = state.matches.filter(m => m.status === 'finished');
+    dateRef = new Date();
+  } else if (_history.length > 0) {
+    const last = _history[_history.length - 1];
+    teams = last.teams; matches = last.matches; dateRef = new Date(last.date);
+  } else {
+    return null;
+  }
+  if (!matches.length) return null;
+
+  const teamMap = {};
+  teams.forEach(t => { teamMap[t.id] = { team: t, wins:0, losses:0, draws:0, jFor:0, jAgainst:0 }; });
+  matches.forEach(m => {
+    const ts1 = teamMap[m.team1Id], ts2 = teamMap[m.team2Id];
+    if (!ts1 || !ts2) return;
+    ts1.jFor += m.score1; ts1.jAgainst += m.score2;
+    ts2.jFor += m.score2; ts2.jAgainst += m.score1;
+    if (m.score1 > m.score2) { ts1.wins++; ts2.losses++; }
+    else if (m.score2 > m.score1) { ts2.wins++; ts1.losses++; }
+    else { ts1.draws++; ts2.draws++; }
+  });
+  const sorted = Object.values(teamMap).sort((a,b) => {
+    const pa = a.wins*3+a.draws, pb = b.wins*3+b.draws;
+    if (pa !== pb) return pb - pa;
+    return (b.jFor-b.jAgainst) - (a.jFor-a.jAgainst);
+  });
+  const medals = ['🥇','🥈','🥉','4️⃣'];
+  const teamLines = sorted.map((ts, i) => {
+    const players = ts.team.players.filter(p => p?.trim()).join(' / ');
+    const diff = ts.jFor - ts.jAgainst;
+    return `${medals[i] || `${i+1}.`} ${players} — ${ts.wins}V ${ts.losses}D${ts.draws ? ` ${ts.draws}N` : ''} (${diff>=0?'+':''}${diff})`;
+  });
+  const matchLines = matches.map(m => {
+    const t1 = teams.find(t => t.id === m.team1Id), t2 = teams.find(t => t.id === m.team2Id);
+    if (!t1 || !t2) return '';
+    const p1 = t1.players.filter(p => p?.trim()).join('/'), p2 = t2.players.filter(p => p?.trim()).join('/');
+    return `${p1} ${m.score1}-${m.score2} ${p2}`;
+  }).filter(Boolean);
+
+  const dateLabel = dateRef.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
+  const dateFmt = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+
+  return [
+    `🎾 *Résultats - ${dateFmt}*`,
+    ``,
+    `🏆 *Classement équipes*`,
+    ...teamLines,
+    ``,
+    `📋 *Matchs*`,
+    ...matchLines,
+  ].join('\n');
+}
+
+function shareSessionResultsText() {
+  const text = buildSessionShareText();
+  if (!text) { alert('Aucune session à partager.'); return; }
+  openWhatsAppText(text);
+}
+
+function shareSessionResultsImage() {
+  shareElementAsImage('stats-content', 'session-vchamps.png', 'Résultats V-Champs');
+}
+
+function buildRankingShareText() {
+  const combined = computeCombinedRanking();
+  if (!combined.length) return null;
+  const medals = ['🥇','🥈','🥉'];
+  const lines = combined.slice(0, 15).map((p, i) => `${medals[i] || `${i+1}.`} ${p.name} — ${p.score} pts`);
+  return [`🏆 *Classement V-Champs*`, ``, ...lines].join('\n');
+}
+
+function shareRankingText() {
+  const text = buildRankingShareText();
+  if (!text) { alert('Pas encore de classement.'); return; }
+  openWhatsAppText(text);
+}
+
+function shareRankingImage() {
+  shareElementAsImage('sub-classement', 'classement-vchamps.png', 'Classement V-Champs');
+}
+
 // ─── Sub-tab switcher ───
 function switchSubTab(sub) {
   const target = document.getElementById(`sub-${sub}`);
@@ -3889,6 +4028,7 @@ function rankingListHTML(entries, valFn, subFn, colorFn) {
 function renderGeneralStats() {
   const el = document.getElementById('sub-classement');
   if (el) el.innerHTML = renderCombinedRanking();
+  setDisplay('ranking-share-bar', computeCombinedRanking().length ? 'flex' : 'none');
 }
 
 // keep for backward compat (called from renderMatchPhase)
