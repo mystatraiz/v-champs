@@ -1673,7 +1673,8 @@ function archiveCurrentSession() {
   const sessionEntry = {
     date: sessionId,
     teams: JSON.parse(JSON.stringify(state.teams)),
-    matches: state.matches.filter(m => m.status === 'finished')
+    matches: state.matches.filter(m => m.status === 'finished'),
+    label: state.label || '6/7'
   };
   _history.push(sessionEntry);
   db.from('app_state').upsert({ key: 'session_history', value: _history, updated_at: new Date().toISOString() }).then();
@@ -1688,7 +1689,9 @@ function archiveCurrentSession() {
 // ═══════════════════════════════════════════════════
 //  V-CHAMPS RANKING SYSTEM
 // ═══════════════════════════════════════════════════
-const BASE_POINTS_BY_POS = { 1: 100, 2: 75, 3: 50, 4: 25 };
+const BASE_POINTS_BY_POS = { 1: 100, 2: 75, 3: 50, 4: 25 }; // barème de référence — niveau 6/7
+const LEVEL_MULTIPLIER = { '4/5': 0.5, '5/6': 0.75, '6/7': 1, '7/8': 1.5 };
+function getLevelMultiplier(label) { return LEVEL_MULTIPLIER[label] ?? 1; }
 let _playerSessionScores = [];
 
 function getDiffCoeff(diff) {
@@ -1696,9 +1699,9 @@ function getDiffCoeff(diff) {
   if (diff >= 200)  return 0.90;
   if (diff >= 100)  return 0.95;
   if (diff >= -99)  return 1.00;
-  if (diff >= -199) return 1.10;
-  if (diff >= -299) return 1.20;
-  return 1.30;
+  if (diff >= -199) return 1.05;
+  if (diff >= -299) return 1.10;
+  return 1.20;
 }
 
 function getPlayerRawScore(playerName, excludeSessionId) {
@@ -1759,10 +1762,11 @@ async function computeAndSaveSessionScores(session, sessionId) {
       .reduce((s, p) => s + (playerScore[p] || 0), 0)
   );
 
+  const levelMult = getLevelMultiplier(session.label);
   const records = [];
   sortedTeams.forEach((team, idx) => {
     const position = idx + 1;
-    const basePoints = BASE_POINTS_BY_POS[position] || 25;
+    const basePoints = Math.round((BASE_POINTS_BY_POS[position] || 25) * levelMult);
     const myStrength = strengths[idx];
     const others = strengths.filter((_, i) => i !== idx);
     const avgOpp = others.length ? others.reduce((s, v) => s + v, 0) / others.length : 0;
@@ -2391,6 +2395,7 @@ function initTournament() {
   state.sessionFinished = false;
   state.sessionArchivedAt = null;
   state.matchPhaseStarted = false;
+  state.label = '6/7'; // niveau par défaut pour un tournoi créé directement (sans planification)
   state.participants = Array(8).fill('');
   state.waitingList = [];
 
@@ -3720,10 +3725,11 @@ function computeSessionPointsLive(sortedTeamStats) {
     ts.team.players.filter(p => p && p.trim())
       .reduce((s, p) => s + getPlayerScoreForCoeff(p, null), 0)
   );
+  const levelMult = getLevelMultiplier(state.label);
   const results = [];
   sortedTeamStats.forEach((ts, idx) => {
     const position = idx + 1;
-    const basePoints = BASE_POINTS_BY_POS[position] || 25;
+    const basePoints = Math.round((BASE_POINTS_BY_POS[position] || 25) * levelMult);
     const myStrength = strengths[idx];
     const others = strengths.filter((_, i) => i !== idx);
     const avgOpp = others.length ? others.reduce((s, v) => s + v, 0) / others.length : 0;
@@ -4852,6 +4858,7 @@ function openPlannedTournament(id) {
   state.sessionStarted = false;
   state.sessionFinished = false;
   state.matchPhaseStarted = false;
+  state.label = pt.label || '6/7';
   state.matches = [];
   state.activeMatches = [];
   state.matchCounter = 0;
