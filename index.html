@@ -14,7 +14,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="V-Champs">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   :root {
     --black: #0a0a0a;
@@ -1061,9 +1060,8 @@
 
   <!-- ═══ STATS TAB (session actuelle) ═══ -->
   <section class="tab-content" id="tab-stats">
-    <div id="session-share-bar" style="display:none;gap:10px;margin-bottom:16px;">
-      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareSessionResultsText()">💬 Partager (texte)</button>
-      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareSessionResultsImage()">📸 Partager (image)</button>
+    <div id="session-share-bar" style="display:none;margin-bottom:16px;">
+      <button class="btn btn-sm" style="width:100%;justify-content:center;" onclick="shareSessionResultsText()">💬 Partager sur WhatsApp</button>
     </div>
     <div id="stats-content">
       <div class="empty-state">Lancez une session pour voir les statistiques.</div>
@@ -1072,9 +1070,8 @@
 
   <!-- ═══ CLASSEMENT TAB ═══ -->
   <section class="tab-content" id="tab-general">
-    <div id="ranking-share-bar" style="display:none;gap:10px;margin-bottom:16px;">
-      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareRankingText()">💬 Partager (texte)</button>
-      <button class="btn btn-sm" style="flex:1;justify-content:center;" onclick="shareRankingImage()">📸 Partager (image)</button>
+    <div id="ranking-share-bar" style="display:none;margin-bottom:16px;">
+      <button class="btn btn-sm" style="width:100%;justify-content:center;" onclick="shareRankingText()">💬 Partager sur WhatsApp</button>
     </div>
     <div id="sub-classement"></div>
   </section>
@@ -3759,7 +3756,7 @@ function renderSessionStats() {
   }
 
   const finished = matches;
-  setDisplay('session-share-bar', finished.length ? 'flex' : 'none');
+  setDisplay('session-share-bar', finished.length ? 'block' : 'none');
   if (!finished.length) {
     container.innerHTML = '<div class="empty-state">Aucun match terminé pour l\'instant.</div>';
     return;
@@ -3861,39 +3858,10 @@ function renderSessionStats() {
 }
 
 // ═══════════════════════════════════════════════════
-//  PARTAGE WHATSAPP (texte + image)
+//  PARTAGE WHATSAPP (texte)
 // ═══════════════════════════════════════════════════
 function openWhatsAppText(text) {
   window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-}
-
-async function shareElementAsImage(elementId, filename, shareTitle) {
-  const el = document.getElementById(elementId);
-  if (!el || typeof html2canvas === 'undefined') {
-    alert('Capture indisponible pour le moment.');
-    return;
-  }
-  try {
-    const canvas = await html2canvas(el, { backgroundColor: '#0d0d0d', scale: 2, useCORS: true });
-    canvas.toBlob(async (blob) => {
-      if (!blob) { alert('Erreur lors de la capture.'); return; }
-      const file = new File([blob], filename, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: shareTitle }); }
-        catch(e) { /* annulé par l'utilisateur */ }
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
-        alert('Image téléchargée — partage-la manuellement sur WhatsApp.');
-      }
-    }, 'image/png');
-  } catch(e) {
-    console.error('Screenshot failed:', e);
-    alert('Erreur lors de la capture.');
-  }
 }
 
 function buildSessionShareText() {
@@ -3939,6 +3907,9 @@ function buildSessionShareText() {
     return `${p1} ${m.score1}-${m.score2} ${p2}`;
   }).filter(Boolean);
 
+  const playerPts = computeSessionPointsLive(sorted);
+  const pointsLines = playerPts.map(p => `${p.name} — +${p.points} pts`);
+
   const dateLabel = dateRef.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
   const dateFmt = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
@@ -3950,6 +3921,9 @@ function buildSessionShareText() {
     ``,
     `📋 *Matchs*`,
     ...matchLines,
+    ``,
+    `⭐ *Points V-Champs*`,
+    ...pointsLines,
   ].join('\n');
 }
 
@@ -3957,10 +3931,6 @@ function shareSessionResultsText() {
   const text = buildSessionShareText();
   if (!text) { alert('Aucune session à partager.'); return; }
   openWhatsAppText(text);
-}
-
-function shareSessionResultsImage() {
-  shareElementAsImage('stats-content', 'session-vchamps.png', 'Résultats V-Champs');
 }
 
 function buildRankingShareText() {
@@ -3975,10 +3945,6 @@ function shareRankingText() {
   const text = buildRankingShareText();
   if (!text) { alert('Pas encore de classement.'); return; }
   openWhatsAppText(text);
-}
-
-function shareRankingImage() {
-  shareElementAsImage('sub-classement', 'classement-vchamps.png', 'Classement V-Champs');
 }
 
 // ─── Sub-tab switcher ───
@@ -4028,7 +3994,7 @@ function rankingListHTML(entries, valFn, subFn, colorFn) {
 function renderGeneralStats() {
   const el = document.getElementById('sub-classement');
   if (el) el.innerHTML = renderCombinedRanking();
-  setDisplay('ranking-share-bar', computeCombinedRanking().length ? 'flex' : 'none');
+  setDisplay('ranking-share-bar', computeCombinedRanking().length ? 'block' : 'none');
 }
 
 // keep for backward compat (called from renderMatchPhase)
