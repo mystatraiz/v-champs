@@ -1628,6 +1628,11 @@ async function loadFromSupabase() {
     if (sd.data?.value) {
       state = sd.data.value;
       if (!state.pairNameMap) state.pairNameMap = {};
+      // Migration : ancien état sauvegardé avant l'ajout de matchPhaseStarted
+      if (state.matchPhaseStarted === undefined) {
+        state.matchPhaseStarted = state.sessionStarted && !state.sessionFinished &&
+          ((state.activeMatches?.length || 0) > 0 || (state.matches?.length || 0) > 0 || !!state.warmupStart);
+      }
     }
     if (hd.data?.value)  _history = hd.data.value;
     if (ptd.data?.value) _plannedTournaments = ptd.data.value;
@@ -2372,6 +2377,7 @@ function initTournament() {
   state.sessionStarted = false;
   state.sessionFinished = false;
   state.sessionArchivedAt = null;
+  state.matchPhaseStarted = false;
   state.participants = Array(8).fill('');
   state.waitingList = [];
 
@@ -3098,6 +3104,7 @@ function startSession() {
     if (exitBtn) exitBtn.textContent = '← Retour';
   }
   state.sessionStarted = true;
+  state.matchPhaseStarted = true;
   state.roundNum = 0;
   saveState();
   try { savePairNames(); } catch(e) {}
@@ -4524,14 +4531,8 @@ function renderTournamentSetup() {
   // En mode édition de tournoi planifié, ne pas toucher aux phases
   if (state.plannedTournamentId) return;
 
-  const active = state.sessionStarted && !state.sessionFinished;
   const finished = state.sessionFinished;
 
-  setDisplay('setup-screen',  (!state.sessionStarted || finished) ? 'block' : 'none');
-  setDisplay('phase-players', (state.sessionStarted && !finished && !state.warmupStart && !state.activeMatches?.length && !document.getElementById('phase-matches')?.style.display !== 'block') ? 'block' : 'none');
-  setDisplay('phase-matches', (state.sessionStarted && !finished && state.warmupStart) ? 'block' : 'none');
-
-  // Simpler state-driven version
   if (!state.sessionStarted || finished) {
     setDisplay('setup-screen', 'block');
     setDisplay('phase-players', 'none');
@@ -4540,7 +4541,10 @@ function renderTournamentSetup() {
   } else {
     setDisplay('setup-screen', 'none');
     setDisplay('new-tournament-bar', 'none');
-    // phase-players and phase-matches are managed by initTournament/startSession
+    // Une fois les matchs lancés (startSession), on reste sur phase-matches ;
+    // sinon on est encore sur l'écran de saisie des joueurs.
+    setDisplay('phase-players', state.matchPhaseStarted ? 'none' : 'block');
+    setDisplay('phase-matches', state.matchPhaseStarted ? 'block' : 'none');
   }
 }
 
@@ -4741,6 +4745,7 @@ function openPlannedTournament(id) {
   state.plannedTournamentId = id;
   state.sessionStarted = false;
   state.sessionFinished = false;
+  state.matchPhaseStarted = false;
   state.matches = [];
   state.activeMatches = [];
   state.matchCounter = 0;
@@ -4798,6 +4803,7 @@ async function saveDraftPlayers() {
   state.activeMatches = [];
   state.sessionStarted = false;
   state.sessionFinished = false;
+  state.matchPhaseStarted = false;
   state.warmupStart = null;
   db.from('app_state').delete().eq('key', 'current_session').then();
   setDisplay('phase-players', 'none');
