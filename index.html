@@ -1439,6 +1439,8 @@ function showAdminApp(isOrg = false) {
     document.getElementById('warmup-section').style.display = 'block';
     document.getElementById('active-matches-section').style.display = 'none';
     resumeWarmup();
+  } else if (state.matchPhaseStarted && state.sessionStarted && !state.sessionFinished) {
+    renderMatchPhase();
   }
   if (!state.sessionStarted || state.sessionFinished) {
     renderUpcomingTournaments();
