@@ -495,6 +495,10 @@
   .sub-tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text); background: none; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
   .sub-tab:hover:not(.active) { background: #2a2a2a; color: var(--white); }
   .sub-tab.active { background: var(--accent); color: var(--black); }
+  .ranking-filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .ranking-filter-btn { flex: 1; min-width: 52px; text-align: center; padding: 7px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-secondary); background: var(--dark); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.18s; }
+  .ranking-filter-btn:hover:not(.active) { color: var(--text); border-color: var(--text-secondary); }
+  .ranking-filter-btn.active { background: var(--accent); color: var(--black); border-color: var(--accent); }
   .sub-tab-content { display: none; }
   .sub-tab-content.active { display: block; }
   /* ─── Ranking list ─── */
@@ -1076,6 +1080,13 @@
   <section class="tab-content" id="tab-general">
     <div id="ranking-share-bar" style="display:none;margin-bottom:16px;">
       <button class="btn btn-sm" style="width:100%;justify-content:center;" onclick="shareRankingText()">💬 Partager sur WhatsApp</button>
+    </div>
+    <div class="ranking-filters">
+      <button class="ranking-filter-btn active" data-level="general" onclick="setRankingLevelFilter(null)">Général</button>
+      <button class="ranking-filter-btn" data-level="4/5" onclick="setRankingLevelFilter('4/5')">4/5</button>
+      <button class="ranking-filter-btn" data-level="5/6" onclick="setRankingLevelFilter('5/6')">5/6</button>
+      <button class="ranking-filter-btn" data-level="6/7" onclick="setRankingLevelFilter('6/7')">6/7</button>
+      <button class="ranking-filter-btn" data-level="7/8" onclick="setRankingLevelFilter('7/8')">7/8</button>
     </div>
     <div id="sub-classement"></div>
   </section>
@@ -1918,10 +1929,17 @@ async function backfillSessionScores() {
   }
 }
 
-function computeGlobalRankings() {
+function getSessionLevelMap() {
+  const map = new Map();
+  _history.forEach(s => { if (s.date) map.set(s.date, s.label || '6/7'); });
+  return map;
+}
+
+function computeGlobalRankings(scoresArr) {
+  const arr = scoresArr || _playerSessionScores;
   const cutoffMs = Date.now() - 180 * 24 * 60 * 60 * 1000;
   const byPlayer = {};
-  _playerSessionScores.forEach(r => {
+  arr.forEach(r => {
     (byPlayer[r.player_name] = byPlayer[r.player_name] || []).push(r);
   });
 
@@ -2021,9 +2039,29 @@ function toggleRankingExpand() {
   if (btn) btn.innerHTML = expanded ? `▼ Voir tout` : `▲ Réduire`;
 }
 
-function computeCombinedRanking() {
-  const rankings   = computeGlobalRankings();
-  const matchStats = buildAllPlayerStats(true);
+let _rankingLevelFilter = null; // null = Général (tous niveaux)
+
+function setRankingLevelFilter(level) {
+  _rankingLevelFilter = level || null;
+  document.querySelectorAll('.ranking-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.level === (_rankingLevelFilter || 'general'));
+  });
+  renderGeneralStats();
+}
+
+function computeCombinedRanking(levelFilter) {
+  const lf = levelFilter !== undefined ? levelFilter : _rankingLevelFilter;
+  let scoresArr = _playerSessionScores;
+  let historyArr = null;
+  let includeCurrent = true;
+  if (lf) {
+    const levelMap = getSessionLevelMap();
+    scoresArr = _playerSessionScores.filter(r => (levelMap.get(r.session_id) || '6/7') === lf);
+    historyArr = _history.filter(s => (s.label || '6/7') === lf);
+    includeCurrent = (state.label || '6/7') === lf;
+  }
+  const rankings   = computeGlobalRankings(scoresArr);
+  const matchStats = buildAllPlayerStats(includeCurrent, historyArr);
 
   // Déduplication insensible à la casse (ex: "Alex" et "alex" → même joueur)
   const seen = new Map(); // clé lowercase → nom canonique
@@ -2080,9 +2118,9 @@ function renderCombinedRanking(highlightPlayer) {
   }
 
   const cutoffMs   = Date.now() - 180 * 24 * 60 * 60 * 1000;
-  const prevRankMap = computePrevRankMap(cutoffMs);
-  // Quand il n'y a qu'une seule session toutes les entrées sont « NEW »
-  const hasPrevData = prevRankMap.size > 0;
+  // Pas de flèches de tendance en vue filtrée (pas de sens par niveau)
+  const prevRankMap = _rankingLevelFilter ? new Map() : computePrevRankMap(cutoffMs);
+  const hasPrevData = !_rankingLevelFilter && prevRankMap.size > 0;
 
   const makeRow = (p, i) => {
     const rc       = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
@@ -2113,34 +2151,33 @@ function renderCombinedRanking(highlightPlayer) {
       </button>
     </div>` : '';
 
-  // ── Mentions spéciales ──
-  const withMatches = combined.filter(p => p.m >= 3);
-  const sideMap = computeAllSideStats();
+  // ── Mentions spéciales (masquées en vue filtrée par niveau) ──
   const mentions = [];
-
-  if (withMatches.length) {
-    const mostWins   = [...withMatches].sort((a,b) => b.v - a.v)[0];
-    const bestDiff   = [...withMatches].sort((a,b) => b.jDiff - a.jDiff)[0];
-    const mostPlayed = [...withMatches].sort((a,b) => b.m - a.m)[0];
-    mentions.push({ icon:'🏆', label:'Plus de victoires',  name: mostWins.name,   val: `${mostWins.v}V` });
-    mentions.push({ icon:'📈', label:'Meilleur +/-',       name: bestDiff.name,   val: `+${bestDiff.jDiff}` });
-    mentions.push({ icon:'💪', label:'Plus de matchs',     name: mostPlayed.name, val: `${mostPlayed.m}M` });
-  }
-
-  // Meilleur joueur de gauche / droite (min 5 matchs sur ce côté)
-  const bestGauche = Object.entries(sideMap)
-    .filter(([,s]) => s.gauche.played >= 5)
-    .sort((a,b) => (b[1].gauche.wins/b[1].gauche.played) - (a[1].gauche.wins/a[1].gauche.played))[0];
-  const bestDroite = Object.entries(sideMap)
-    .filter(([,s]) => s.droite.played >= 5)
-    .sort((a,b) => (b[1].droite.wins/b[1].droite.played) - (a[1].droite.wins/a[1].droite.played))[0];
-  if (bestGauche) {
-    const wr = Math.round(bestGauche[1].gauche.wins / bestGauche[1].gauche.played * 100);
-    mentions.push({ icon:'◀', label:'Meilleur côté gauche', name: bestGauche[0], val: `${wr}%`, color:'#3b82f6' });
-  }
-  if (bestDroite) {
-    const wr = Math.round(bestDroite[1].droite.wins / bestDroite[1].droite.played * 100);
-    mentions.push({ icon:'▶', label:'Meilleur côté droite', name: bestDroite[0], val: `${wr}%`, color:'#f97316' });
+  if (!_rankingLevelFilter) {
+    const withMatches = combined.filter(p => p.m >= 3);
+    if (withMatches.length) {
+      const mostWins   = [...withMatches].sort((a,b) => b.v - a.v)[0];
+      const bestDiff   = [...withMatches].sort((a,b) => b.jDiff - a.jDiff)[0];
+      const mostPlayed = [...withMatches].sort((a,b) => b.m - a.m)[0];
+      mentions.push({ icon:'🏆', label:'Plus de victoires',  name: mostWins.name,   val: `${mostWins.v}V` });
+      mentions.push({ icon:'📈', label:'Meilleur +/-',       name: bestDiff.name,   val: `+${bestDiff.jDiff}` });
+      mentions.push({ icon:'💪', label:'Plus de matchs',     name: mostPlayed.name, val: `${mostPlayed.m}M` });
+    }
+    const sideMap = computeAllSideStats();
+    const bestGauche = Object.entries(sideMap)
+      .filter(([,s]) => s.gauche.played >= 5)
+      .sort((a,b) => (b[1].gauche.wins/b[1].gauche.played) - (a[1].gauche.wins/a[1].gauche.played))[0];
+    const bestDroite = Object.entries(sideMap)
+      .filter(([,s]) => s.droite.played >= 5)
+      .sort((a,b) => (b[1].droite.wins/b[1].droite.played) - (a[1].droite.wins/a[1].droite.played))[0];
+    if (bestGauche) {
+      const wr = Math.round(bestGauche[1].gauche.wins / bestGauche[1].gauche.played * 100);
+      mentions.push({ icon:'◀', label:'Meilleur côté gauche', name: bestGauche[0], val: `${wr}%`, color:'#3b82f6' });
+    }
+    if (bestDroite) {
+      const wr = Math.round(bestDroite[1].droite.wins / bestDroite[1].droite.played * 100);
+      mentions.push({ icon:'▶', label:'Meilleur côté droite', name: bestDroite[0], val: `${wr}%`, color:'#f97316' });
+    }
   }
 
   const mentionsHTML = mentions.length ? `
@@ -2439,9 +2476,9 @@ function showPlayerModal(playerName) { showPlayerDetail(playerName, 'stats'); }
 function showVChampsPlayerDetail(playerName) { showPlayerDetail(playerName, 'stats'); }
 
 // Build aggregated player stats from all sessions (history + optional current)
-function buildAllPlayerStats(includeCurrent = true) {
-  const sessions = [..._history];
-  if (includeCurrent && state.sessionStarted && !state.sessionFinished) {
+function buildAllPlayerStats(includeCurrent = true, historyArr) {
+  const sessions = [...(historyArr || _history)];
+  if (!historyArr && includeCurrent && state.sessionStarted && !state.sessionFinished) {
     sessions.push({ teams: state.teams, matches: state.matches.filter(m => m.status === 'finished') });
   }
   const stats = {}; // playerName → {wins, losses, draws, jFor, jAgainst, played, sessions:[{date,teamName}]}
@@ -4049,7 +4086,8 @@ function buildRankingShareText() {
   if (!combined.length) return null;
   const medals = ['🥇','🥈','🥉'];
   const lines = combined.slice(0, 15).map((p, i) => `${medals[i] || `${i+1}.`} ${p.name} — ${p.score} pts`);
-  return [`🏆 *Classement V-Champs*`, ``, ...lines].join('\n');
+  const levelLabel = _rankingLevelFilter ? ` ${_rankingLevelFilter}` : '';
+  return [`🏆 *Classement V-Champs${levelLabel}*`, ``, ...lines].join('\n');
 }
 
 function shareRankingText() {
@@ -4106,6 +4144,10 @@ function renderGeneralStats() {
   const el = document.getElementById('sub-classement');
   if (el) el.innerHTML = renderCombinedRanking();
   setDisplay('ranking-share-bar', computeCombinedRanking().length ? 'block' : 'none');
+  // sync filter buttons
+  document.querySelectorAll('.ranking-filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.level === (_rankingLevelFilter || 'general'));
+  });
 }
 
 // keep for backward compat (called from renderMatchPhase)
