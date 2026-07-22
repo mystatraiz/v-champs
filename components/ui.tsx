@@ -242,13 +242,11 @@ export function Modal({
 }) {
   if (!open) return null;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="fade-up max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-line bg-card p-5 sm:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      {/* Fond sombre sur sa propre couche : PAS de backdrop-filter au-dessus du
+          contenu (Safari iOS masque sinon le contenu de la fenêtre). */}
+      <div className="absolute inset-0 bg-black/75" onClick={onClose} aria-hidden="true" />
+      <div className="fade-up relative z-10 max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-line bg-card p-5 sm:rounded-2xl">
         {children}
       </div>
     </div>
