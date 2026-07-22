@@ -4,6 +4,9 @@ import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
+import { fetchProfile, requestRegistration } from "@/lib/store";
+import { notifyAdmins } from "@/lib/push";
 import { Btn, Card, Input, Loader, Select } from "@/components/ui";
 
 type Mode = "login" | "register" | "complete";
@@ -25,6 +28,17 @@ function LoginInner() {
   const [hand, setHand] = useState("right");
   const [side, setSide] = useState("any");
 
+  const joinId = params.get("join");
+  const pseudo = params.get("pseudo");
+
+  // Pré-remplissage quand on arrive depuis un lien d'inscription à un tournoi.
+  useEffect(() => {
+    const tab = params.get("tab");
+    if (tab === "register") setMode("register");
+    else if (tab === "login") setMode("login");
+    if (pseudo) setNickname((n) => n || pseudo);
+  }, [params, pseudo]);
+
   // Redirection si déjà connecté avec un profil complet
   useEffect(() => {
     if (loading) return;
@@ -37,6 +51,27 @@ function LoginInner() {
     }
   }, [user, profile, loading, router, params]);
 
+  // Inscrit automatiquement au tournoi visé (après connexion ou création de compte).
+  async function finishJoin(preferredName?: string) {
+    if (!joinId) return;
+    try {
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+      let regName = preferredName?.trim();
+      if (!regName && u) {
+        const prof = await fetchProfile(u.id);
+        regName = prof?.linked_player_name || prof?.nickname || pseudo || "";
+      }
+      if (!regName) regName = pseudo || "";
+      if (!regName) return;
+      await requestRegistration(joinId, regName, u?.id ?? null);
+      notifyAdmins("registration", regName);
+    } catch {
+      /* déjà inscrit ou erreur réseau → sans conséquence */
+    }
+  }
+
   async function handleSubmit() {
     setError("");
     setBusy(true);
@@ -45,6 +80,7 @@ function LoginInner() {
         if (!phone || !password) return setError("Téléphone et mot de passe requis.");
         const err = await signIn(phone, password);
         if (err) return setError(err);
+        await finishJoin();
         router.replace("/");
       } else if (mode === "register") {
         if (!phone || !password) return setError("Téléphone et mot de passe requis.");
@@ -62,6 +98,7 @@ function LoginInner() {
           preferred_side: side,
         });
         if (err) return setError(err);
+        await finishJoin(nickname.trim());
         router.replace("/pending");
       }
     } finally {

@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getTournament, listRegistrations, requestRegistration } from "@/lib/store";
 import { notifyAdmins } from "@/lib/push";
@@ -13,6 +14,7 @@ import { Badge, Btn, Card, Input, Loader } from "@/components/ui";
 // Page publique d'invitation : lien partagé sur WhatsApp.
 export default function JoinPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
   const [tournament, setTournament] = useState<Tournament | null | undefined>(undefined);
   const [regs, setRegs] = useState<Registration[]>([]);
@@ -45,6 +47,17 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
   const gridNames = (tournament?.teams || []).flatMap((tm) => tm.players).filter((p) => p?.trim());
   const confirmed = [...new Set([...approved.map((r) => r.player_name), ...gridNames])];
   const free = tournament ? Math.max(0, tournament.capacity - confirmed.length) : 0;
+
+  // Voie recommandée : on emmène vers la création de compte, pseudo pré-rempli,
+  // et l'inscription à ce tournoi se fera automatiquement après la création.
+  function goCreateAccount() {
+    const n = name.trim();
+    if (!n) {
+      setError("Saisis ton prénom / pseudo d'abord.");
+      return;
+    }
+    router.push(`/login?join=${id}&pseudo=${encodeURIComponent(n)}&tab=register`);
+  }
 
   async function submitGuest() {
     if (!tournament) return;
@@ -115,24 +128,46 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
             {free > 0 && (
               <div className="mt-5 space-y-3">
                 <Input
-                  placeholder="Ton prénom"
+                  placeholder="Ton prénom / pseudo"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitGuest()}
+                  onKeyDown={(e) => e.key === "Enter" && goCreateAccount()}
                 />
                 {error && <p className="text-sm font-semibold text-bad">{error}</p>}
-                <Btn size="lg" onClick={submitGuest} disabled={busy}>
-                  🎾 Je m&apos;inscris
+
+                {/* Voie principale : créer un compte pour fixer le pseudo + stats + niveau */}
+                <Btn size="lg" onClick={goCreateAccount} disabled={busy}>
+                  🎾 M&apos;inscrire &amp; créer mon compte
                 </Btn>
+                <p className="text-center text-[11px] leading-4 text-mut">
+                  Ton pseudo est conservé pour la prochaine fois, avec tes stats et ton classement.
+                </p>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="h-px flex-1 bg-line" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-mut">ou</span>
+                  <div className="h-px flex-1 bg-line" />
+                </div>
+
+                {/* Voie rapide : invité, juste pour cette fois */}
+                <button
+                  onClick={submitGuest}
+                  disabled={busy}
+                  className="w-full cursor-pointer text-center text-xs font-semibold text-sub underline underline-offset-2 hover:text-body disabled:opacity-50"
+                >
+                  M&apos;inscrire juste pour cette fois (invité)
+                </button>
               </div>
             )}
 
             <p className="mt-5 text-center text-[11px] text-mut">
-              Tu as un compte ?{" "}
-              <Link href="/login" className="font-bold text-gold underline">
+              Tu as déjà un compte ?{" "}
+              <Link
+                href={`/login?join=${tournament.id}&tab=login`}
+                className="font-bold text-gold underline"
+              >
                 Connecte-toi
-              </Link>{" "}
-              pour suivre tes stats.
+              </Link>
             </p>
           </Card>
         )}
