@@ -1,17 +1,126 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   listProfiles,
   markUserNotificationRead,
+  renamePlayer,
   resetAllScores,
   updateProfile,
 } from "@/lib/store";
 import { useAppData } from "@/lib/use-app-data";
+import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
 import type { Profile, Role } from "@/lib/types";
-import { Avatar, Badge, Btn, Card, EmptyState, Loader, SectionTitle, Select } from "@/components/ui";
+import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
+
+// Liste tous les noms de joueurs distincts trouvés dans les données, avec le
+// nombre de sessions où ils apparaissent (aide à repérer les doublons).
+function collectPlayerNames(data: AppData): { name: string; count: number }[] {
+  const counts = new Map<string, number>();
+  const add = (n: string | undefined) => {
+    const t = (n || "").trim();
+    if (t) counts.set(t, (counts.get(t) || 0) + 1);
+  };
+  data.history.forEach((s) => (s.teams || []).forEach((t) => (t.players || []).forEach(add)));
+  data.scores.forEach((r) => add(r.player_name));
+  data.knownPlayers.forEach(add);
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+
+// Outil admin : fusionner un nom mal saisi vers le bon.
+function MergeTool({ data, onDone }: { data: AppData; onDone: () => void }) {
+  const names = useMemo(() => collectPlayerNames(data), [data]);
+  const [oldName, setOldName] = useState("");
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function doMerge() {
+    if (!oldName || !newName.trim()) return;
+    if (oldName.toLowerCase().trim() === newName.toLowerCase().trim()) {
+      setMsg("Les deux noms sont identiques.");
+      return;
+    }
+    if (
+      !confirm(
+        `Fusionner « ${oldName} » → « ${newName.trim()} » ?\n\nToutes les sessions, points, palmarès et comptes liés au nom « ${oldName} » seront réattribués à « ${newName.trim()} ». Action définitive.`
+      )
+    )
+      return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await renamePlayer(oldName, newName.trim());
+      setMsg(
+        `✓ Fusionné. ${r.historyTouched ? "Historique mis à jour." : ""} ${
+          r.scoresTouched ? `${r.scoresTouched} score(s) réattribué(s).` : ""
+        }`.trim() || "✓ Fusionné."
+      );
+      setOldName("");
+      setNewName("");
+      onDone();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Erreur pendant la fusion.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-4">
+      <p className="mb-3 text-xs leading-5 text-sub">
+        Corrige un nom mal saisi (ex. « fredv ») en le fusionnant vers le bon (ex. « Fred V »).
+        La correction s&apos;applique partout : historique, points V-Champs, palmarès et comptes liés.
+      </p>
+      <div className="space-y-2">
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+            Nom à corriger
+          </label>
+          <Select value={oldName} onChange={(e) => setOldName(e.target.value)}>
+            <option value="">— Choisir le nom erroné —</option>
+            {names.map((n) => (
+              <option key={n.name} value={n.name}>
+                {n.name} ({n.count})
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+            Vers le bon nom
+          </label>
+          <Input
+            list="known-names-list"
+            placeholder="Bon nom (ex. Fred V)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <datalist id="known-names-list">
+            {names.map((n) => (
+              <option key={n.name} value={n.name} />
+            ))}
+          </datalist>
+        </div>
+      </div>
+      {msg && (
+        <p className={`mt-2 text-xs font-semibold ${msg.startsWith("✓") ? "text-ok" : "text-bad"}`}>{msg}</p>
+      )}
+      <Btn
+        className="mt-3"
+        size="lg"
+        disabled={busy || !oldName || !newName.trim()}
+        onClick={doMerge}
+      >
+        {busy ? "Fusion en cours…" : "Fusionner les noms"}
+      </Btn>
+    </Card>
+  );
+}
 
 const ROLE_LABEL: Record<Role, string> = {
   pending: "En attente",
@@ -115,7 +224,7 @@ function PendingCard({
 
 export default function AdminJoueurs() {
   const { profile: me } = useAuth();
-  const { data } = useAppData();
+  const { data, reload: reloadData } = useAppData();
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
@@ -141,6 +250,17 @@ export default function AdminJoueurs() {
 
   return (
     <div className="fade-up space-y-6">
+      <div>
+        <SectionTitle>🔗 Corriger / fusionner un nom</SectionTitle>
+        <MergeTool
+          data={data}
+          onDone={() => {
+            reloadData();
+            reload();
+          }}
+        />
+      </div>
+
       <div>
         <SectionTitle>
           Comptes en attente{" "}

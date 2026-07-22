@@ -155,6 +155,125 @@ export async function updateProfile(id: string, patch: Partial<Profile>): Promis
   if (error) throw error;
 }
 
+// ─── Fusion / correction d'un nom de joueur ───
+// Corrige un nom mal saisi (ex. « fredv ») vers le bon (ex. « Fred V ») dans
+// TOUTES les données : historique des sessions, points V-Champs, joueurs connus,
+// noms d'équipes mémorisés et comptes liés. Insensible à la casse sur l'ancien nom.
+export async function renamePlayer(
+  oldName: string,
+  newName: string
+): Promise<{ historyTouched: boolean; scoresTouched: number }> {
+  const oldKey = oldName.toLowerCase().trim();
+  const newTrim = newName.trim();
+  const newKey = newTrim.toLowerCase().trim();
+  const result = { historyTouched: false, scoresTouched: 0 };
+  if (!oldKey || !newTrim || oldKey === newKey) return result;
+
+  // 1) Historique des sessions (pilote stats matchs + palmarès)
+  try {
+    const { data } = await supabase
+      .from("app_state")
+      .select("value")
+      .eq("key", "session_history")
+      .maybeSingle();
+    const history = ((data?.value as SessionHistoryEntry[]) || []).map((s) => ({
+      ...s,
+      teams: (s.teams || []).map((t) => ({
+        ...t,
+        players: (t.players || []).map((p) =>
+          p && p.toLowerCase().trim() === oldKey ? newTrim : p
+        ) as [string, string],
+      })),
+    }));
+    const touched = history.some((s) =>
+      (s.teams || []).some((t) => (t.players || []).includes(newTrim))
+    );
+    if (touched) {
+      await supabase.from("app_state").upsert({
+        key: "session_history",
+        value: history,
+        updated_at: new Date().toISOString(),
+      });
+      result.historyTouched = true;
+    }
+  } catch (e) {
+    console.error("renamePlayer history:", e);
+  }
+
+  // 2) Points V-Champs (gère la contrainte unique player_name+session_id)
+  try {
+    const { data } = await supabase.from("player_session_scores").select("*");
+    const rows = (data as PlayerSessionScore[]) || [];
+    const newSessions = new Set(
+      rows.filter((r) => (r.player_name || "").toLowerCase().trim() === newKey).map((r) => r.session_id)
+    );
+    for (const r of rows.filter((r) => (r.player_name || "").toLowerCase().trim() === oldKey)) {
+      if (newSessions.has(r.session_id)) {
+        // Le bon nom a déjà un score sur cette session → on retire le doublon
+        await supabase
+          .from("player_session_scores")
+          .delete()
+          .eq("player_name", r.player_name)
+          .eq("session_id", r.session_id);
+      } else {
+        await supabase
+          .from("player_session_scores")
+          .update({ player_name: newTrim })
+          .eq("player_name", r.player_name)
+          .eq("session_id", r.session_id);
+        newSessions.add(r.session_id);
+      }
+      result.scoresTouched++;
+    }
+  } catch (e) {
+    console.error("renamePlayer scores:", e);
+  }
+
+  // 3) Joueurs connus (autocomplétion + liaison)
+  try {
+    const { data } = await supabase.from("known_players").select("name");
+    const names = ((data as { name: string }[]) || []).map((r) => r.name);
+    for (const n of names.filter((n) => n.toLowerCase().trim() === oldKey)) {
+      await supabase.from("known_players").delete().eq("name", n);
+    }
+    if (!names.some((n) => n.toLowerCase().trim() === newKey)) {
+      await supabase.from("known_players").upsert({ name: newTrim });
+    }
+  } catch (e) {
+    console.error("renamePlayer known_players:", e);
+  }
+
+  // 4) Noms d'équipes mémorisés (clé = paire de noms en minuscules)
+  try {
+    const { data } = await supabase.from("pair_names").select("pair_key,team_name");
+    const rows = (data as { pair_key: string; team_name: string }[]) || [];
+    for (const row of rows) {
+      const parts = row.pair_key.split("|");
+      if (!parts.includes(oldKey)) continue;
+      const newPairKey = parts.map((p) => (p === oldKey ? newKey : p)).sort().join("|");
+      await supabase.from("pair_names").delete().eq("pair_key", row.pair_key);
+      await supabase.from("pair_names").upsert({ pair_key: newPairKey, team_name: row.team_name });
+    }
+  } catch (e) {
+    console.error("renamePlayer pair_names:", e);
+  }
+
+  // 5) Comptes liés à ce nom
+  try {
+    const { data } = await supabase.from("profiles").select("id,linked_player_name");
+    const profs = (data as { id: string; linked_player_name: string | null }[]) || [];
+    for (const p of profs.filter(
+      (p) => p.linked_player_name && p.linked_player_name.toLowerCase().trim() === oldKey
+    )) {
+      await supabase.from("profiles").update({ linked_player_name: newTrim }).eq("id", p.id);
+    }
+  } catch (e) {
+    console.error("renamePlayer profiles:", e);
+  }
+
+  return result;
+}
+
 // ─── Tournois (table v2) ───
 
 export async function listTournaments(): Promise<Tournament[]> {
