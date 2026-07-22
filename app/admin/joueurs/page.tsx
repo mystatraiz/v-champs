@@ -12,8 +12,76 @@ import {
 import { useAppData } from "@/lib/use-app-data";
 import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
+import {
+  badgingSupported,
+  enableNotifications,
+  notificationPermission,
+  updateAppBadge,
+} from "@/lib/badge";
 import type { Profile, Role } from "@/lib/types";
 import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
+
+// Encart : activer le badge sur l'icône de l'écran d'accueil (iOS/Android).
+function BadgeSettings() {
+  const [perm, setPerm] = useState<string>("default");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setPerm(notificationPermission());
+  }, []);
+
+  async function activate() {
+    setBusy(true);
+    try {
+      const ok = await enableNotifications();
+      setPerm(notificationPermission());
+      if (ok) updateAppBadge(0);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const supported = badgingSupported() || notificationPermission() !== "unsupported";
+
+  return (
+    <Card className="p-4">
+      <p className="mb-3 text-xs leading-5 text-sub">
+        Affiche une pastille avec le nombre d&apos;actions en attente directement sur l&apos;icône de
+        l&apos;app, sur ton écran d&apos;accueil.
+      </p>
+      <ol className="mb-3 list-decimal space-y-1 pl-4 text-xs leading-5 text-sub">
+        <li>
+          Ajoute l&apos;app à ton écran d&apos;accueil : bouton <b className="text-body">Partager</b> de
+          Safari → <b className="text-body">« Sur l&apos;écran d&apos;accueil »</b>.
+        </li>
+        <li>Ouvre l&apos;app depuis cette icône, puis autorise les notifications ci-dessous.</li>
+      </ol>
+      {perm === "granted" ? (
+        <div className="flex items-center gap-2 text-sm font-bold text-ok">
+          ✓ Notifications activées — la pastille s&apos;affichera sur l&apos;icône.
+        </div>
+      ) : perm === "denied" ? (
+        <p className="text-xs font-semibold text-bad">
+          Notifications refusées. Autorise-les dans Réglages iOS → Notifications → V-Champs, puis
+          reviens ici.
+        </p>
+      ) : perm === "unsupported" ? (
+        <p className="text-xs text-mut">
+          Ton navigateur ne gère pas le badge d&apos;icône. Les pastilles restent visibles dans l&apos;app.
+        </p>
+      ) : (
+        <Btn size="lg" disabled={busy} onClick={activate}>
+          {busy ? "…" : "🔔 Activer la pastille sur l'icône"}
+        </Btn>
+      )}
+      {!supported && (
+        <p className="mt-2 text-xs text-mut">
+          (Fonctionne une fois l&apos;app installée sur l&apos;écran d&apos;accueil.)
+        </p>
+      )}
+    </Card>
+  );
+}
 
 // Liste tous les noms de joueurs distincts trouvés dans les données, avec le
 // nombre de sessions où ils apparaissent (aide à repérer les doublons).
@@ -339,6 +407,11 @@ export default function AdminJoueurs() {
 
   return (
     <div className="fade-up space-y-6">
+      <div>
+        <SectionTitle>🔔 Pastille sur l&apos;icône</SectionTitle>
+        <BadgeSettings />
+      </div>
+
       <div>
         <SectionTitle>✏️ Modifier les noms de joueurs</SectionTitle>
         <NamesManager

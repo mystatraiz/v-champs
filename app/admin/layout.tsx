@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { countPendingProfiles, countPendingRegistrations } from "@/lib/store";
+import { updateAppBadge } from "@/lib/badge";
 import { Loader } from "@/components/ui";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ]);
       setPendingRegs(regs);
       setPendingAccounts(accs);
+      updateAppBadge(regs + accs); // badge sur l'icône de l'app (si installée)
     } catch {
       /* silencieux : les pastilles ne doivent jamais casser la navigation */
     }
