@@ -31,6 +31,95 @@ function collectPlayerNames(data: AppData): { name: string; count: number }[] {
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
+// Gestionnaire : liste tous les noms et permet de les renommer un par un.
+function NamesManager({ data, onDone }: { data: AppData; onDone: () => void }) {
+  const names = useMemo(() => collectPlayerNames(data), [data]);
+  const [filter, setFilter] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const filtered = names.filter((n) => n.name.toLowerCase().includes(filter.toLowerCase()));
+
+  async function save(oldName: string) {
+    const nv = value.trim();
+    if (!nv || nv === oldName) {
+      setEditing(null);
+      return;
+    }
+    const exists = names.some((n) => n.name.toLowerCase().trim() === nv.toLowerCase().trim());
+    if (
+      !confirm(
+        exists
+          ? `« ${nv} » existe déjà : « ${oldName} » sera fusionné avec « ${nv} » partout. Continuer ?`
+          : `Renommer « ${oldName} » en « ${nv} » partout (historique, points, palmarès, compte lié) ?`
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await renamePlayer(oldName, nv);
+      setEditing(null);
+      onDone();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur pendant le renommage.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-3">
+      <Input
+        placeholder="Rechercher un nom…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        className="mb-3"
+      />
+      {!filtered.length ? (
+        <EmptyState>Aucun nom.</EmptyState>
+      ) : (
+        <div className="max-h-96 divide-y divide-line overflow-y-auto">
+          {filtered.map((n) =>
+            editing === n.name ? (
+              <div key={n.name} className="flex items-center gap-2 py-2">
+                <Input
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && save(n.name)}
+                  autoFocus
+                />
+                <Btn size="sm" variant="success" disabled={busy} onClick={() => save(n.name)}>
+                  ✓
+                </Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                  ✕
+                </Btn>
+              </div>
+            ) : (
+              <div key={n.name} className="flex items-center gap-2 py-2">
+                <span className="flex-1 truncate text-sm text-body">
+                  {n.name} <span className="text-xs text-mut">({n.count})</span>
+                </span>
+                <Btn
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setEditing(n.name);
+                    setValue(n.name);
+                  }}
+                >
+                  ✏️ Renommer
+                </Btn>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // Outil admin : fusionner un nom mal saisi vers le bon.
 function MergeTool({ data, onDone }: { data: AppData; onDone: () => void }) {
   const names = useMemo(() => collectPlayerNames(data), [data]);
@@ -251,7 +340,18 @@ export default function AdminJoueurs() {
   return (
     <div className="fade-up space-y-6">
       <div>
-        <SectionTitle>🔗 Corriger / fusionner un nom</SectionTitle>
+        <SectionTitle>✏️ Modifier les noms de joueurs</SectionTitle>
+        <NamesManager
+          data={data}
+          onDone={() => {
+            reloadData();
+            reload();
+          }}
+        />
+      </div>
+
+      <div>
+        <SectionTitle>🔗 Fusion rapide de deux noms</SectionTitle>
         <MergeTool
           data={data}
           onDone={() => {
