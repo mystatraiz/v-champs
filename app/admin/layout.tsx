@@ -32,8 +32,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const tabs = [
     { href: "/admin", label: "Tournois", icon: "🎾" },
     { href: "/admin/classement", label: "Classement", icon: "🏆" },
-    ...(isAdmin ? [{ href: "/admin/joueurs", label: "Joueurs", icon: "👥" }] : []),
     { href: "/admin/reglement", label: "Règlement", icon: "📖" },
+    ...(isAdmin ? [{ href: "/admin/joueurs", label: "Réglages", icon: "⚙️" }] : []),
   ];
 
   return (
