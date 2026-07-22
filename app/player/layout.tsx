@@ -44,11 +44,6 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
             Espace joueur
           </div>
         </div>
-        {profile.level != null && (
-          <span className="rounded-full border border-gold/50 px-2.5 py-1 text-[11px] font-extrabold text-gold">
-            Niv. {profile.level}
-          </span>
-        )}
         <button
           onClick={async () => {
             await signOut();

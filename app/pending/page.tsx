@@ -26,8 +26,7 @@ export default function PendingPage() {
           <p className="text-sm leading-6 text-sub">
             Votre compte a bien été créé{profile ? `, ${profile.first_name}` : ""}.
             <br />
-            Un administrateur doit le valider et vous attribuer un niveau avant que vous puissiez
-            accéder à l&apos;application.
+            Un administrateur doit le valider avant que vous puissiez accéder à l&apos;application.
           </p>
           <div className="mt-6 flex gap-2">
             <Btn variant="secondary" className="flex-1" onClick={() => refreshProfile()}>

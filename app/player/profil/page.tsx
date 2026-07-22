@@ -38,11 +38,6 @@ export default function PlayerProfil() {
         <div className="mt-2 flex flex-wrap justify-center gap-1.5">
           <Badge>🎾 {handLabel}</Badge>
           <Badge>📍 {sideLabel}</Badge>
-          {profile.level != null ? (
-            <Badge color="gold">Niveau {profile.level}</Badge>
-          ) : (
-            <Badge color="bad">Niveau non défini</Badge>
-          )}
           {profile.linked_player_name ? (
             <Badge color="ok">✓ Lié : {profile.linked_player_name}</Badge>
           ) : (

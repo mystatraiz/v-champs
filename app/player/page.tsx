@@ -55,7 +55,8 @@ export default function PlayerTournaments() {
     const today = localDateStr(new Date());
     return tournaments
       .filter((t) => t.date >= today && (t.status === "open" || t.status === "locked"))
-      .filter((t) => labelIncludesPlayer(t.level, profile?.level ?? null));
+      // Niveau non défini par l'admin → le joueur voit tous les tournois.
+      .filter((t) => (profile?.level == null ? true : labelIncludesPlayer(t.level, profile.level)));
   }, [tournaments, profile]);
 
   async function toggleRegistration(t: Tournament, mine: Registration | undefined) {
@@ -76,28 +77,16 @@ export default function PlayerTournaments() {
     }
   }
 
-  if (tournaments === null) return <Loader />;
+  if (tournaments === null || !profile) return <Loader />;
 
   return (
     <div className="fade-up space-y-5">
       <div>
-        <SectionTitle>Tournois à venir — mon niveau</SectionTitle>
+        <SectionTitle>Tournois à venir</SectionTitle>
 
-        {profile?.level == null ? (
-          <Card tone="gold" className="p-5 text-center">
-            <div className="mb-2 text-3xl">🎚️</div>
-            <p className="text-sm leading-6 text-sub">
-              Votre niveau n&apos;a pas encore été défini par l&apos;administrateur.
-              <br />
-              Les tournois correspondant à votre niveau apparaîtront ici dès qu&apos;il vous sera
-              attribué.
-            </p>
-          </Card>
-        ) : !upcoming.length ? (
+        {!upcoming.length ? (
           <Card>
-            <EmptyState>
-              Aucun tournoi de votre niveau ({profile.level}) n&apos;est planifié pour le moment.
-            </EmptyState>
+            <EmptyState>Aucun tournoi à venir pour le moment.</EmptyState>
           </Card>
         ) : (
           <div className="space-y-3">
