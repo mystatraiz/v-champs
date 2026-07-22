@@ -59,8 +59,24 @@ Settings → Environment Variables :
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://shficsyskgqcmtinguum.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la clé anon du projet |
+| `WEBPUSH_VAPID_PUBLIC` | clé publique VAPID (voir `lib/push-config.ts`) |
+| `WEBPUSH_VAPID_PRIVATE` | clé privée VAPID |
+| `WEBPUSH_SUBJECT` | `mailto:votre@email` |
 
-(Sans ces variables, l'app utilise les valeurs par défaut du projet actuel.)
+(Sans ces variables, l'app utilise les valeurs par défaut intégrées. Pour la
+production, il est recommandé de régénérer une paire VAPID —
+`npx web-push generate-vapid-keys` — et de la placer en variables
+d'environnement plutôt que dans le code.)
+
+### Notifications push
+
+L'admin reçoit une notification (et une pastille sur l'icône) quand un joueur
+s'inscrit à une partie ou qu'un nouveau compte attend validation. Sur iPhone,
+cela nécessite d'**installer l'app sur l'écran d'accueil** (Safari → Partager →
+« Sur l'écran d'accueil »), puis d'activer les notifications depuis l'onglet
+**Réglages**. Les abonnements sont stockés dans `app_state` (clé
+`push_subscriptions`) — aucune table supplémentaire à créer. L'envoi passe par
+la route serveur `app/api/push` (runtime Node, librairie `web-push`).
 
 ### 3. Développement local
 

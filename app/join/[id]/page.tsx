@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { getTournament, listRegistrations, requestRegistration } from "@/lib/store";
+import { notifyAdmins } from "@/lib/push";
 import { formatDateLong } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, Input, Loader } from "@/components/ui";
@@ -56,6 +57,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
     setBusy(true);
     try {
       await requestRegistration(tournament.id, n, profile?.id ?? null, !profile);
+      notifyAdmins("registration", n); // push aux admins (non bloquant)
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors de l'inscription");

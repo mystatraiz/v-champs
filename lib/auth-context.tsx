@@ -11,6 +11,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { phoneToEmail, supabase } from "./supabase";
 import { fetchProfile, notifyNewUser } from "./store";
+import { notifyAdmins } from "./push";
 import type { Profile } from "./types";
 
 interface AuthCtx {
@@ -131,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (error) return error.message;
       await notifyNewUser({ user_id: user.id, ...p, email: user.email });
+      notifyAdmins("account", p.nickname); // push aux admins (non bloquant)
       await loadProfile(user);
       return null;
     },

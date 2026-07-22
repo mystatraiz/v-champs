@@ -8,6 +8,7 @@ import {
   listTournaments,
   requestRegistration,
 } from "@/lib/store";
+import { notifyAdmins } from "@/lib/push";
 import { labelIncludesPlayer } from "@/lib/levels";
 import { formatDateLong, localDateStr } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
@@ -65,6 +66,7 @@ export default function PlayerTournaments() {
         await deleteRegistration(mine.id);
       } else {
         await requestRegistration(t.id, myName, profile.id);
+        notifyAdmins("registration", myName); // push aux admins (non bloquant)
       }
       await reload();
     } catch (e) {

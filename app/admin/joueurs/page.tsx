@@ -12,72 +12,75 @@ import {
 import { useAppData } from "@/lib/use-app-data";
 import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
-import {
-  badgingSupported,
-  enableNotifications,
-  notificationPermission,
-  updateAppBadge,
-} from "@/lib/badge";
+import { notificationPermission, updateAppBadge } from "@/lib/badge";
+import { pushSupported, subscribeAdminPush } from "@/lib/push";
 import type { Profile, Role } from "@/lib/types";
 import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
 
-// Encart : activer le badge sur l'icône de l'écran d'accueil (iOS/Android).
-function BadgeSettings() {
+// Encart : notifications push + badge sur l'icône de l'écran d'accueil.
+function BadgeSettings({ role }: { role: string }) {
   const [perm, setPerm] = useState<string>("default");
   const [busy, setBusy] = useState(false);
+  const [supported, setSupported] = useState(true);
 
   useEffect(() => {
     setPerm(notificationPermission());
+    setSupported(pushSupported());
   }, []);
 
   async function activate() {
     setBusy(true);
     try {
-      const ok = await enableNotifications();
+      const ok = await subscribeAdminPush(role);
       setPerm(notificationPermission());
       if (ok) updateAppBadge(0);
+      else if (Notification.permission !== "denied")
+        alert(
+          "Impossible d'activer les notifications. Assure-toi d'avoir ajouté l'app à l'écran d'accueil et de l'ouvrir depuis cette icône."
+        );
     } finally {
       setBusy(false);
     }
   }
 
-  const supported = badgingSupported() || notificationPermission() !== "unsupported";
-
   return (
     <Card className="p-4">
       <p className="mb-3 text-xs leading-5 text-sub">
-        Affiche une pastille avec le nombre d&apos;actions en attente directement sur l&apos;icône de
-        l&apos;app, sur ton écran d&apos;accueil.
+        Reçois une <b className="text-body">notification</b> et une <b className="text-body">pastille sur
+        l&apos;icône</b> — même app fermée — dès qu&apos;un joueur s&apos;inscrit à une partie ou qu&apos;un
+        nouveau compte attend ta validation.
       </p>
       <ol className="mb-3 list-decimal space-y-1 pl-4 text-xs leading-5 text-sub">
         <li>
           Ajoute l&apos;app à ton écran d&apos;accueil : bouton <b className="text-body">Partager</b> de
           Safari → <b className="text-body">« Sur l&apos;écran d&apos;accueil »</b>.
         </li>
-        <li>Ouvre l&apos;app depuis cette icône, puis autorise les notifications ci-dessous.</li>
+        <li>Ouvre l&apos;app depuis cette icône, puis active les notifications ci-dessous.</li>
       </ol>
-      {perm === "granted" ? (
-        <div className="flex items-center gap-2 text-sm font-bold text-ok">
-          ✓ Notifications activées — la pastille s&apos;affichera sur l&apos;icône.
+      {perm === "unsupported" || !supported ? (
+        <p className="text-xs text-mut">
+          Les notifications push nécessitent d&apos;ouvrir l&apos;app depuis l&apos;icône de l&apos;écran
+          d&apos;accueil (pas un simple onglet Safari). Les pastilles restent visibles dans l&apos;app.
+        </p>
+      ) : perm === "granted" ? (
+        <div className="text-sm font-bold text-ok">
+          ✓ Notifications activées sur cet appareil.
+          <button
+            onClick={activate}
+            className="ml-2 cursor-pointer text-xs font-semibold text-sub underline"
+          >
+            réactiver
+          </button>
         </div>
       ) : perm === "denied" ? (
         <p className="text-xs font-semibold text-bad">
           Notifications refusées. Autorise-les dans Réglages iOS → Notifications → V-Champs, puis
           reviens ici.
         </p>
-      ) : perm === "unsupported" ? (
-        <p className="text-xs text-mut">
-          Ton navigateur ne gère pas le badge d&apos;icône. Les pastilles restent visibles dans l&apos;app.
-        </p>
       ) : (
         <Btn size="lg" disabled={busy} onClick={activate}>
-          {busy ? "…" : "🔔 Activer la pastille sur l'icône"}
+          {busy ? "Activation…" : "🔔 Activer les notifications"}
         </Btn>
-      )}
-      {!supported && (
-        <p className="mt-2 text-xs text-mut">
-          (Fonctionne une fois l&apos;app installée sur l&apos;écran d&apos;accueil.)
-        </p>
       )}
     </Card>
   );
@@ -408,8 +411,8 @@ export default function AdminJoueurs() {
   return (
     <div className="fade-up space-y-6">
       <div>
-        <SectionTitle>🔔 Pastille sur l&apos;icône</SectionTitle>
-        <BadgeSettings />
+        <SectionTitle>🔔 Notifications</SectionTitle>
+        <BadgeSettings role={me?.role || "admin"} />
       </div>
 
       <div>

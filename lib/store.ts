@@ -375,6 +375,42 @@ export async function countPendingProfiles(): Promise<number> {
   return count || 0;
 }
 
+// ─── Abonnements push (stockés dans app_state pour éviter une nouvelle table) ───
+
+export interface StoredPushSub {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  role?: string;
+}
+
+export async function getPushSubscriptions(): Promise<StoredPushSub[]> {
+  const { data } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", "push_subscriptions")
+    .maybeSingle();
+  return (data?.value as StoredPushSub[]) || [];
+}
+
+export async function savePushSubscription(sub: StoredPushSub): Promise<void> {
+  const subs = await getPushSubscriptions();
+  const next = [...subs.filter((s) => s.endpoint !== sub.endpoint), sub];
+  await supabase.from("app_state").upsert({
+    key: "push_subscriptions",
+    value: next,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+  const subs = await getPushSubscriptions();
+  await supabase.from("app_state").upsert({
+    key: "push_subscriptions",
+    value: subs.filter((s) => s.endpoint !== endpoint),
+    updated_at: new Date().toISOString(),
+  });
+}
+
 // ─── Notifications (compatibles v1) ───
 
 export async function notifyNewUser(payload: Record<string, unknown>): Promise<void> {
