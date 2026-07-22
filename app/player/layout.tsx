@@ -1,11 +1,64 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Loader } from "@/components/ui";
+import { Btn, Loader, Modal } from "@/components/ui";
+
+// Message de bienvenue affiché une seule fois quand le compte vient d'être lié
+// à un joueur (par l'admin) — ses stats/classement deviennent disponibles.
+function LinkNotice() {
+  const { profile } = useAuth();
+  const [show, setShow] = useState(false);
+  const linked = profile?.linked_player_name || null;
+
+  useEffect(() => {
+    if (!profile || !linked) return;
+    try {
+      const key = `vchamps_link_seen_${profile.id}`;
+      if (localStorage.getItem(key) !== linked) setShow(true);
+    } catch {
+      /* localStorage indisponible : on n'affiche rien */
+    }
+  }, [profile, linked]);
+
+  function dismiss() {
+    try {
+      if (profile && linked) localStorage.setItem(`vchamps_link_seen_${profile.id}`, linked);
+    } catch {
+      /* ignore */
+    }
+    setShow(false);
+  }
+
+  if (!linked) return null;
+
+  return (
+    <Modal open={show} onClose={dismiss}>
+      <div className="text-center">
+        <div className="mb-3 text-5xl">🎉</div>
+        <h3 className="mb-2 text-xl font-extrabold text-bright">Ton compte est lié !</h3>
+        <p className="text-sm leading-6 text-sub">
+          Ton compte a été associé au joueur{" "}
+          <b className="text-gold">«&nbsp;{linked}&nbsp;»</b>. Tes{" "}
+          <b className="text-body">statistiques</b> et ton{" "}
+          <b className="text-body">classement V-Champs</b> sont désormais disponibles dans ton
+          profil.
+        </p>
+        <div className="mt-5 flex gap-2">
+          <Link href="/player/profil" className="flex-1" onClick={dismiss}>
+            <Btn className="w-full">Voir mon profil →</Btn>
+          </Link>
+          <Btn variant="secondary" className="flex-1" onClick={dismiss}>
+            Plus tard
+          </Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 const TABS = [
   { href: "/player", label: "Tournois", icon: "🎾" },
@@ -55,6 +108,8 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
           ⎋
         </button>
       </header>
+
+      <LinkNotice />
 
       <main className="flex-1 px-4 py-5 pb-24">{children}</main>
 
