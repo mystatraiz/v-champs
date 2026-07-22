@@ -17,41 +17,60 @@ export function PlayerSheet({
   playerName: string | null;
   onClose: () => void;
 }) {
+  // Toutes les données proviennent de la base partagée avec la v1 : on isole
+  // chaque calcul pour qu'une éventuelle donnée mal formée n'affiche jamais
+  // un écran vide (au pire une section reste absente).
   const stats = useMemo(() => {
     if (!playerName) return null;
-    const all = buildAllPlayerStats(data.history, data.currentSession);
-    const key = playerName.toLowerCase().trim();
-    const match = Object.keys(all).find((k) => k.toLowerCase().trim() === key);
-    return match ? all[match] : null;
+    try {
+      const all = buildAllPlayerStats(data.history, data.currentSession);
+      const key = playerName.toLowerCase().trim();
+      const match = Object.keys(all).find((k) => k.toLowerCase().trim() === key);
+      return match ? all[match] : null;
+    } catch {
+      return null;
+    }
   }, [data, playerName]);
 
   const side = useMemo(() => {
     if (!playerName) return null;
-    const all = computeAllSideStats(data.history, data.currentSession);
-    const key = playerName.toLowerCase().trim();
-    const match = Object.keys(all).find((k) => k.toLowerCase().trim() === key);
-    return match ? all[match] : null;
+    try {
+      const all = computeAllSideStats(data.history, data.currentSession);
+      const key = playerName.toLowerCase().trim();
+      const match = Object.keys(all).find((k) => k.toLowerCase().trim() === key);
+      return match ? all[match] : null;
+    } catch {
+      return null;
+    }
   }, [data, playerName]);
 
-  const palmares = useMemo(
-    () => (playerName ? buildPlayerPalmares(data.history, playerName) : []),
-    [data, playerName]
-  );
+  const palmares = useMemo(() => {
+    if (!playerName) return [];
+    try {
+      return buildPlayerPalmares(data.history, playerName);
+    } catch {
+      return [];
+    }
+  }, [data, playerName]);
 
   const perfs = useMemo(() => {
     if (!playerName) return [];
-    const key = playerName.toLowerCase().trim();
-    const cutoff = Date.now() - RANKING_WINDOW_MS;
-    const valid = data.scores.filter(
-      (r) =>
-        r.player_name.toLowerCase().trim() === key &&
-        new Date(r.created_at).getTime() >= cutoff
-    );
-    const sorted = [...valid].sort((a, b) => b.points_earned - a.points_earned);
-    const retainedIds = new Set(sorted.slice(0, RETAINED_PERFS).map((r) => r.session_id));
-    return valid
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .map((r) => ({ ...r, retained: retainedIds.has(r.session_id) }));
+    try {
+      const key = playerName.toLowerCase().trim();
+      const cutoff = Date.now() - RANKING_WINDOW_MS;
+      const valid = data.scores.filter(
+        (r) =>
+          (r.player_name || "").toLowerCase().trim() === key &&
+          new Date(r.created_at).getTime() >= cutoff
+      );
+      const sorted = [...valid].sort((a, b) => b.points_earned - a.points_earned);
+      const retainedIds = new Set(sorted.slice(0, RETAINED_PERFS).map((r) => r.session_id));
+      return valid
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .map((r) => ({ ...r, retained: retainedIds.has(r.session_id) }));
+    } catch {
+      return [];
+    }
   }, [data.scores, playerName]);
 
   if (!playerName) return null;

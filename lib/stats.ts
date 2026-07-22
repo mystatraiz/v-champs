@@ -50,7 +50,7 @@ export function buildAllPlayerStats(
           [t2, m.score2, m.score1, sa1, sf1],
         ] as [Team, number, number, number, number][]
       ).forEach(([team, sw, sl, sf, sa]) => {
-        team.players
+        (team.players || [])
           .filter((p) => p && p.trim())
           .forEach((p) => {
             if (!stats[p])
@@ -102,7 +102,7 @@ export function buildTeamStats(
         if (!allTeams[key])
           allTeams[key] = {
             name: key,
-            players: [...team.players],
+            players: [...(team.players || [])],
             wins: 0,
             losses: 0,
             draws: 0,
@@ -146,7 +146,7 @@ export function computeAllSideStats(
         const myScore = team === t1 ? m.score1 : m.score2;
         const oppScore = team === t1 ? m.score2 : m.score1;
         const won = myScore > oppScore;
-        team.players.forEach((player, idx) => {
+        (team.players || []).forEach((player, idx) => {
           if (!player?.trim()) return;
           const side = idx === 0 ? "gauche" : "droite";
           if (!sideMap[player])
@@ -179,7 +179,7 @@ export function buildPlayerPalmares(
   const key = playerName.toLowerCase().trim();
   const entries: PalmaresEntry[] = [];
   history.forEach((session) => {
-    const ranked = [...session.teams].sort((a, b) => {
+    const ranked = [...(session.teams || [])].sort((a, b) => {
       const pa = (a.wins || 0) * 3 + (a.draws || 0);
       const pb = (b.wins || 0) * 3 + (b.draws || 0);
       if (pa !== pb) return pb - pa;
@@ -189,9 +189,10 @@ export function buildPlayerPalmares(
       return (b.pointsFor || 0) - (a.pointsFor || 0);
     });
     ranked.forEach((team, idx) => {
-      const inTeam = team.players.some((p) => p?.toLowerCase().trim() === key);
+      const players = team.players || [];
+      const inTeam = players.some((p) => p?.toLowerCase().trim() === key);
       if (!inTeam) return;
-      const partner = team.players.find((p) => p?.toLowerCase().trim() !== key) || null;
+      const partner = players.find((p) => p?.toLowerCase().trim() !== key) || null;
       entries.push({
         date: session.date,
         label: session.label || "6/7",
