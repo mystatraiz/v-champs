@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 export function Card({
@@ -240,8 +242,25 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
-  if (!open) return null;
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Bloque le défilement de l'arrière-plan quand la fenêtre est ouverte.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open || !mounted) return null;
+
+  // Rendu via un portail sur <body> : la fenêtre échappe ainsi aux animations
+  // (transform) des pages qui, sur Safari iOS, la « piégeaient » en bas du
+  // contenu au lieu de la superposer par-dessus l'écran.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* Fond sombre sur sa propre couche : PAS de backdrop-filter au-dessus du
           contenu (Safari iOS masque sinon le contenu de la fenêtre). */}
@@ -249,6 +268,7 @@ export function Modal({
       <div className="fade-up relative z-10 max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-line bg-card p-5 sm:rounded-2xl">
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
