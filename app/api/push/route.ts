@@ -1,31 +1,9 @@
 import { NextResponse } from "next/server";
-import webpush from "web-push";
-import { createClient } from "@supabase/supabase-js";
+import { levelsOfLabel } from "@/lib/levels";
+import { frDate, getDb, getSubs, sendToSubs, type StoredSub } from "@/lib/server-push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const SUPA_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://shficsyskgqcmtinguum.supabase.co";
-const SUPA_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoZmljc3lza2dxY210aW5ndXVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDAxOTIsImV4cCI6MjA5NTkxNjE5Mn0.5YL_WesWzAIdpy4CUhIXzFB_YmvxfPpHNIAsMT-mznk";
-
-const VAPID_PUBLIC =
-  process.env.WEBPUSH_VAPID_PUBLIC ??
-  "BATMAZ0wA3-iHMgIf1IEiHBEplxM3UO9p7mO1fDTmfpxAFKHjBrblSTJEZwGX-VtvL_SGQcuv-3NfXX4mNETJlo";
-const VAPID_PRIVATE =
-  process.env.WEBPUSH_VAPID_PRIVATE ?? "izJGRbLtXW50owKKPsfeD33jeS7f9oMDU_8v-gnPAPk";
-const VAPID_SUBJECT = process.env.WEBPUSH_SUBJECT ?? "mailto:contact@vchamps.club";
-
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
-
-interface StoredSub {
-  endpoint: string;
-  keys: { p256dh: string; auth: string };
-  role?: string;
-  profileId?: string;
-}
 
 interface Body {
   type?: string;
@@ -33,74 +11,140 @@ interface Body {
   profileId?: string;
   title?: string;
   body?: string;
+  level?: string;
+  date?: string;
+  time?: string;
+  tournamentId?: string;
+  results?: { name: string; points: number; rank?: number }[];
 }
 
 export async function POST(req: Request) {
-  const db = createClient(SUPA_URL, SUPA_KEY);
+  const db = getDb();
   const body = (await req.json().catch(() => ({}))) as Body;
+  const subs = await getSubs(db);
+  const admins = subs.filter((s) => s.role !== "player");
 
-  const { data } = await db
-    .from("app_state")
-    .select("value")
-    .eq("key", "push_subscriptions")
-    .maybeSingle();
-  const subs = ((data?.value as StoredSub[]) || []).filter((s) => s && s.endpoint);
+  const j = (sent: number) => NextResponse.json({ sent });
 
-  let targets: StoredSub[];
-  let payloadObj: { title: string; body: string; url: string; count?: number };
-
+  // ── Notification à un joueur précis ──
   if (body.type === "player") {
-    // Notification adressée à un joueur précis (tous ses appareils).
     const pid = String(body.profileId || "");
-    if (!pid) return NextResponse.json({ sent: 0 });
-    targets = subs.filter((s) => s.profileId === pid);
-    payloadObj = {
-      title: (body.title || "V-Champs").slice(0, 80),
-      body: (body.body || "").slice(0, 160),
-      url: "/player",
-    };
-  } else {
-    // Broadcast aux admins/organisateurs (jamais aux joueurs).
-    const type = body.type === "account" ? "account" : "registration";
-    const [regsRes, accsRes] = await Promise.all([
-      db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
-      db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
-    ]);
-    const total = (regsRes.count || 0) + (accsRes.count || 0);
-    targets = subs.filter((s) => s.role !== "player");
-    payloadObj = {
-      title: type === "account" ? "Nouveau compte à valider" : "Nouvelle demande d'inscription",
-      body: body.name
-        ? String(body.name).slice(0, 60)
-        : type === "account"
-          ? "Un joueur attend la validation de son compte."
-          : "Un joueur veut rejoindre une partie.",
-      count: total,
-      url: "/admin",
-    };
+    if (!pid) return j(0);
+    const targets = subs.filter((s) => s.profileId === pid);
+    return j(
+      await sendToSubs(db, subs, targets, {
+        title: (body.title || "V-Champs").slice(0, 80),
+        body: (body.body || "").slice(0, 160),
+        url: "/player",
+      })
+    );
   }
 
-  const payload = JSON.stringify(payloadObj);
-  const dead = new Set<string>();
-
-  await Promise.all(
-    targets.map(async (s) => {
-      try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, payload);
-      } catch (e) {
-        const code = (e as { statusCode?: number })?.statusCode;
-        if (code === 404 || code === 410) dead.add(s.endpoint); // abonnement expiré
-      }
-    })
-  );
-
-  if (dead.size) {
-    await db.from("app_state").upsert({
-      key: "push_subscriptions",
-      value: subs.filter((s) => !dead.has(s.endpoint)),
-      updated_at: new Date().toISOString(),
-    });
+  // ── Nouveau tournoi → joueurs du bon niveau (ou sans niveau défini) ──
+  if (body.type === "new-tournament") {
+    const level = String(body.level || "");
+    const lvls = levelsOfLabel(level);
+    const { data: profs } = await db.from("profiles").select("id,level,role").eq("role", "player");
+    const eligible = new Set(
+      (profs || [])
+        .filter((p) => p.level == null || lvls.includes(p.level as number))
+        .map((p) => p.id as string)
+    );
+    const targets = subs.filter((s) => s.role === "player" && s.profileId && eligible.has(s.profileId));
+    return j(
+      await sendToSubs(db, subs, targets, {
+        title: "Nouveau tournoi 🎾",
+        body: `Niveau ${level} — ${frDate(body.date)}${body.time ? ` à ${body.time}` : ""}. Inscris-toi vite !`,
+        url: "/player",
+      })
+    );
   }
 
-  return NextResponse.json({ sent: targets.length - dead.size });
+  // ── Une place s'est libérée → joueurs en liste d'attente ──
+  if (body.type === "spot-freed") {
+    const tid = String(body.tournamentId || "");
+    if (!tid) return j(0);
+    const { data: regs } = await db
+      .from("registrations")
+      .select("profile_id")
+      .eq("tournament_id", tid)
+      .eq("status", "waitlist");
+    const ids = new Set((regs || []).map((r) => r.profile_id as string).filter(Boolean));
+    const targets = subs.filter((s) => s.profileId && ids.has(s.profileId));
+    return j(
+      await sendToSubs(db, subs, targets, {
+        title: "Une place s'est libérée 🎾",
+        body: `Une place vient de se libérer${body.date ? ` pour le tournoi du ${frDate(body.date)}` : ""}. Vite, confirme la tienne !`,
+        url: "/player",
+      })
+    );
+  }
+
+  // ── Résultats de session → chaque joueur reçoit son bilan ──
+  if (body.type === "session-results") {
+    const results = Array.isArray(body.results) ? body.results : [];
+    const { data: profs } = await db
+      .from("profiles")
+      .select("id,linked_player_name")
+      .eq("role", "player");
+    let sent = 0;
+    for (const r of results) {
+      const key = String(r.name || "").toLowerCase().trim();
+      if (!key) continue;
+      const ids = new Set(
+        (profs || [])
+          .filter((p) => p.linked_player_name && String(p.linked_player_name).toLowerCase().trim() === key)
+          .map((p) => p.id as string)
+      );
+      const targets = subs.filter((s) => s.profileId && ids.has(s.profileId));
+      if (!targets.length) continue;
+      sent += await sendToSubs(db, subs, targets, {
+        title: "Résultats de session 🏆",
+        body: `+${r.points} pts V-Champs${r.rank ? ` — tu es ${r.rank}e au classement` : ""} !`,
+        url: "/player",
+      });
+    }
+    return j(sent);
+  }
+
+  // ── Tournoi complet → admins ──
+  if (body.type === "tournament-full") {
+    return j(
+      await sendToSubs(db, subs, admins, {
+        title: "Tournoi complet ✅",
+        body: `Le tournoi du ${frDate(body.date)}${body.time ? ` (${body.time})` : ""} est complet.`,
+        url: "/admin",
+      })
+    );
+  }
+
+  // ── Désistement → admins ──
+  if (body.type === "withdrawal") {
+    return j(
+      await sendToSubs(db, subs, admins, {
+        title: "Désistement ⚠️",
+        body: `${(body.name || "Un joueur").slice(0, 40)} s'est désinscrit du tournoi du ${frDate(body.date)}${body.time ? ` (${body.time})` : ""}.`,
+        url: "/admin",
+      })
+    );
+  }
+
+  // ── Broadcast admin par défaut : nouvelle demande / nouveau compte ──
+  const type = body.type === "account" ? "account" : "registration";
+  const [regsRes, accsRes] = await Promise.all([
+    db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
+  ]);
+  const total = (regsRes.count || 0) + (accsRes.count || 0);
+  const sent = await sendToSubs(db, subs, admins, {
+    title: type === "account" ? "Nouveau compte à valider" : "Nouvelle demande d'inscription",
+    body: body.name
+      ? String(body.name).slice(0, 60)
+      : type === "account"
+        ? "Un joueur attend la validation de son compte."
+        : "Un joueur veut rejoindre une partie.",
+    count: total,
+    url: "/admin",
+  });
+  return NextResponse.json({ sent, total });
 }

@@ -69,16 +69,13 @@ export async function subscribePush(
 export const subscribeAdminPush = (role?: string) => subscribePush({ role });
 export const subscribePlayerPush = (profileId: string) => subscribePush({ role: "player", profileId });
 
-// Prévient les admins abonnés (appelé après une inscription ou un nouveau compte).
-export async function notifyAdmins(
-  type: "registration" | "account",
-  name?: string
-): Promise<void> {
+// Envoi générique vers la route serveur (jamais bloquant).
+async function post(payload: Record<string, unknown>): Promise<void> {
   try {
     await fetch("/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, name }),
+      body: JSON.stringify(payload),
       keepalive: true,
     });
   } catch {
@@ -86,20 +83,31 @@ export async function notifyAdmins(
   }
 }
 
-// Prévient un joueur précis sur ses appareils abonnés.
-export async function notifyPlayer(
-  profileId: string,
-  title: string,
-  body: string
-): Promise<void> {
-  try {
-    await fetch("/api/push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "player", profileId, title, body }),
-      keepalive: true,
-    });
-  } catch {
-    /* non bloquant */
-  }
-}
+// Admins : nouvelle demande d'inscription / nouveau compte.
+export const notifyAdmins = (type: "registration" | "account", name?: string) =>
+  post({ type, name });
+
+// Un joueur précis (compte validé, inscription confirmée, demande refusée…).
+export const notifyPlayer = (profileId: string, title: string, body: string) =>
+  post({ type: "player", profileId, title, body });
+
+// Nouveau tournoi → joueurs du bon niveau.
+export const notifyNewTournament = (level: string, date: string, time: string) =>
+  post({ type: "new-tournament", level, date, time });
+
+// Place libérée → joueurs en liste d'attente du tournoi.
+export const notifySpotFreed = (tournamentId: string, date: string) =>
+  post({ type: "spot-freed", tournamentId, date });
+
+// Désistement → admins.
+export const notifyWithdrawal = (name: string, date: string, time: string) =>
+  post({ type: "withdrawal", name, date, time });
+
+// Tournoi complet → admins.
+export const notifyTournamentFull = (date: string, time: string) =>
+  post({ type: "tournament-full", date, time });
+
+// Résultats de session → chaque joueur son bilan.
+export const notifySessionResults = (
+  results: { name: string; points: number; rank?: number }[]
+) => post({ type: "session-results", results });

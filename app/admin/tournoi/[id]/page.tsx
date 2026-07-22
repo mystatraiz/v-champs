@@ -14,7 +14,7 @@ import {
   setRegistrationStatus,
   updateTournament,
 } from "@/lib/store";
-import { notifyPlayer } from "@/lib/push";
+import { notifyPlayer, notifyTournamentFull } from "@/lib/push";
 import { emptyTeam, normalizeName, pairKey } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
 import type { AppData } from "@/lib/store";
@@ -221,6 +221,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                           "Inscription confirmée ✅",
                           `Ta place au tournoi du ${formatDateLong(tournament.date)} (${tournament.time}) est confirmée !`
                         );
+                      if (confirmedNames.length + 1 >= tournament.capacity)
+                        notifyTournamentFull(tournament.date, tournament.time);
                       reload();
                     }}
                   >
@@ -231,6 +233,12 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                     variant="ghost"
                     onClick={async () => {
                       await setRegistrationStatus(r.id, "declined");
+                      if (r.profile_id)
+                        notifyPlayer(
+                          r.profile_id,
+                          "Demande non retenue",
+                          `Ta demande pour le tournoi du ${formatDateLong(tournament.date)} n'a pas pu être retenue.`
+                        );
                       reload();
                     }}
                   >
@@ -255,6 +263,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                           "Inscription confirmée ✅",
                           `Ta place au tournoi du ${formatDateLong(tournament.date)} (${tournament.time}) est confirmée !`
                         );
+                      if (confirmedNames.length + 1 >= tournament.capacity)
+                        notifyTournamentFull(tournament.date, tournament.time);
                       reload();
                     }}
                   >

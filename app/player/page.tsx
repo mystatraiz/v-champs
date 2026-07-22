@@ -8,7 +8,7 @@ import {
   listTournaments,
   requestRegistration,
 } from "@/lib/store";
-import { notifyAdmins } from "@/lib/push";
+import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
 import { labelIncludesPlayer } from "@/lib/levels";
 import { formatDateLong, localDateStr } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
@@ -50,21 +50,46 @@ export default function PlayerTournaments() {
 
   const myName = profile?.linked_player_name || profile?.nickname || "";
 
+  // Tournois où le joueur a déjà une inscription (par compte ou par nom).
+  const myTournamentIds = useMemo(() => {
+    const key = myName.toLowerCase().trim();
+    return new Set(
+      regs
+        .filter(
+          (r) =>
+            (profile && r.profile_id === profile.id) ||
+            (key && r.player_name.toLowerCase().trim() === key)
+        )
+        .map((r) => r.tournament_id)
+    );
+  }, [regs, profile, myName]);
+
   const upcoming = useMemo(() => {
     if (!tournaments) return [];
     const today = localDateStr(new Date());
     return tournaments
       .filter((t) => t.date >= today && (t.status === "open" || t.status === "locked"))
-      // Niveau non défini par l'admin → le joueur voit tous les tournois.
-      .filter((t) => (profile?.level == null ? true : labelIncludesPlayer(t.level, profile.level)));
-  }, [tournaments, profile]);
+      .filter(
+        (t) =>
+          // Niveau non défini → tous les tournois ; sinon ceux de son niveau ;
+          // et TOUJOURS ceux où il est déjà inscrit (quel que soit le niveau).
+          profile?.level == null ||
+          labelIncludesPlayer(t.level, profile.level) ||
+          myTournamentIds.has(t.id)
+      );
+  }, [tournaments, profile, myTournamentIds]);
 
   async function toggleRegistration(t: Tournament, mine: Registration | undefined) {
     if (!profile) return;
     setBusy(t.id);
     try {
       if (mine) {
+        const wasApproved = mine.status === "approved";
         await deleteRegistration(mine.id);
+        // Désistement : prévient les admins, et si une place confirmée se libère,
+        // prévient les joueurs en liste d'attente.
+        notifyWithdrawal(myName, t.date, t.time);
+        if (wasApproved) notifySpotFreed(t.id, t.date);
       } else {
         await requestRegistration(t.id, myName, profile.id);
         notifyAdmins("registration", myName); // push aux admins (non bloquant)

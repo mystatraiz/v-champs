@@ -70,13 +70,25 @@ d'environnement plutôt que dans le code.)
 
 ### Notifications push
 
-L'admin reçoit une notification (et une pastille sur l'icône) quand un joueur
-s'inscrit à une partie ou qu'un nouveau compte attend validation. Sur iPhone,
-cela nécessite d'**installer l'app sur l'écran d'accueil** (Safari → Partager →
-« Sur l'écran d'accueil »), puis d'activer les notifications depuis l'onglet
-**Réglages**. Les abonnements sont stockés dans `app_state` (clé
-`push_subscriptions`) — aucune table supplémentaire à créer. L'envoi passe par
-la route serveur `app/api/push` (runtime Node, librairie `web-push`).
+Admin comme joueurs peuvent activer les notifications (et la pastille d'icône).
+Sur iPhone, cela nécessite d'**installer l'app sur l'écran d'accueil** (Safari →
+Partager → « Sur l'écran d'accueil »), puis d'activer depuis **Réglages** (admin)
+ou **Profil** (joueur). Les abonnements sont stockés dans `app_state` (clé
+`push_subscriptions`) — aucune table supplémentaire. L'envoi passe par la route
+Node `app/api/push` (librairie `web-push`).
+
+Alertes câblées :
+
+- **Admin** : nouvelle demande d'inscription, nouveau compte à valider, tournoi
+  complet, désistement.
+- **Joueur** : compte validé, inscription confirmée / non retenue, nouveau
+  tournoi de son niveau, place libérée (liste d'attente), résultats de session
+  (points V-Champs + rang).
+- **Rappels programmés** (`app/api/cron/reminders`, planifié à 8h UTC via la clé
+  `crons` de `vercel.json`) : rappel la veille aux joueurs inscrits + alerte de
+  remplissage à l'admin si un tournoi du lendemain n'est pas complet. Les tâches
+  Cron ne s'exécutent que sur le déploiement de **production** Vercel. Définir
+  `CRON_SECRET` (variable d'env) sécurise l'endpoint ; sinon il reste public.
 
 ### 3. Développement local
 

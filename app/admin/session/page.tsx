@@ -20,6 +20,8 @@ import {
   proposeBestMatchups,
   type Matchup,
 } from "@/lib/session";
+import { computeCombinedRanking } from "@/lib/scoring";
+import { notifySessionResults } from "@/lib/push";
 import { playBell, unlockAudio } from "@/lib/audio";
 import { formatClock } from "@/lib/format";
 import type { Match, PlayerSessionScore, SessionHistoryEntry, SessionState } from "@/lib/types";
@@ -275,6 +277,23 @@ export default function SessionLive() {
       persist(res.state.sessionArchivedAt ? res.state : finished);
       if (s.plannedTournamentId) {
         updateTournament(s.plannedTournamentId, { status: "done" }).catch(() => {});
+      }
+      // Notifie chaque joueur de son bilan (points V-Champs + rang au classement).
+      try {
+        const sid = res.state.sessionArchivedAt;
+        if (sid) {
+          const ranking = computeCombinedRanking(res.scores, res.history, null, null);
+          const rankOf = (name: string) => {
+            const i = ranking.findIndex((p) => p.key === name.toLowerCase().trim());
+            return i >= 0 ? i + 1 : undefined;
+          };
+          const results = res.scores
+            .filter((r) => r.session_id === sid)
+            .map((r) => ({ name: r.player_name, points: r.points_earned, rank: rankOf(r.player_name) }));
+          if (results.length) notifySessionResults(results);
+        }
+      } catch {
+        /* non bloquant */
       }
     } finally {
       archiving.current = false;

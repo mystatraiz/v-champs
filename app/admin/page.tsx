@@ -10,6 +10,7 @@ import {
   listTournaments,
   loadAppData,
 } from "@/lib/store";
+import { notifyNewTournament } from "@/lib/push";
 import { LEVEL_LABELS } from "@/lib/levels";
 import { TIME_SLOTS, formatDateLong, localDateStr } from "@/lib/format";
 import type { Registration, SessionState, Tournament } from "@/lib/types";
@@ -109,6 +110,7 @@ export default function AdminTournaments() {
         courts: fCourts,
         capacity: fCourts * 4,
       });
+      notifyNewTournament(fLevel, fDate, fTime); // prévient les joueurs du niveau
       setShowForm(false);
       await reload();
     } catch (e) {
