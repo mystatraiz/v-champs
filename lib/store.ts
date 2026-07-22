@@ -1,0 +1,253 @@
+// ═══ Accès données Supabase — clés et formats identiques à la v1 ═══
+import { supabase } from "./supabase";
+import { computeSessionScores } from "./scoring";
+import type {
+  PlayerSessionScore,
+  Profile,
+  Registration,
+  RegistrationStatus,
+  SessionHistoryEntry,
+  SessionState,
+  Tournament,
+} from "./types";
+
+// ─── Données historiques partagées avec la v1 ───
+
+export interface AppData {
+  currentSession: SessionState | null;
+  history: SessionHistoryEntry[];
+  scores: PlayerSessionScore[];
+  knownPlayers: string[];
+  pairNames: Record<string, string>;
+}
+
+export async function loadAppData(): Promise<AppData> {
+  const [sd, hd, rsd, pd, kd, psd] = await Promise.all([
+    supabase.from("app_state").select("value").eq("key", "current_session").maybeSingle(),
+    supabase.from("app_state").select("value").eq("key", "session_history").maybeSingle(),
+    supabase.from("app_state").select("value").eq("key", "scores_reset_at").maybeSingle(),
+    supabase.from("pair_names").select("pair_key,team_name"),
+    supabase.from("known_players").select("name"),
+    supabase.from("player_session_scores").select("*"),
+  ]);
+
+  const currentSession = (sd.data?.value as SessionState) || null;
+  if (currentSession && !currentSession.pairNameMap) currentSession.pairNameMap = {};
+
+  const resetAt = rsd.data?.value ? new Date(rsd.data.value as string).getTime() : 0;
+  const rawScores = (psd.data as PlayerSessionScore[]) || [];
+  const scores = resetAt
+    ? rawScores.filter((r) => new Date(r.created_at).getTime() > resetAt)
+    : rawScores;
+
+  const pairNames: Record<string, string> = {};
+  (pd.data || []).forEach((r: { pair_key: string; team_name: string }) => {
+    pairNames[r.pair_key] = r.team_name;
+  });
+
+  return {
+    currentSession,
+    history: (hd.data?.value as SessionHistoryEntry[]) || [],
+    scores,
+    knownPlayers: ((kd.data as { name: string }[]) || []).map((r) => r.name),
+    pairNames,
+  };
+}
+
+export async function saveSessionState(state: SessionState): Promise<void> {
+  await supabase.from("app_state").upsert({
+    key: "current_session",
+    value: state,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+export async function clearSessionState(): Promise<void> {
+  await supabase.from("app_state").delete().eq("key", "current_session");
+}
+
+export async function saveHistory(history: SessionHistoryEntry[]): Promise<void> {
+  await supabase.from("app_state").upsert({
+    key: "session_history",
+    value: history,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+export async function savePairNames(pairNameMap: Record<string, string>): Promise<void> {
+  const rows = Object.entries(pairNameMap).map(([pair_key, team_name]) => ({
+    pair_key,
+    team_name,
+  }));
+  if (rows.length) await supabase.from("pair_names").upsert(rows);
+}
+
+export async function addKnownPlayers(names: string[], existing: string[]): Promise<string[]> {
+  const lowSet = new Set(existing.map((n) => n.toLowerCase()));
+  const newNames = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter(
+    (n) => !lowSet.has(n.toLowerCase())
+  );
+  if (newNames.length)
+    await supabase.from("known_players").upsert(newNames.map((n) => ({ name: n })));
+  return [...existing, ...newNames];
+}
+
+export async function upsertSessionScores(records: PlayerSessionScore[]): Promise<void> {
+  if (!records.length) return;
+  await supabase
+    .from("player_session_scores")
+    .upsert(records, { onConflict: "player_name,session_id" });
+}
+
+// Archive la session terminée : historique + points V-Champs.
+export async function archiveSession(
+  state: SessionState,
+  history: SessionHistoryEntry[],
+  scores: PlayerSessionScore[]
+): Promise<{ history: SessionHistoryEntry[]; scores: PlayerSessionScore[]; state: SessionState }> {
+  if (state.sessionArchivedAt) return { history, scores, state };
+  if (!state.sessionStarted || !state.matches.some((m) => m.status === "finished"))
+    return { history, scores, state };
+
+  const archivedAt = new Date().toISOString();
+  const newState = { ...state, sessionArchivedAt: archivedAt };
+  const entry: SessionHistoryEntry = {
+    date: archivedAt,
+    teams: JSON.parse(JSON.stringify(state.teams)),
+    matches: state.matches.filter((m) => m.status === "finished"),
+    label: (state.label as string) || "6/7",
+  };
+  const newHistory = [...history, entry];
+  await saveHistory(newHistory);
+
+  const records = computeSessionScores(entry, archivedAt, scores);
+  await upsertSessionScores(records);
+  const newScores = scores.filter((r) => r.session_id !== archivedAt).concat(records);
+
+  return { history: newHistory, scores: newScores, state: newState };
+}
+
+export async function resetAllScores(): Promise<void> {
+  await supabase.from("app_state").upsert({
+    key: "scores_reset_at",
+    value: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+}
+
+// ─── Profils ───
+
+export async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  return (data as Profile) || null;
+}
+
+export async function listProfiles(): Promise<Profile[]> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: false });
+  return (data as Profile[]) || [];
+}
+
+export async function updateProfile(id: string, patch: Partial<Profile>): Promise<void> {
+  const { error } = await supabase.from("profiles").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Tournois (table v2) ───
+
+export async function listTournaments(): Promise<Tournament[]> {
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("*")
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
+  if (error) throw error;
+  return (data as Tournament[]) || [];
+}
+
+export async function getTournament(id: string): Promise<Tournament | null> {
+  const { data } = await supabase.from("tournaments").select("*").eq("id", id).maybeSingle();
+  return (data as Tournament) || null;
+}
+
+export async function createTournament(
+  t: Pick<Tournament, "date" | "time" | "level" | "courts" | "capacity">
+): Promise<Tournament> {
+  const { data, error } = await supabase
+    .from("tournaments")
+    .insert({ ...t, status: "open" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Tournament;
+}
+
+export async function updateTournament(id: string, patch: Partial<Tournament>): Promise<void> {
+  const { error } = await supabase.from("tournaments").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTournament(id: string): Promise<void> {
+  const { error } = await supabase.from("tournaments").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Inscriptions ───
+
+export async function listRegistrations(tournamentId?: string): Promise<Registration[]> {
+  let q = supabase.from("registrations").select("*").order("created_at", { ascending: true });
+  if (tournamentId) q = q.eq("tournament_id", tournamentId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data as Registration[]) || [];
+}
+
+export async function requestRegistration(
+  tournamentId: string,
+  playerName: string,
+  profileId: string | null,
+  isGuest = false
+): Promise<Registration> {
+  const { data, error } = await supabase
+    .from("registrations")
+    .insert({
+      tournament_id: tournamentId,
+      profile_id: profileId,
+      player_name: playerName,
+      status: "pending",
+      is_guest: isGuest,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Registration;
+}
+
+export async function setRegistrationStatus(
+  id: string,
+  status: RegistrationStatus
+): Promise<void> {
+  const { error } = await supabase.from("registrations").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteRegistration(id: string): Promise<void> {
+  const { error } = await supabase.from("registrations").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Notifications (compatibles v1) ───
+
+export async function notifyNewUser(payload: Record<string, unknown>): Promise<void> {
+  await supabase.from("notifications").insert({ type: "new_user", payload });
+}
+
+export async function markUserNotificationRead(userId: string): Promise<void> {
+  await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("type", "new_user")
+    .filter("payload->>user_id", "eq", userId);
+}
