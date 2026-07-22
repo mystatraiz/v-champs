@@ -381,6 +381,7 @@ export interface StoredPushSub {
   endpoint: string;
   keys: { p256dh: string; auth: string };
   role?: string;
+  profileId?: string;
 }
 
 export async function getPushSubscriptions(): Promise<StoredPushSub[]> {

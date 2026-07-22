@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useAppData } from "@/lib/use-app-data";
 import { buildAllPlayerStats } from "@/lib/stats";
-import { Avatar, Badge, Btn, Card, DonutTriple, Loader, StatPill } from "@/components/ui";
+import { Avatar, Badge, Btn, Card, DonutTriple, Loader, SectionTitle, StatPill } from "@/components/ui";
 import { PlayerSheet } from "@/components/PlayerSheet";
+import { NotifToggle } from "@/components/NotifToggle";
 
 export default function PlayerProfil() {
   const { profile } = useAuth();
@@ -93,6 +94,15 @@ export default function PlayerProfil() {
           l&apos;administrateur.
         </Card>
       )}
+
+      <div>
+        <SectionTitle>🔔 Notifications</SectionTitle>
+        <NotifToggle
+          role="player"
+          profileId={profile.id}
+          intro="Sois prévenu(e) quand ton compte est validé et quand ta place à un tournoi est confirmée."
+        />
+      </div>
 
       <PlayerSheet
         data={data}

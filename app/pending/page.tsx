@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Btn, Card } from "@/components/ui";
+import { NotifToggle } from "@/components/NotifToggle";
 
 export default function PendingPage() {
   const { user, profile, loading, signOut, refreshProfile } = useAuth();
@@ -44,6 +45,16 @@ export default function PendingPage() {
             </Btn>
           </div>
         </Card>
+
+        {profile && (
+          <div className="mt-4 text-left">
+            <NotifToggle
+              role="player"
+              profileId={profile.id}
+              intro="Active les notifications pour être prévenu(e) dès que ton compte est validé — sans avoir à revenir vérifier."
+            />
+          </div>
+        )}
       </div>
     </main>
   );

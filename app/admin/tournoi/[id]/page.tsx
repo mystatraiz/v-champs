@@ -14,6 +14,7 @@ import {
   setRegistrationStatus,
   updateTournament,
 } from "@/lib/store";
+import { notifyPlayer } from "@/lib/push";
 import { emptyTeam, normalizeName, pairKey } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
 import type { AppData } from "@/lib/store";
@@ -214,6 +215,12 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                     variant="success"
                     onClick={async () => {
                       await setRegistrationStatus(r.id, "approved");
+                      if (r.profile_id)
+                        notifyPlayer(
+                          r.profile_id,
+                          "Inscription confirmée ✅",
+                          `Ta place au tournoi du ${formatDateLong(tournament.date)} (${tournament.time}) est confirmée !`
+                        );
                       reload();
                     }}
                   >
@@ -242,6 +249,12 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                     variant="secondary"
                     onClick={async () => {
                       await setRegistrationStatus(r.id, "approved");
+                      if (r.profile_id)
+                        notifyPlayer(
+                          r.profile_id,
+                          "Inscription confirmée ✅",
+                          `Ta place au tournoi du ${formatDateLong(tournament.date)} (${tournament.time}) est confirmée !`
+                        );
                       reload();
                     }}
                   >

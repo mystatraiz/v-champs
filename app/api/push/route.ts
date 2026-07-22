@@ -24,27 +24,20 @@ interface StoredSub {
   endpoint: string;
   keys: { p256dh: string; auth: string };
   role?: string;
+  profileId?: string;
+}
+
+interface Body {
+  type?: string;
+  name?: string;
+  profileId?: string;
+  title?: string;
+  body?: string;
 }
 
 export async function POST(req: Request) {
   const db = createClient(SUPA_URL, SUPA_KEY);
-  const body = await req.json().catch(() => ({}) as { type?: string; name?: string });
-  const type = body.type === "account" ? "account" : "registration";
-
-  // Nombre réel d'actions en attente (sert au badge + évite d'envoyer dans le vide)
-  const [regsRes, accsRes] = await Promise.all([
-    db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
-    db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
-  ]);
-  const total = (regsRes.count || 0) + (accsRes.count || 0);
-
-  const title =
-    type === "account" ? "Nouveau compte à valider" : "Nouvelle demande d'inscription";
-  const text = body.name
-    ? String(body.name).slice(0, 60)
-    : type === "account"
-      ? "Un joueur attend la validation de son compte."
-      : "Un joueur veut rejoindre une partie.";
+  const body = (await req.json().catch(() => ({}))) as Body;
 
   const { data } = await db
     .from("app_state")
@@ -53,32 +46,61 @@ export async function POST(req: Request) {
     .maybeSingle();
   const subs = ((data?.value as StoredSub[]) || []).filter((s) => s && s.endpoint);
 
-  const payload = JSON.stringify({ title, body: text, count: total, url: "/admin" });
-  const alive: StoredSub[] = [];
+  let targets: StoredSub[];
+  let payloadObj: { title: string; body: string; url: string; count?: number };
+
+  if (body.type === "player") {
+    // Notification adressée à un joueur précis (tous ses appareils).
+    const pid = String(body.profileId || "");
+    if (!pid) return NextResponse.json({ sent: 0 });
+    targets = subs.filter((s) => s.profileId === pid);
+    payloadObj = {
+      title: (body.title || "V-Champs").slice(0, 80),
+      body: (body.body || "").slice(0, 160),
+      url: "/player",
+    };
+  } else {
+    // Broadcast aux admins/organisateurs (jamais aux joueurs).
+    const type = body.type === "account" ? "account" : "registration";
+    const [regsRes, accsRes] = await Promise.all([
+      db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
+    ]);
+    const total = (regsRes.count || 0) + (accsRes.count || 0);
+    targets = subs.filter((s) => s.role !== "player");
+    payloadObj = {
+      title: type === "account" ? "Nouveau compte à valider" : "Nouvelle demande d'inscription",
+      body: body.name
+        ? String(body.name).slice(0, 60)
+        : type === "account"
+          ? "Un joueur attend la validation de son compte."
+          : "Un joueur veut rejoindre une partie.",
+      count: total,
+      url: "/admin",
+    };
+  }
+
+  const payload = JSON.stringify(payloadObj);
+  const dead = new Set<string>();
 
   await Promise.all(
-    subs.map(async (s) => {
+    targets.map(async (s) => {
       try {
-        await webpush.sendNotification(
-          { endpoint: s.endpoint, keys: s.keys },
-          payload
-        );
-        alive.push(s);
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, payload);
       } catch (e) {
         const code = (e as { statusCode?: number })?.statusCode;
-        // 404/410 = abonnement expiré → on le retire ; sinon on le garde
-        if (code !== 404 && code !== 410) alive.push(s);
+        if (code === 404 || code === 410) dead.add(s.endpoint); // abonnement expiré
       }
     })
   );
 
-  if (alive.length !== subs.length) {
+  if (dead.size) {
     await db.from("app_state").upsert({
       key: "push_subscriptions",
-      value: alive,
+      value: subs.filter((s) => !dead.has(s.endpoint)),
       updated_at: new Date().toISOString(),
     });
   }
 
-  return NextResponse.json({ sent: alive.length, total });
+  return NextResponse.json({ sent: targets.length - dead.size });
 }

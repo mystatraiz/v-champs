@@ -30,8 +30,11 @@ export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
   }
 }
 
-// Abonne l'appareil courant aux notifications push (admin/organisateur).
-export async function subscribeAdminPush(role?: string): Promise<boolean> {
+// Abonne l'appareil courant aux notifications push. On rattache le rôle et,
+// pour un joueur, son identifiant de compte (pour un ciblage individuel).
+export async function subscribePush(
+  opts: { role?: string; profileId?: string } = {}
+): Promise<boolean> {
   if (!pushSupported()) return false;
   if (Notification.permission !== "granted") {
     const p = await Notification.requestPermission();
@@ -53,13 +56,18 @@ export async function subscribeAdminPush(role?: string): Promise<boolean> {
     await savePushSubscription({
       endpoint: sub.endpoint,
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-      role,
+      role: opts.role,
+      profileId: opts.profileId,
     });
     return true;
   } catch {
     return false;
   }
 }
+
+// Raccourcis
+export const subscribeAdminPush = (role?: string) => subscribePush({ role });
+export const subscribePlayerPush = (profileId: string) => subscribePush({ role: "player", profileId });
 
 // Prévient les admins abonnés (appelé après une inscription ou un nouveau compte).
 export async function notifyAdmins(
@@ -75,5 +83,23 @@ export async function notifyAdmins(
     });
   } catch {
     /* l'envoi de notification ne doit jamais bloquer l'action utilisateur */
+  }
+}
+
+// Prévient un joueur précis sur ses appareils abonnés.
+export async function notifyPlayer(
+  profileId: string,
+  title: string,
+  body: string
+): Promise<void> {
+  try {
+    await fetch("/api/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "player", profileId, title, body }),
+      keepalive: true,
+    });
+  } catch {
+    /* non bloquant */
   }
 }

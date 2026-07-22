@@ -13,7 +13,7 @@ import { useAppData } from "@/lib/use-app-data";
 import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
-import { pushSupported, subscribeAdminPush } from "@/lib/push";
+import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import type { Profile, Role } from "@/lib/types";
 import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
 
@@ -313,6 +313,13 @@ function PendingCard({
         linked_player_name: role === "player" ? linked || p.nickname : null,
       });
       await markUserNotificationRead(p.id);
+      notifyPlayer(
+        p.id,
+        "Compte validé 🎾",
+        role === "player"
+          ? "Ton compte est activé ! Tes statistiques et le classement V-Champs sont disponibles."
+          : "Ton compte est activé, bienvenue sur V-Champs !"
+      );
       onValidated();
     } finally {
       setBusy(false);
