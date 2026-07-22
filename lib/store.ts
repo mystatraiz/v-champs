@@ -357,6 +357,24 @@ export async function deleteRegistration(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Compteurs pour les pastilles de notification (admin) ───
+
+export async function countPendingRegistrations(): Promise<number> {
+  const { count } = await supabase
+    .from("registrations")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
+  return count || 0;
+}
+
+export async function countPendingProfiles(): Promise<number> {
+  const { count } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true })
+    .eq("role", "pending");
+  return count || 0;
+}
+
 // ─── Notifications (compatibles v1) ───
 
 export async function notifyNewUser(payload: Record<string, unknown>): Promise<void> {

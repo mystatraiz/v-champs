@@ -1,16 +1,45 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { countPendingProfiles, countPendingRegistrations } from "@/lib/store";
 import { Loader } from "@/components/ui";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+
+  // Compteurs des pastilles (demandes d'inscription + comptes à valider).
+  const [pendingRegs, setPendingRegs] = useState(0);
+  const [pendingAccounts, setPendingAccounts] = useState(0);
+
+  const isReady = !loading && !!profile && (profile.role === "admin" || profile.role === "organisateur");
+  const canModerate = profile?.role === "admin";
+
+  const refreshBadges = useCallback(async () => {
+    if (!isReady) return;
+    try {
+      const [regs, accs] = await Promise.all([
+        countPendingRegistrations(),
+        canModerate ? countPendingProfiles() : Promise.resolve(0),
+      ]);
+      setPendingRegs(regs);
+      setPendingAccounts(accs);
+    } catch {
+      /* silencieux : les pastilles ne doivent jamais casser la navigation */
+    }
+  }, [isReady, canModerate]);
+
+  // Rafraîchit à chaque changement d'onglet + toutes les 45 s.
+  useEffect(() => {
+    refreshBadges();
+    const iv = setInterval(refreshBadges, 45000);
+    return () => clearInterval(iv);
+  }, [refreshBadges, pathname]);
 
   useEffect(() => {
     if (loading) return;
@@ -29,11 +58,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const isAdmin = profile.role === "admin";
-  const tabs = [
-    { href: "/admin", label: "Tournois", icon: "🎾" },
+  const tabs: { href: string; label: string; icon: string; badge?: number }[] = [
+    { href: "/admin", label: "Tournois", icon: "🎾", badge: pendingRegs },
     { href: "/admin/classement", label: "Classement", icon: "🏆" },
     { href: "/admin/reglement", label: "Règlement", icon: "📖" },
-    ...(isAdmin ? [{ href: "/admin/joueurs", label: "Réglages", icon: "⚙️" }] : []),
+    ...(isAdmin
+      ? [{ href: "/admin/joueurs", label: "Réglages", icon: "⚙️", badge: pendingAccounts }]
+      : []),
   ];
 
   return (
@@ -76,11 +107,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={t.href}
                 href={t.href}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                className={`relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                   active ? "text-gold" : "text-mut hover:text-sub"
                 }`}
               >
-                <span className="text-lg leading-none">{t.icon}</span>
+                <span className="relative text-lg leading-none">
+                  {t.icon}
+                  {!!t.badge && t.badge > 0 && (
+                    <span className="absolute -right-3 -top-1.5 inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold leading-none text-white ring-2 ring-ink">
+                      {t.badge > 99 ? "99+" : t.badge}
+                    </span>
+                  )}
+                </span>
                 {t.label}
               </Link>
             );
