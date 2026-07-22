@@ -25,8 +25,25 @@ export function PlayerSheet({
     try {
       const all = buildAllPlayerStats(data.history, data.currentSession);
       const key = playerName.toLowerCase().trim();
-      const match = Object.keys(all).find((k) => k.toLowerCase().trim() === key);
-      return match ? all[match] : null;
+      // Fusionne TOUTES les variantes de casse/orthographe du nom (ex. « Fred V »
+      // et « Fred v ») comme le fait le classement, pour ne rater aucune session.
+      const keys = Object.keys(all).filter((k) => k.toLowerCase().trim() === key);
+      if (!keys.length) return null;
+      return keys.reduce(
+        (acc, k) => {
+          const s = all[k];
+          return {
+            wins: acc.wins + s.wins,
+            losses: acc.losses + s.losses,
+            draws: acc.draws + s.draws,
+            jFor: acc.jFor + s.jFor,
+            jAgainst: acc.jAgainst + s.jAgainst,
+            played: acc.played + s.played,
+            teamNames: [...new Set([...acc.teamNames, ...s.teamNames])],
+          };
+        },
+        { wins: 0, losses: 0, draws: 0, jFor: 0, jAgainst: 0, played: 0, teamNames: [] as string[] }
+      );
     } catch {
       return null;
     }
@@ -37,8 +54,21 @@ export function PlayerSheet({
     try {
       const all = computeAllSideStats(data.history, data.currentSession);
       const key = playerName.toLowerCase().trim();
-      const match = Object.keys(all).find((k) => k.toLowerCase().trim() === key);
-      return match ? all[match] : null;
+      const keys = Object.keys(all).filter((k) => k.toLowerCase().trim() === key);
+      if (!keys.length) return null;
+      return keys.reduce(
+        (acc, k) => ({
+          gauche: {
+            wins: acc.gauche.wins + all[k].gauche.wins,
+            played: acc.gauche.played + all[k].gauche.played,
+          },
+          droite: {
+            wins: acc.droite.wins + all[k].droite.wins,
+            played: acc.droite.played + all[k].droite.played,
+          },
+        }),
+        { gauche: { wins: 0, played: 0 }, droite: { wins: 0, played: 0 } }
+      );
     } catch {
       return null;
     }
