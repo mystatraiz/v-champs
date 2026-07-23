@@ -1,6 +1,6 @@
 // ─── Domain types ────────────────────────────────────────────────────────────
 
-export type LevelLabel = "4/5" | "5/6" | "6/7" | "7/8";
+export type LevelLabel = "3/4" | "4/5" | "5/6" | "6/7" | "7/8" | "8/9" | "9/10";
 
 export type Role = "pending" | "player" | "organisateur" | "admin";
 

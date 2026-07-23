@@ -30,7 +30,7 @@ deux applications. Vous pouvez donc utiliser la v1 et la v2 en parallèle et cho
   liaison compte ↔ joueur, remise à zéro du classement
 
 ### Système V-Champs (identique à la v1)
-- Barème par position (100/75/50/25) × multiplicateur de niveau (4/5 ×0.5 → 7/8 ×1.5)
+- Barème par position (100/75/50/25) × multiplicateur de niveau (3/4 ×0.35 → 6/7 ×1.0 → 9/10 ×2.5)
 - Coefficient d'ajustement selon la force des adversaires (×0.80 → ×1.20)
 - 8 meilleures performances sur 180 jours, statut actif à partir de 4 sessions
 

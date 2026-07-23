@@ -1,8 +1,8 @@
 import type { LevelLabel } from "./types";
 
-export const LEVEL_LABELS: LevelLabel[] = ["4/5", "5/6", "6/7", "7/8"];
+export const LEVEL_LABELS: LevelLabel[] = ["3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "9/10"];
 
-export const PLAYER_LEVELS = [4, 5, 6, 7, 8];
+export const PLAYER_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // Un tournoi « 6/7 » comprend les joueurs de niveau 6 et 7.
 export function levelsOfLabel(label: string): number[] {
@@ -17,10 +17,13 @@ export function labelIncludesPlayer(label: string, playerLevel: number | null): 
 }
 
 export const LEVEL_MULTIPLIER: Record<string, number> = {
+  "3/4": 0.35,
   "4/5": 0.5,
   "5/6": 0.75,
   "6/7": 1,
   "7/8": 1.5,
+  "8/9": 2,
+  "9/10": 2.5,
 };
 
 export function getLevelMultiplier(label?: string): number {
