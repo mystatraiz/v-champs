@@ -5,11 +5,14 @@ import { useAppData } from "@/lib/use-app-data";
 import { buildTeamStats } from "@/lib/stats";
 import { formatDateShort } from "@/lib/format";
 import { RankingBoard } from "@/components/RankingBoard";
+import { SessionSheet } from "@/components/SessionSheet";
 import { Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
+import type { SessionHistoryEntry } from "@/lib/types";
 
 export default function AdminClassement() {
   const { data, loading } = useAppData();
   const [tab, setTab] = useState<"vchamps" | "equipes" | "sessions">("vchamps");
+  const [openSession, setOpenSession] = useState<SessionHistoryEntry | null>(null);
 
   const teamStats = useMemo(
     () => (data ? buildTeamStats(data.history, data.currentSession) : []),
@@ -117,14 +120,15 @@ export default function AdminClassement() {
                     b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst)
                 )[0];
                 return (
-                  <div
+                  <button
                     key={s.date}
-                    className={`flex items-center gap-3 px-4 py-3 text-sm ${
+                    onClick={() => setOpenSession(s)}
+                    className={`flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-card2 ${
                       i < arr.length - 1 ? "border-b border-line/60" : ""
                     }`}
                   >
-                    <span className="w-16 text-xs text-mut">{formatDateShort(s.date)}</span>
-                    <span className="rounded bg-card2 px-1.5 py-0.5 text-[10px] font-bold text-sub">
+                    <span className="w-16 shrink-0 text-xs text-mut">{formatDateShort(s.date)}</span>
+                    <span className="shrink-0 rounded bg-card2 px-1.5 py-0.5 text-[10px] font-bold text-sub">
                       {s.label || "6/7"}
                     </span>
                     <span className="flex-1 truncate">
@@ -133,14 +137,21 @@ export default function AdminClassement() {
                         {winner?.players.filter(Boolean).join(" / ")}
                       </span>
                     </span>
-                    <span className="text-[11px] text-mut">{s.matches.length} matchs</span>
-                  </div>
+                    <span className="shrink-0 text-[11px] text-mut">{s.matches.length} matchs</span>
+                    <span className="shrink-0 text-mut">›</span>
+                  </button>
                 );
               })}
             </Card>
           )}
         </div>
       )}
+
+      <SessionSheet
+        entry={openSession}
+        scores={data.scores}
+        onClose={() => setOpenSession(null)}
+      />
     </div>
   );
 }
