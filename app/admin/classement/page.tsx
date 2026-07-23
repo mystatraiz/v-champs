@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useAppData } from "@/lib/use-app-data";
 import { buildTeamStats } from "@/lib/stats";
-import { formatDateShort } from "@/lib/format";
+import { formatDateShort, teamLabel } from "@/lib/format";
 import { RankingBoard } from "@/components/RankingBoard";
 import { SessionSheet } from "@/components/SessionSheet";
 import { Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
@@ -71,14 +71,15 @@ export default function AdminClassement() {
                   <tbody>
                     {teamStats.map((t, i) => {
                       const diff = t.jFor - t.jAgainst;
+                      const players = t.players.filter(Boolean).join(" / ");
                       return (
-                        <tr key={t.name} className="border-b border-line/50 last:border-0">
+                        <tr key={t.name + i} className="border-b border-line/50 last:border-0">
                           <td className="px-3 py-2.5 font-extrabold text-gold">{i + 1}</td>
                           <td className="px-2 py-2.5">
                             <span className="font-bold text-body">{t.name}</span>
-                            <div className="text-[11px] text-mut">
-                              {t.players.filter(Boolean).join(" / ")}
-                            </div>
+                            {t.name !== players && players && (
+                              <div className="text-[11px] text-mut">{players}</div>
+                            )}
                           </td>
                           <td className="px-2 py-2.5 text-sub">{t.played}</td>
                           <td className="px-2 py-2.5 text-ok">{t.wins}</td>
@@ -132,9 +133,9 @@ export default function AdminClassement() {
                       {s.label || "6/7"}
                     </span>
                     <span className="flex-1 truncate">
-                      🏆 <span className="font-bold text-gold">{winner?.name}</span>{" "}
-                      <span className="text-[11px] text-mut">
-                        {winner?.players.filter(Boolean).join(" / ")}
+                      🏆{" "}
+                      <span className="font-bold text-gold">
+                        {winner ? teamLabel(winner.name, winner.players) : ""}
                       </span>
                     </span>
                     <span className="shrink-0 text-[11px] text-mut">{s.matches.length} matchs</span>

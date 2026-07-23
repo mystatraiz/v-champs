@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { rankTeamsInSession } from "@/lib/scoring";
-import { formatDateLong } from "@/lib/format";
+import { formatDateLong, teamLabel } from "@/lib/format";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
 import { Badge, Modal, SectionTitle } from "./ui";
 
@@ -69,14 +69,16 @@ export function SessionSheet({
           <tbody>
             {ranked.map((t, i) => {
               const diff = (t.pointsFor || 0) - (t.pointsAgainst || 0);
+              const players = (t.players || []).filter(Boolean).join(" / ");
+              const label = teamLabel(t.name, t.players);
               return (
                 <tr key={t.id} className="border-b border-line/50 last:border-0">
                   <td className="px-3 py-2 font-extrabold text-gold">{i + 1}</td>
                   <td className="px-2 py-2">
-                    <span className="font-bold text-body">{t.name}</span>
-                    <div className="text-[11px] text-mut">
-                      {(t.players || []).filter(Boolean).join(" / ")}
-                    </div>
+                    <span className="font-bold text-body">{label}</span>
+                    {label !== players && players && (
+                      <div className="text-[11px] text-mut">{players}</div>
+                    )}
                   </td>
                   <td className="px-2 py-2 font-extrabold">{(t.wins || 0) * 3 + (t.draws || 0)}</td>
                   <td className="px-2 py-2 text-ok">{t.wins || 0}</td>

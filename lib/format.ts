@@ -19,6 +19,18 @@ export function positionLabel(pos: number): string {
   return pos === 1 ? "1er" : `${pos}e`;
 }
 
+// Un nom d'équipe « Équipe 1 », « Équipe 2 »… est un libellé par défaut.
+export function isGenericTeamName(name?: string): boolean {
+  return !name || /^équipe\s*\d+$/i.test(name.trim());
+}
+
+// Libellé d'affichage d'une équipe : les noms des joueurs si l'équipe n'a pas
+// de nom personnalisé, sinon le nom personnalisé.
+export function teamLabel(name: string | undefined, players: (string | undefined)[]): string {
+  const p = (players || []).filter(Boolean).join(" / ");
+  return isGenericTeamName(name) ? p || name || "" : (name as string);
+}
+
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;

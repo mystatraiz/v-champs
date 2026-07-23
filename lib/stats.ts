@@ -5,6 +5,7 @@ import type {
   SessionState,
   Team,
 } from "./types";
+import { isGenericTeamName, teamLabel } from "./format";
 
 interface SessionLike {
   teams: Team[];
@@ -98,10 +99,16 @@ export function buildTeamStats(
           [t2, m.score2, m.score1, sa1, sf1],
         ] as [Team, number, number, number, number][]
       ).forEach(([team, sw, sl, sf, sa]) => {
-        const key = team.name;
+        const players = (team.players || []).filter((p) => p && p.trim());
+        // Clé = paire de joueurs (pour agréger le même duo entre sessions) ;
+        // repli sur le nom si aucun joueur renseigné.
+        const key =
+          players.length > 0
+            ? players.map((p) => p.toLowerCase().trim()).sort().join("|")
+            : team.name;
         if (!allTeams[key])
           allTeams[key] = {
-            name: key,
+            name: teamLabel(team.name, team.players),
             players: [...(team.players || [])],
             wins: 0,
             losses: 0,
@@ -110,6 +117,10 @@ export function buildTeamStats(
             jAgainst: 0,
             played: 0,
           };
+        // Si un nom personnalisé apparaît dans une session, on le préfère.
+        if (isGenericTeamName(allTeams[key].name) && !isGenericTeamName(team.name)) {
+          allTeams[key].name = team.name;
+        }
         allTeams[key].played++;
         allTeams[key].jFor += sf;
         allTeams[key].jAgainst += sa;
