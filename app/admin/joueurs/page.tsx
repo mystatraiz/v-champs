@@ -14,8 +14,41 @@ import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
+import { isTestMode, setTestMode } from "@/lib/test-mode";
+import { isOwner } from "@/lib/owner";
 import type { Profile, Role } from "@/lib/types";
 import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
+
+// Encart : mode test (bac à sable) — réservé au propriétaire.
+function TestModeCard() {
+  const [on, setOn] = useState(false);
+  useEffect(() => setOn(isTestMode()), []);
+
+  function toggle() {
+    setTestMode(!on);
+    // Rechargement : toutes les données rebasculent sur le bon espace.
+    window.location.reload();
+  }
+
+  return (
+    <Card tone={on ? "gold" : "default"} className="p-4">
+      <p className="mb-3 text-xs leading-5 text-sub">
+        Le mode test est un <b className="text-body">bac à sable</b> : tu peux créer et lancer des
+        tournois pour t&apos;entraîner, <b className="text-body">sans toucher aux vraies données</b>
+        {" "}(classement, historique). Les joueurs ne voient rien et aucune notification n&apos;est
+        envoyée. Actif uniquement sur cet appareil.
+      </p>
+      {on && (
+        <p className="mb-3 rounded-lg bg-gold/10 px-3 py-2 text-xs font-bold text-gold">
+          🧪 Mode test ACTIVÉ — tu manipules des données de test.
+        </p>
+      )}
+      <Btn variant={on ? "danger" : "primary"} size="lg" onClick={toggle}>
+        {on ? "Revenir aux vraies données" : "🧪 Activer le mode test"}
+      </Btn>
+    </Card>
+  );
+}
 
 // Encart : notifications push + badge sur l'icône de l'écran d'accueil.
 function BadgeSettings({ role }: { role: string }) {
@@ -390,7 +423,7 @@ function PendingCard({
 }
 
 export default function AdminJoueurs() {
-  const { profile: me } = useAuth();
+  const { profile: me, user } = useAuth();
   const { data, reload: reloadData } = useAppData();
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -417,6 +450,13 @@ export default function AdminJoueurs() {
 
   return (
     <div className="fade-up space-y-6">
+      {isOwner(user?.email) && (
+        <div>
+          <SectionTitle>🧪 Mode test</SectionTitle>
+          <TestModeCard />
+        </div>
+      )}
+
       <div>
         <SectionTitle>🔔 Notifications</SectionTitle>
         <BadgeSettings role={me?.role || "admin"} />

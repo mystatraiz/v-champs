@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { isOwner } from "@/lib/owner";
+import { TestModeBanner } from "@/components/TestModeBanner";
 import { Btn, Loader, Modal } from "@/components/ui";
 
 // Message de bienvenue affiché une seule fois quand le compte vient d'être lié
@@ -90,6 +91,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-2xl flex-col">
+      <TestModeBanner />
       <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-line bg-ink/90 px-4 py-3 backdrop-blur">
         <Image src="/logo.png" alt="" width={34} height={34} />
         <div className="flex-1">

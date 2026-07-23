@@ -1,6 +1,7 @@
 // ═══ Accès données Supabase — clés et formats identiques à la v1 ═══
 import { supabase } from "./supabase";
 import { computeSessionScores } from "./scoring";
+import { isTestMode, nsKey } from "./test-mode";
 import type {
   PlayerSessionScore,
   Profile,
@@ -10,6 +11,22 @@ import type {
   SessionState,
   Tournament,
 } from "./types";
+
+// ─── Helpers app_state (stockage JSON générique) ───
+async function readJsonKey<T>(key: string): Promise<T[]> {
+  const { data } = await supabase.from("app_state").select("value").eq("key", key).maybeSingle();
+  return (data?.value as T[]) || [];
+}
+async function writeJsonKey<T>(key: string, value: T[]): Promise<void> {
+  await supabase.from("app_state").upsert({ key, value, updated_at: new Date().toISOString() });
+}
+function newId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return "id_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+}
 
 // ─── Données historiques partagées avec la v1 ───
 
@@ -22,20 +39,23 @@ export interface AppData {
 }
 
 export async function loadAppData(): Promise<AppData> {
-  const [sd, hd, rsd, pd, kd, psd] = await Promise.all([
-    supabase.from("app_state").select("value").eq("key", "current_session").maybeSingle(),
-    supabase.from("app_state").select("value").eq("key", "session_history").maybeSingle(),
-    supabase.from("app_state").select("value").eq("key", "scores_reset_at").maybeSingle(),
+  const testMode = isTestMode();
+  const [sd, hd, rsd, pd, kd] = await Promise.all([
+    supabase.from("app_state").select("value").eq("key", nsKey("current_session")).maybeSingle(),
+    supabase.from("app_state").select("value").eq("key", nsKey("session_history")).maybeSingle(),
+    supabase.from("app_state").select("value").eq("key", nsKey("scores_reset_at")).maybeSingle(),
     supabase.from("pair_names").select("pair_key,team_name"),
     supabase.from("known_players").select("name"),
-    supabase.from("player_session_scores").select("*"),
   ]);
 
   const currentSession = (sd.data?.value as SessionState) || null;
   if (currentSession && !currentSession.pairNameMap) currentSession.pairNameMap = {};
 
   const resetAt = rsd.data?.value ? new Date(rsd.data.value as string).getTime() : 0;
-  const rawScores = (psd.data as PlayerSessionScore[]) || [];
+  // En mode test, les scores vivent dans une clé JSON dédiée ; sinon la table.
+  const rawScores = testMode
+    ? await readJsonKey<PlayerSessionScore>("test_player_session_scores")
+    : ((await supabase.from("player_session_scores").select("*")).data as PlayerSessionScore[]) || [];
   const scores = resetAt
     ? rawScores.filter((r) => new Date(r.created_at).getTime() > resetAt)
     : rawScores;
@@ -56,25 +76,26 @@ export async function loadAppData(): Promise<AppData> {
 
 export async function saveSessionState(state: SessionState): Promise<void> {
   await supabase.from("app_state").upsert({
-    key: "current_session",
+    key: nsKey("current_session"),
     value: state,
     updated_at: new Date().toISOString(),
   });
 }
 
 export async function clearSessionState(): Promise<void> {
-  await supabase.from("app_state").delete().eq("key", "current_session");
+  await supabase.from("app_state").delete().eq("key", nsKey("current_session"));
 }
 
 export async function saveHistory(history: SessionHistoryEntry[]): Promise<void> {
   await supabase.from("app_state").upsert({
-    key: "session_history",
+    key: nsKey("session_history"),
     value: history,
     updated_at: new Date().toISOString(),
   });
 }
 
 export async function savePairNames(pairNameMap: Record<string, string>): Promise<void> {
+  if (isTestMode()) return; // pas d'écriture réelle en mode test
   const rows = Object.entries(pairNameMap).map(([pair_key, team_name]) => ({
     pair_key,
     team_name,
@@ -87,13 +108,21 @@ export async function addKnownPlayers(names: string[], existing: string[]): Prom
   const newNames = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter(
     (n) => !lowSet.has(n.toLowerCase())
   );
-  if (newNames.length)
+  // En mode test on n'écrit pas dans la liste réelle (mais on renvoie la fusion).
+  if (newNames.length && !isTestMode())
     await supabase.from("known_players").upsert(newNames.map((n) => ({ name: n })));
   return [...existing, ...newNames];
 }
 
 export async function upsertSessionScores(records: PlayerSessionScore[]): Promise<void> {
   if (!records.length) return;
+  if (isTestMode()) {
+    const existing = await readJsonKey<PlayerSessionScore>("test_player_session_scores");
+    const ids = new Set(records.map((r) => `${r.player_name}|${r.session_id}`));
+    const merged = existing.filter((r) => !ids.has(`${r.player_name}|${r.session_id}`)).concat(records);
+    await writeJsonKey("test_player_session_scores", merged);
+    return;
+  }
   await supabase
     .from("player_session_scores")
     .upsert(records, { onConflict: "player_name,session_id" });
@@ -129,7 +158,7 @@ export async function archiveSession(
 
 export async function resetAllScores(): Promise<void> {
   await supabase.from("app_state").upsert({
-    key: "scores_reset_at",
+    key: nsKey("scores_reset_at"),
     value: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -274,9 +303,16 @@ export async function renamePlayer(
   return result;
 }
 
-// ─── Tournois (table v2) ───
+// ─── Tournois ───
+// En mode test : stockés dans app_state (clé « test_tournaments »). Sinon : table.
+const TEST_TOURN = "test_tournaments";
+const TEST_REG = "test_registrations";
 
 export async function listTournaments(): Promise<Tournament[]> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Tournament>(TEST_TOURN);
+    return arr.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  }
   const { data, error } = await supabase
     .from("tournaments")
     .select("*")
@@ -287,6 +323,10 @@ export async function listTournaments(): Promise<Tournament[]> {
 }
 
 export async function getTournament(id: string): Promise<Tournament | null> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Tournament>(TEST_TOURN);
+    return arr.find((t) => t.id === id) || null;
+  }
   const { data } = await supabase.from("tournaments").select("*").eq("id", id).maybeSingle();
   return (data as Tournament) || null;
 }
@@ -294,6 +334,18 @@ export async function getTournament(id: string): Promise<Tournament | null> {
 export async function createTournament(
   t: Pick<Tournament, "date" | "time" | "level" | "courts" | "capacity">
 ): Promise<Tournament> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Tournament>(TEST_TOURN);
+    const created: Tournament = {
+      id: newId(),
+      ...t,
+      status: "open",
+      teams: null,
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_TOURN, [...arr, created]);
+    return created;
+  }
   const { data, error } = await supabase
     .from("tournaments")
     .insert({ ...t, status: "open" })
@@ -304,11 +356,27 @@ export async function createTournament(
 }
 
 export async function updateTournament(id: string, patch: Partial<Tournament>): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Tournament>(TEST_TOURN);
+    await writeJsonKey(
+      TEST_TOURN,
+      arr.map((t) => (t.id === id ? { ...t, ...patch } : t))
+    );
+    return;
+  }
   const { error } = await supabase.from("tournaments").update(patch).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteTournament(id: string): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Tournament>(TEST_TOURN);
+    await writeJsonKey(
+      TEST_TOURN,
+      arr.filter((t) => t.id !== id)
+    );
+    return;
+  }
   const { error } = await supabase.from("tournaments").delete().eq("id", id);
   if (error) throw error;
 }
@@ -316,6 +384,12 @@ export async function deleteTournament(id: string): Promise<void> {
 // ─── Inscriptions ───
 
 export async function listRegistrations(tournamentId?: string): Promise<Registration[]> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    return (tournamentId ? arr.filter((r) => r.tournament_id === tournamentId) : arr).sort((a, b) =>
+      (a.created_at || "").localeCompare(b.created_at || "")
+    );
+  }
   let q = supabase.from("registrations").select("*").order("created_at", { ascending: true });
   if (tournamentId) q = q.eq("tournament_id", tournamentId);
   const { data, error } = await q;
@@ -329,6 +403,20 @@ export async function requestRegistration(
   profileId: string | null,
   isGuest = false
 ): Promise<Registration> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    const created: Registration = {
+      id: newId(),
+      tournament_id: tournamentId,
+      profile_id: profileId,
+      player_name: playerName,
+      status: "pending",
+      is_guest: isGuest,
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_REG, [...arr, created]);
+    return created;
+  }
   const { data, error } = await supabase
     .from("registrations")
     .insert({
@@ -348,11 +436,27 @@ export async function setRegistrationStatus(
   id: string,
   status: RegistrationStatus
 ): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    await writeJsonKey(
+      TEST_REG,
+      arr.map((r) => (r.id === id ? { ...r, status } : r))
+    );
+    return;
+  }
   const { error } = await supabase.from("registrations").update({ status }).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteRegistration(id: string): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    await writeJsonKey(
+      TEST_REG,
+      arr.filter((r) => r.id !== id)
+    );
+    return;
+  }
   const { error } = await supabase.from("registrations").delete().eq("id", id);
   if (error) throw error;
 }
@@ -360,6 +464,10 @@ export async function deleteRegistration(id: string): Promise<void> {
 // ─── Compteurs pour les pastilles de notification (admin) ───
 
 export async function countPendingRegistrations(): Promise<number> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    return arr.filter((r) => r.status === "pending").length;
+  }
   const { count } = await supabase
     .from("registrations")
     .select("*", { count: "exact", head: true })

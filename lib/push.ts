@@ -2,6 +2,7 @@
 
 import { VAPID_PUBLIC_KEY } from "./push-config";
 import { savePushSubscription } from "./store";
+import { isTestMode } from "./test-mode";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -71,6 +72,7 @@ export const subscribePlayerPush = (profileId: string) => subscribePush({ role: 
 
 // Envoi générique vers la route serveur (jamais bloquant).
 async function post(payload: Record<string, unknown>): Promise<void> {
+  if (isTestMode()) return; // aucune notification réelle en mode test
   try {
     await fetch("/api/push", {
       method: "POST",
