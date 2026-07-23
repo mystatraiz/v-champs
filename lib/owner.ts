@@ -3,9 +3,8 @@
 // - Connexion par téléphone → email interne "<chiffres>@vchamps.club"
 // - Connexion Google (comptes v1) → email Google
 export const OWNER_IDENTIFIERS: string[] = [
-  "verger.alexandre@gmail.com",
-  // Ajouter ici l'email de connexion téléphone si besoin, ex :
-  // "0612345678@vchamps.club",
+  "0643490537@vchamps.club", // connexion par téléphone
+  "verger.alexandre@gmail.com", // connexion Google (au cas où)
 ];
 
 export function isOwner(email?: string | null): boolean {
