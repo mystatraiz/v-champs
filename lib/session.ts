@@ -189,6 +189,70 @@ export function finishMatch(state: SessionState, matchId: number): void {
   state.activeMatches = state.activeMatches.filter((id) => id !== matchId);
 }
 
+// ═══ Affectation automatique des équipes (côté + équilibrage par force) ═══
+export interface AssignPlayer {
+  name: string;
+  side: "left" | "right" | "any";
+  strength: number;
+}
+
+export function teamStrength(team: Team, strengthOf: (name: string) => number): number {
+  return team.players.filter((p) => p && p.trim()).reduce((s, p) => s + strengthOf(p), 0);
+}
+
+// Place un joueur dans le meilleur slot libre : d'abord son côté préféré, puis
+// l'équipe la plus faible (pour répartir les forts). Renvoie placed=false si plein.
+export function autoPlace(
+  teams: Team[],
+  player: AssignPlayer,
+  strengthOf: (name: string) => number
+): { teams: Team[]; placed: boolean } {
+  const next = structuredClone(teams);
+  const free: { ti: number; pi: number }[] = [];
+  next.forEach((t, ti) =>
+    t.players.forEach((p, pi) => {
+      if (!p || !p.trim()) free.push({ ti, pi });
+    })
+  );
+  if (!free.length) return { teams: next, placed: false };
+
+  const wantPi = player.side === "left" ? 0 : player.side === "right" ? 1 : null;
+  let candidates = wantPi === null ? free : free.filter((s) => s.pi === wantPi);
+  if (!candidates.length) candidates = free; // aucun slot du bon côté → n'importe lequel
+
+  candidates.sort((a, b) => {
+    const sa = teamStrength(next[a.ti], strengthOf);
+    const sb = teamStrength(next[b.ti], strengthOf);
+    if (sa !== sb) return sa - sb; // équipe la plus faible d'abord
+    const ca = next[a.ti].players.filter((p) => p && p.trim()).length;
+    const cb = next[b.ti].players.filter((p) => p && p.trim()).length;
+    return ca - cb; // sinon celle avec le moins de joueurs
+  });
+
+  const slot = candidates[0];
+  next[slot.ti].players[slot.pi] = player.name;
+  return { teams: next, placed: true };
+}
+
+// Recompose entièrement les équipes de façon équilibrée (bouton « Rééquilibrer »).
+export function rebalanceTeams(
+  teams: Team[],
+  players: AssignPlayer[],
+  strengthOf: (name: string) => number
+): Team[] {
+  let cur = teams.map((t) => ({ ...t, players: ["", ""] as [string, string] }));
+  // Les plus forts d'abord, puis ceux qui ont une préférence de côté (placés
+  // en priorité tant que leur côté est libre).
+  const sorted = [...players].sort((a, b) => {
+    if (b.strength !== a.strength) return b.strength - a.strength;
+    const pa = a.side === "any" ? 1 : 0;
+    const pb = b.side === "any" ? 1 : 0;
+    return pa - pb;
+  });
+  for (const p of sorted) cur = autoPlace(cur, p, strengthOf).teams;
+  return cur;
+}
+
 export function getTeamPoints(t: Team): number {
   return t.wins * 3 + (t.draws || 0);
 }

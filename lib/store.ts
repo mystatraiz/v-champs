@@ -436,7 +436,8 @@ export async function requestRegistration(
 // (persistée : elle réapparaît si on revient plus tard sur le tournoi).
 export async function addApprovedPlayer(
   tournamentId: string,
-  name: string
+  name: string,
+  status: RegistrationStatus = "approved"
 ): Promise<void> {
   const trimmed = name.trim();
   if (!trimmed) return;
@@ -445,7 +446,7 @@ export async function addApprovedPlayer(
     (r) => r.player_name.toLowerCase().trim() === trimmed.toLowerCase()
   );
   if (dup) {
-    if (dup.status !== "approved") await setRegistrationStatus(dup.id, "approved");
+    if (dup.status !== status) await setRegistrationStatus(dup.id, status);
     return;
   }
   if (isTestMode()) {
@@ -455,7 +456,7 @@ export async function addApprovedPlayer(
       tournament_id: tournamentId,
       profile_id: null,
       player_name: trimmed,
-      status: "approved",
+      status,
       is_guest: false,
       created_at: new Date().toISOString(),
     });
@@ -466,7 +467,7 @@ export async function addApprovedPlayer(
     tournament_id: tournamentId,
     profile_id: null,
     player_name: trimmed,
-    status: "approved",
+    status,
     is_guest: false,
   });
   if (error) throw error;

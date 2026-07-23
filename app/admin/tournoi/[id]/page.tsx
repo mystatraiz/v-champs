@@ -8,6 +8,7 @@ import {
   deleteRegistration,
   deleteTournament,
   getTournament,
+  listProfiles,
   listRegistrations,
   loadAppData,
   savePairNames,
@@ -16,28 +17,38 @@ import {
   updateTournament,
 } from "@/lib/store";
 import { notifyPlayer, notifyTournamentFull } from "@/lib/push";
-import { emptyTeam, normalizeName, pairKey } from "@/lib/session";
+import { computeCombinedRanking } from "@/lib/scoring";
+import { autoPlace, emptyTeam, normalizeName, pairKey, rebalanceTeams } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
 import type { AppData } from "@/lib/store";
-import type { Registration, SessionState, Team, Tournament } from "@/lib/types";
+import type { Profile, Registration, SessionState, Team, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
 import { TeamComposer } from "@/components/TeamComposer";
+
+type Side = "left" | "right" | "any";
 
 export default function TournamentDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [tournament, setTournament] = useState<Tournament | null | undefined>(undefined);
   const [regs, setRegs] = useState<Registration[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [appData, setAppData] = useState<AppData | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [busy, setBusy] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
-    const [t, rs, app] = await Promise.all([getTournament(id), listRegistrations(id), loadAppData()]);
+    const [t, rs, app, profs] = await Promise.all([
+      getTournament(id),
+      listRegistrations(id),
+      loadAppData(),
+      listProfiles().catch(() => [] as Profile[]),
+    ]);
     setTournament(t);
     setRegs(rs);
     setAppData(app);
+    setProfiles(profs);
     if (t) {
       const base = t.teams?.length
         ? (t.teams as Team[])
@@ -50,7 +61,6 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     reload();
   }, [reload]);
 
-  // Sauvegarde de la composition (débouncée)
   const persistTeams = useCallback(
     (next: Team[]) => {
       setTeams(next);
@@ -62,16 +72,45 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     [id]
   );
 
-  const approved = useMemo(() => regs.filter((r) => r.status === "approved"), [regs]);
+  // Force V-Champs (classement) par nom, pour l'équilibrage.
+  const strengthMap = useMemo(() => {
+    const m = new Map<string, number>();
+    if (appData) {
+      computeCombinedRanking(appData.scores, appData.history, null, null).forEach((r) =>
+        m.set(r.key, r.score)
+      );
+    }
+    return m;
+  }, [appData]);
+
+  const profById = useMemo(() => {
+    const m = new Map<string, Profile>();
+    profiles.forEach((p) => m.set(p.id, p));
+    return m;
+  }, [profiles]);
+  const profByName = useMemo(() => {
+    const m = new Map<string, Profile>();
+    profiles.forEach((p) => {
+      if (p.linked_player_name) m.set(p.linked_player_name.toLowerCase().trim(), p);
+    });
+    return m;
+  }, [profiles]);
+
+  const strengthOf = useCallback(
+    (name: string) => strengthMap.get(name.toLowerCase().trim()) ?? 0,
+    [strengthMap]
+  );
+  const sideOf = useCallback(
+    (name: string, profileId: string | null): Side => {
+      const byId = profileId ? profById.get(profileId) : undefined;
+      const byName = profByName.get(name.toLowerCase().trim());
+      return ((byId?.preferred_side || byName?.preferred_side || "any") as Side) || "any";
+    },
+    [profById, profByName]
+  );
+
   const pending = useMemo(() => regs.filter((r) => r.status === "pending"), [regs]);
   const waitlist = useMemo(() => regs.filter((r) => r.status === "waitlist"), [regs]);
-
-  const pool = useMemo(() => {
-    const names = new Set<string>();
-    approved.forEach((r) => names.add(r.player_name));
-    teams.flatMap((t) => t.players).filter((p) => p?.trim()).forEach((p) => names.add(p));
-    return [...names];
-  }, [approved, teams]);
 
   if (tournament === undefined || !appData) return <Loader />;
   if (!tournament) {
@@ -85,59 +124,137 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     );
   }
 
-  const filledCount = teams.flatMap((t) => t.players).filter((p) => p?.trim()).length;
-  const gridFull = filledCount === tournament.courts * 4;
+  const t = tournament;
+  const filledCount = teams.flatMap((tm) => tm.players).filter((p) => p?.trim()).length;
+  const gridFull = filledCount === t.courts * 4;
   const confirmedNames = [
-    ...new Set([
-      ...approved.map((r) => r.player_name),
-      ...teams.flatMap((t) => t.players).filter((p) => p?.trim()),
-    ]),
+    ...new Set(teams.flatMap((tm) => tm.players).filter((p) => p?.trim())),
   ];
 
+  // ── Placement automatique d'un joueur (côté + équilibrage) ──
+  async function placeByName(name: string, profileId: string | null): Promise<boolean> {
+    const { teams: next, placed } = autoPlace(
+      teams,
+      { name, side: sideOf(name, profileId), strength: strengthOf(name) },
+      strengthOf
+    );
+    if (placed) {
+      setTeams(next);
+      await updateTournament(t.id, { teams: next });
+    }
+    return placed;
+  }
+
+  async function acceptRegistration(r: Registration) {
+    setBusy(true);
+    try {
+      const placed = await placeByName(r.player_name, r.profile_id);
+      await setRegistrationStatus(r.id, placed ? "approved" : "waitlist");
+      if (r.profile_id) {
+        if (placed)
+          notifyPlayer(
+            r.profile_id,
+            "Inscription confirmée ✅",
+            `Ta place au tournoi du ${formatDateLong(t.date)} (${t.time}) est confirmée !`
+          );
+        else
+          notifyPlayer(
+            r.profile_id,
+            "Liste d'attente ⏳",
+            `Le tournoi du ${formatDateLong(t.date)} est complet — tu es en liste d'attente.`
+          );
+      }
+      if (placed && filledCount + 1 >= t.capacity) notifyTournamentFull(t.date, t.time);
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function declineRegistration(r: Registration) {
+    await setRegistrationStatus(r.id, "declined");
+    if (r.profile_id)
+      notifyPlayer(
+        r.profile_id,
+        "Demande non retenue",
+        `Ta demande pour le tournoi du ${formatDateLong(t.date)} n'a pas pu être retenue.`
+      );
+    reload();
+  }
+
+  async function addPlayer(name: string) {
+    const nm = normalizeName(name);
+    if (!nm) return;
+    const placed = await placeByName(nm, null);
+    await addApprovedPlayer(t.id, nm, placed ? "approved" : "waitlist");
+    reload();
+  }
+
+  async function removePlayer(name: string) {
+    const key = name.toLowerCase().trim();
+    const next = teams.map((tm) => ({
+      ...tm,
+      players: tm.players.map((p) => (p?.toLowerCase().trim() === key ? "" : p)) as [string, string],
+    }));
+    setTeams(next);
+    await updateTournament(t.id, { teams: next });
+    const reg = regs.find((r) => r.player_name.toLowerCase().trim() === key);
+    if (reg) await setRegistrationStatus(reg.id, "waitlist");
+    else await addApprovedPlayer(t.id, name, "waitlist");
+    reload();
+  }
+
+  function rebalance() {
+    const placedPlayers = teams.flatMap((tm) => tm.players).filter((p) => p?.trim());
+    if (!placedPlayers.length) return;
+    const players = placedPlayers.map((name) => ({
+      name,
+      side: sideOf(name, null),
+      strength: strengthOf(name),
+    }));
+    persistTeams(rebalanceTeams(teams, players, strengthOf));
+  }
+
   function shareWhatsApp() {
-    if (!tournament) return;
-    const free = Math.max(0, tournament.capacity - confirmedNames.length);
+    const free = Math.max(0, t.capacity - confirmedNames.length);
     const emojis = ["🎾", "🏅", "⚡", "🔥", "💪", "🎯", "🌟", "👊"];
     const lines = [
-      `🎾 *Mini Tournoi à ${tournament.capacity} - Niveau ${tournament.level}*`,
+      `🎾 *Mini Tournoi à ${t.capacity} - Niveau ${t.level}*`,
       ``,
-      `📅 *${formatDateLong(tournament.date)}*`,
-      `⏰ *${tournament.time}*`,
+      `📅 *${formatDateLong(t.date)}*`,
+      `⏰ *${t.time}*`,
       ``,
-      confirmedNames.length ? `👥 *Joueurs inscrits (${confirmedNames.length}/${tournament.capacity}) :*` : null,
+      confirmedNames.length ? `👥 *Joueurs inscrits (${confirmedNames.length}/${t.capacity}) :*` : null,
       ...confirmedNames.map((p, i) => `${emojis[i % emojis.length]} ${p}`),
       ``,
       free === 0 ? `🔴 *Complet !*` : `🟢 *${free} place${free > 1 ? "s" : ""} disponible${free > 1 ? "s" : ""}*`,
       ``,
-      `👉 Inscription : ${window.location.origin}/join/${tournament.id}`,
+      `👉 Inscription : ${window.location.origin}/join/${t.id}`,
     ].filter((l) => l !== null);
     window.open("https://wa.me/?text=" + encodeURIComponent(lines.join("\n")), "_blank");
   }
 
   async function startSession() {
-    if (!tournament || !appData || busy) return;
+    if (!appData || busy) return;
     setBusy(true);
     try {
-      const cleanTeams = structuredClone(teams).map((t, i) => ({
+      const cleanTeams = structuredClone(teams).map((tm, i) => ({
         ...emptyTeam(i),
-        name: t.name || `Équipe ${i + 1}`,
-        players: [normalizeName(t.players[0] || ""), normalizeName(t.players[1] || "")] as [string, string],
+        name: tm.name || `Équipe ${i + 1}`,
+        players: [normalizeName(tm.players[0] || ""), normalizeName(tm.players[1] || "")] as [string, string],
       }));
-
-      // Mémorise noms d'équipes et joueurs connus
       const pairNameMap = { ...appData.pairNames };
-      cleanTeams.forEach((t) => {
-        if (t.players[0] && t.players[1] && t.name && !t.name.startsWith("Équipe")) {
-          pairNameMap[pairKey(t.players[0], t.players[1])] = t.name;
+      cleanTeams.forEach((tm) => {
+        if (tm.players[0] && tm.players[1] && tm.name && !tm.name.startsWith("Équipe")) {
+          pairNameMap[pairKey(tm.players[0], tm.players[1])] = tm.name;
         }
       });
       await Promise.all([
         savePairNames(pairNameMap),
-        addKnownPlayers(cleanTeams.flatMap((t) => t.players), appData.knownPlayers),
+        addKnownPlayers(cleanTeams.flatMap((tm) => tm.players), appData.knownPlayers),
       ]);
-
       const state: SessionState = {
-        courts: tournament.courts,
+        courts: t.courts,
         teams: cleanTeams,
         matches: [],
         matchCounter: 0,
@@ -148,12 +265,12 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         matchPhaseStarted: true,
         sessionArchivedAt: null,
         warmupStart: null,
-        label: tournament.level,
+        label: t.level,
         pairNameMap,
-        plannedTournamentId: tournament.id,
+        plannedTournamentId: t.id,
       };
       await saveSessionState(state);
-      await updateTournament(tournament.id, { status: "started", teams: cleanTeams });
+      await updateTournament(t.id, { status: "started", teams: cleanTeams });
       router.push("/admin/session");
     } finally {
       setBusy(false);
@@ -177,13 +294,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         <Btn variant="ghost" size="sm" onClick={() => router.push("/admin")}>←</Btn>
         <div className="flex-1">
           <div className="font-extrabold text-bright">
-            {formatDateLong(tournament.date)} · <span className="text-gold">{tournament.time}</span>
+            {formatDateLong(t.date)} · <span className="text-gold">{t.time}</span>
           </div>
           <div className="mt-0.5 flex items-center gap-2">
-            <Badge color="gold">Niveau {tournament.level}</Badge>
-            <Badge>{tournament.courts} terrain{tournament.courts > 1 ? "s" : ""}</Badge>
+            <Badge color="gold">Niveau {t.level}</Badge>
+            <Badge>{t.courts} terrain{t.courts > 1 ? "s" : ""}</Badge>
             <span className={`text-xs font-bold ${gridFull ? "text-ok" : "text-sub"}`}>
-              {filledCount}/{tournament.courts * 4} placés
+              {filledCount}/{t.courts * 4} placés
             </span>
           </div>
         </div>
@@ -196,7 +313,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         </button>
       </div>
 
-      {(pending.length > 0 || waitlist.length > 0) && (
+      {pending.length > 0 && (
         <div>
           <SectionTitle>
             Demandes d&apos;inscription{" "}
@@ -209,35 +326,44 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
               regRow(
                 r,
                 <>
+                  <Btn size="sm" variant="success" disabled={busy} onClick={() => acceptRegistration(r)}>
+                    ✓ Accepter &amp; placer
+                  </Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => declineRegistration(r)}>
+                    ✕
+                  </Btn>
+                </>
+              )
+            )}
+          </Card>
+          <p className="mt-1.5 px-1 text-[11px] text-mut">
+            À l&apos;acceptation, le joueur est placé automatiquement selon son côté préféré et pour
+            équilibrer les équipes (ou en liste d&apos;attente si complet).
+          </p>
+        </div>
+      )}
+
+      {waitlist.length > 0 && (
+        <div>
+          <SectionTitle>Liste d&apos;attente ({waitlist.length})</SectionTitle>
+          <Card className="overflow-hidden">
+            {waitlist.map((r) =>
+              regRow(
+                r,
+                <>
                   <Btn
                     size="sm"
-                    variant="success"
-                    onClick={async () => {
-                      await setRegistrationStatus(r.id, "approved");
-                      if (r.profile_id)
-                        notifyPlayer(
-                          r.profile_id,
-                          "Inscription confirmée ✅",
-                          `Ta place au tournoi du ${formatDateLong(tournament.date)} (${tournament.time}) est confirmée !`
-                        );
-                      if (confirmedNames.length + 1 >= tournament.capacity)
-                        notifyTournamentFull(tournament.date, tournament.time);
-                      reload();
-                    }}
+                    variant="secondary"
+                    disabled={busy || gridFull}
+                    onClick={() => acceptRegistration(r)}
                   >
-                    ✓ Accepter
+                    Placer
                   </Btn>
                   <Btn
                     size="sm"
                     variant="ghost"
                     onClick={async () => {
-                      await setRegistrationStatus(r.id, "declined");
-                      if (r.profile_id)
-                        notifyPlayer(
-                          r.profile_id,
-                          "Demande non retenue",
-                          `Ta demande pour le tournoi du ${formatDateLong(tournament.date)} n'a pas pu être retenue.`
-                        );
+                      await deleteRegistration(r.id);
                       reload();
                     }}
                   >
@@ -246,103 +372,48 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                 </>
               )
             )}
-            {waitlist.map((r) =>
-              regRow(
-                r,
-                <>
-                  <Badge>Attente</Badge>
-                  <Btn
-                    size="sm"
-                    variant="secondary"
-                    onClick={async () => {
-                      await setRegistrationStatus(r.id, "approved");
-                      if (r.profile_id)
-                        notifyPlayer(
-                          r.profile_id,
-                          "Inscription confirmée ✅",
-                          `Ta place au tournoi du ${formatDateLong(tournament.date)} (${tournament.time}) est confirmée !`
-                        );
-                      if (confirmedNames.length + 1 >= tournament.capacity)
-                        notifyTournamentFull(tournament.date, tournament.time);
-                      reload();
-                    }}
-                  >
-                    ✓
-                  </Btn>
-                </>
-              )
-            )}
-          </Card>
-        </div>
-      )}
-
-      {approved.length > 0 && (
-        <div>
-          <SectionTitle>Inscrits confirmés ({approved.length})</SectionTitle>
-          <Card className="overflow-hidden">
-            {approved.map((r) =>
-              regRow(
-                r,
-                <Btn
-                  size="sm"
-                  variant="ghost"
-                  onClick={async () => {
-                    await deleteRegistration(r.id);
-                    reload();
-                  }}
-                >
-                  Retirer
-                </Btn>
-              )
-            )}
           </Card>
         </div>
       )}
 
       <div>
-        <SectionTitle>Composition des équipes</SectionTitle>
+        <div className="mb-2.5 flex items-center justify-between">
+          <SectionTitle className="mb-0">Composition des équipes</SectionTitle>
+          <Btn size="sm" variant="secondary" disabled={filledCount < 2} onClick={rebalance}>
+            ⚖️ Rééquilibrer
+          </Btn>
+        </div>
         <TeamComposer
           teams={teams}
-          pool={pool}
           knownPlayers={appData.knownPlayers}
-          pairNameMap={appData.pairNames}
           onChange={persistTeams}
-          onPoolAdd={async (name) => {
-            // Persisté : le joueur est enregistré comme inscrit confirmé.
-            await addApprovedPlayer(tournament.id, normalizeName(name));
-            reload();
-          }}
-          onPoolRemove={async (name) => {
-            const key = name.toLowerCase().trim();
-            const reg = regs.find((r) => r.player_name.toLowerCase().trim() === key);
-            if (reg) await deleteRegistration(reg.id);
-            reload();
-          }}
+          onAddPlayer={addPlayer}
+          onRemovePlayer={removePlayer}
         />
       </div>
 
       <div className="space-y-2.5 pt-1">
         <Btn size="lg" disabled={!gridFull || busy} onClick={startSession}>
-          {gridFull ? "▶ Lancer la session" : `Placez les ${tournament.courts * 4} joueurs pour lancer`}
+          {gridFull ? "▶ Lancer la session" : `Placez les ${t.courts * 4} joueurs pour lancer`}
         </Btn>
         <div className="flex gap-2">
           <Btn
             variant="secondary"
             className="flex-1"
             onClick={async () => {
-              await updateTournament(tournament.id, {
-                status: tournament.status === "locked" ? "open" : "locked",
+              await updateTournament(t.id, {
+                status: t.status === "locked" ? "open" : "locked",
               });
               reload();
             }}
           >
-            {tournament.status === "locked" ? "🔓 Rouvrir les inscriptions" : "🔒 Clôturer les inscriptions"}
+            {t.status === "locked" ? "🔓 Rouvrir les inscriptions" : "🔒 Clôturer les inscriptions"}
           </Btn>
           <Btn
             variant="ghost"
             onClick={async () => {
               if (!confirm("Supprimer ce tournoi ?")) return;
-              await deleteTournament(tournament.id);
+              await deleteTournament(t.id);
               router.push("/admin");
             }}
           >
