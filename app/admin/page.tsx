@@ -16,39 +16,62 @@ import { TIME_SLOTS, formatDateLong, localDateStr } from "@/lib/format";
 import type { Registration, SessionState, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
 
-// Maintient 4 tournois récurrents lundi/mardi 12:30 niveau 6/7 à venir (comme la v1).
+// Règles de tournois récurrents (jour(s) de la semaine 0=dim..6=sam).
+const RECURRENCES: {
+  days: number[];
+  time: string;
+  level: string;
+  courts: number;
+  count: number;
+}[] = [
+  { days: [1, 2], time: "12:30", level: "6/7", courts: 2, count: 4 }, // lundi/mardi
+  { days: [4], time: "12:30", level: "5/6", courts: 2, count: 4 }, // jeudi
+];
+
+// Maintient les prochains tournois récurrents (crée ceux qui manquent).
 async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
   const today = localDateStr(new Date());
-  const upcoming = tournaments.filter((t) => {
-    const d = new Date(t.date + "T00:00:00");
-    return (
-      t.date >= today &&
-      t.time === "12:30" &&
-      t.level === "6/7" &&
-      (d.getDay() === 1 || d.getDay() === 2) &&
-      t.status !== "cancelled"
-    );
-  });
-  if (upcoming.length >= 4) return false;
+  let created = false;
 
-  const existingDates = new Set(tournaments.map((t) => t.date));
-  let added = 0;
-  const needed = 4 - upcoming.length;
-  const cursor = new Date();
-  cursor.setDate(cursor.getDate() + 1);
-  let safety = 0;
-  while (added < needed && safety < 60) {
-    safety++;
-    const day = cursor.getDay();
-    const dateStr = localDateStr(cursor);
-    if ((day === 1 || day === 2) && !existingDates.has(dateStr)) {
-      await createTournament({ date: dateStr, time: "12:30", level: "6/7", courts: 2, capacity: 8 });
-      existingDates.add(dateStr);
-      added++;
-    }
+  for (const rule of RECURRENCES) {
+    const upcoming = tournaments.filter((t) => {
+      const d = new Date(t.date + "T00:00:00");
+      return (
+        t.date >= today &&
+        t.time === rule.time &&
+        t.level === rule.level &&
+        rule.days.includes(d.getDay()) &&
+        t.status !== "cancelled"
+      );
+    });
+    let need = rule.count - upcoming.length;
+    if (need <= 0) continue;
+
+    const existingDates = new Set(
+      tournaments.filter((t) => t.time === rule.time && t.level === rule.level).map((t) => t.date)
+    );
+    const cursor = new Date();
     cursor.setDate(cursor.getDate() + 1);
+    let safety = 0;
+    while (need > 0 && safety < 120) {
+      safety++;
+      const dateStr = localDateStr(cursor);
+      if (rule.days.includes(cursor.getDay()) && !existingDates.has(dateStr)) {
+        await createTournament({
+          date: dateStr,
+          time: rule.time,
+          level: rule.level,
+          courts: rule.courts,
+          capacity: rule.courts * 4,
+        });
+        existingDates.add(dateStr);
+        need--;
+        created = true;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
   }
-  return added > 0;
+  return created;
 }
 
 export default function AdminTournaments() {
