@@ -11,7 +11,7 @@ export default function AdminClassement() {
 
   return (
     <div className="fade-up">
-      <ClassementTabs data={data} />
+      <ClassementTabs data={data} canShare />
     </div>
   );
 }

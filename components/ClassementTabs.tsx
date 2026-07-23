@@ -13,9 +13,11 @@ import { Card, EmptyState, SectionTitle } from "./ui";
 export function ClassementTabs({
   data,
   highlightPlayer,
+  canShare = false,
 }: {
   data: AppData;
   highlightPlayer?: string | null;
+  canShare?: boolean;
 }) {
   const [tab, setTab] = useState<"vchamps" | "equipes" | "sessions">("vchamps");
   const [openSession, setOpenSession] = useState<SessionHistoryEntry | null>(null);
@@ -45,7 +47,9 @@ export function ClassementTabs({
         ))}
       </div>
 
-      {tab === "vchamps" && <RankingBoard data={data} highlightPlayer={highlightPlayer} />}
+      {tab === "vchamps" && (
+        <RankingBoard data={data} highlightPlayer={highlightPlayer} canShare={canShare} />
+      )}
 
       {tab === "equipes" && (
         <div>
@@ -158,7 +162,12 @@ export function ClassementTabs({
         </div>
       )}
 
-      <SessionSheet entry={openSession} scores={data.scores} onClose={() => setOpenSession(null)} />
+      <SessionSheet
+        entry={openSession}
+        scores={data.scores}
+        onClose={() => setOpenSession(null)}
+        canShare={canShare}
+      />
     </div>
   );
 }

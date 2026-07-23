@@ -7,6 +7,7 @@ import {
   computePrevRankMap,
 } from "@/lib/scoring";
 import { LEVEL_LABELS } from "@/lib/levels";
+import { formatRankingText, openWhatsApp } from "@/lib/share";
 import type { AppData } from "@/lib/store";
 import { Card, EmptyState, RankBadge, SectionTitle } from "./ui";
 import { PlayerSheet } from "./PlayerSheet";
@@ -24,9 +25,11 @@ function Trend({ curr, prev, isNew }: { curr: number; prev?: number; isNew: bool
 export function RankingBoard({
   data,
   highlightPlayer,
+  canShare = false,
 }: {
   data: AppData;
   highlightPlayer?: string | null;
+  canShare?: boolean;
 }) {
   const [levelFilter, setLevelFilter] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -52,20 +55,31 @@ export function RankingBoard({
 
   return (
     <div>
-      <div className="mb-3 flex gap-1.5 overflow-x-auto">
-        {[null, ...LEVEL_LABELS].map((lv) => (
+      <div className="mb-3 flex items-center gap-1.5">
+        <div className="flex flex-1 gap-1.5 overflow-x-auto">
+          {[null, ...LEVEL_LABELS].map((lv) => (
+            <button
+              key={lv ?? "general"}
+              onClick={() => setLevelFilter(lv)}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                levelFilter === lv
+                  ? "border-gold bg-gold text-ink"
+                  : "border-line2 text-sub hover:text-body"
+              }`}
+            >
+              {lv ?? "Général"}
+            </button>
+          ))}
+        </div>
+        {canShare && combined.length > 0 && (
           <button
-            key={lv ?? "general"}
-            onClick={() => setLevelFilter(lv)}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-              levelFilter === lv
-                ? "border-gold bg-gold text-ink"
-                : "border-line2 text-sub hover:text-body"
-            }`}
+            onClick={() => openWhatsApp(formatRankingText(combined, levelFilter))}
+            title="Partager le classement sur WhatsApp"
+            className="shrink-0 cursor-pointer rounded-lg bg-[#25D366] px-2.5 py-1.5 text-sm font-extrabold text-white"
           >
-            {lv ?? "Général"}
+            📲
           </button>
-        ))}
+        )}
       </div>
 
       {!combined.length ? (

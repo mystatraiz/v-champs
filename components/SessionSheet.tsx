@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { rankTeamsInSession } from "@/lib/scoring";
 import { formatDateLong, teamLabel } from "@/lib/format";
+import { formatSessionText, openWhatsApp } from "@/lib/share";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
 import { Badge, Modal, SectionTitle } from "./ui";
 
@@ -21,10 +22,12 @@ export function SessionSheet({
   entry,
   scores,
   onClose,
+  canShare = false,
 }: {
   entry: SessionHistoryEntry | null;
   scores: PlayerSessionScore[];
   onClose: () => void;
+  canShare?: boolean;
 }) {
   const ranked = useMemo(() => (entry ? rankTeamsInSession(entry.teams || []) : []), [entry]);
   const points = useMemo(() => {
@@ -44,12 +47,23 @@ export function SessionSheet({
           <h3 className="text-lg font-extrabold text-bright">{formatDateLong(entry.date)}</h3>
           <Badge color="gold">Niveau {entry.label || "6/7"}</Badge>
         </div>
-        <button
-          onClick={onClose}
-          className="cursor-pointer rounded-lg px-2 py-1 text-lg text-mut hover:text-body"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          {canShare && (
+            <button
+              onClick={() => openWhatsApp(formatSessionText(entry, scores))}
+              title="Partager sur WhatsApp"
+              className="cursor-pointer rounded-lg bg-[#25D366] px-2.5 py-1.5 text-sm font-extrabold text-white"
+            >
+              📲
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="cursor-pointer rounded-lg px-2 py-1 text-lg text-mut hover:text-body"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <SectionTitle>Classement final</SectionTitle>

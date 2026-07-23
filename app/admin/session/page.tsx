@@ -22,6 +22,7 @@ import {
 } from "@/lib/session";
 import { computeCombinedRanking } from "@/lib/scoring";
 import { notifySessionResults } from "@/lib/push";
+import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { playBell, unlockAudio } from "@/lib/audio";
 import { formatClock, teamLabel } from "@/lib/format";
 import type { Match, PlayerSessionScore, SessionHistoryEntry, SessionState } from "@/lib/types";
@@ -418,6 +419,25 @@ export default function SessionLive() {
             </Card>
           </div>
         )}
+        <Btn
+          variant="secondary"
+          size="lg"
+          onClick={() =>
+            openWhatsApp(
+              formatSessionText(
+                {
+                  date: state.sessionArchivedAt || new Date().toISOString(),
+                  teams: state.teams,
+                  matches: [],
+                  label: (state.label as string) || "6/7",
+                },
+                scores
+              )
+            )
+          }
+        >
+          📲 Partager les résultats sur WhatsApp
+        </Btn>
         <Btn
           size="lg"
           onClick={async () => {
