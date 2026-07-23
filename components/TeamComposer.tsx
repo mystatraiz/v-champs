@@ -179,6 +179,26 @@ export function TeamComposer({
         </div>
       </div>
 
+      <div className="flex items-center justify-between">
+        <SectionTitle className="mb-0">Équipes</SectionTitle>
+        {(() => {
+          const complete = teams.filter(
+            (t) => t.players[0]?.trim() && t.players[1]?.trim()
+          ).length;
+          const placed = teams.flatMap((t) => t.players).filter((p) => p?.trim()).length;
+          const allReady = complete === teams.length && teams.length > 0;
+          return (
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-extrabold ${
+                allReady ? "border-ok/60 text-ok" : "border-gold/50 text-gold"
+              }`}
+            >
+              {complete}/{teams.length} équipes · {placed}/{teams.length * 2} joueurs
+            </span>
+          );
+        })()}
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         {teams.map((team, ti) => (
           <Card key={team.id} className="p-3.5">

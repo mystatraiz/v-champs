@@ -432,6 +432,46 @@ export async function requestRegistration(
   return data as Registration;
 }
 
+// Ajoute un joueur saisi manuellement par l'admin comme inscription confirmée
+// (persistée : elle réapparaît si on revient plus tard sur le tournoi).
+export async function addApprovedPlayer(
+  tournamentId: string,
+  name: string
+): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const existing = await listRegistrations(tournamentId);
+  const dup = existing.find(
+    (r) => r.player_name.toLowerCase().trim() === trimmed.toLowerCase()
+  );
+  if (dup) {
+    if (dup.status !== "approved") await setRegistrationStatus(dup.id, "approved");
+    return;
+  }
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    arr.push({
+      id: newId(),
+      tournament_id: tournamentId,
+      profile_id: null,
+      player_name: trimmed,
+      status: "approved",
+      is_guest: false,
+      created_at: new Date().toISOString(),
+    });
+    await writeJsonKey(TEST_REG, arr);
+    return;
+  }
+  const { error } = await supabase.from("registrations").insert({
+    tournament_id: tournamentId,
+    profile_id: null,
+    player_name: trimmed,
+    status: "approved",
+    is_guest: false,
+  });
+  if (error) throw error;
+}
+
 export async function setRegistrationStatus(
   id: string,
   status: RegistrationStatus

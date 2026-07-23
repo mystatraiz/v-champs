@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  addApprovedPlayer,
   addKnownPlayers,
   deleteRegistration,
   deleteTournament,
@@ -29,7 +30,6 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   const [regs, setRegs] = useState<Registration[]>([]);
   const [appData, setAppData] = useState<AppData | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [manualPool, setManualPool] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,9 +70,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     const names = new Set<string>();
     approved.forEach((r) => names.add(r.player_name));
     teams.flatMap((t) => t.players).filter((p) => p?.trim()).forEach((p) => names.add(p));
-    manualPool.forEach((p) => names.add(p));
     return [...names];
-  }, [approved, teams, manualPool]);
+  }, [approved, teams]);
 
   if (tournament === undefined || !appData) return <Loader />;
   if (!tournament) {
@@ -308,10 +307,17 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
           knownPlayers={appData.knownPlayers}
           pairNameMap={appData.pairNames}
           onChange={persistTeams}
-          onPoolAdd={(name) => setManualPool((p) => [...new Set([...p, normalizeName(name)])])}
-          onPoolRemove={(name) =>
-            setManualPool((p) => p.filter((n) => n.toLowerCase() !== name.toLowerCase()))
-          }
+          onPoolAdd={async (name) => {
+            // Persisté : le joueur est enregistré comme inscrit confirmé.
+            await addApprovedPlayer(tournament.id, normalizeName(name));
+            reload();
+          }}
+          onPoolRemove={async (name) => {
+            const key = name.toLowerCase().trim();
+            const reg = regs.find((r) => r.player_name.toLowerCase().trim() === key);
+            if (reg) await deleteRegistration(reg.id);
+            reload();
+          }}
         />
       </div>
 

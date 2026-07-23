@@ -88,8 +88,8 @@ function MatchCard({
 
       {match.scoreType === "games" ? (
         <div className="flex items-center justify-center gap-3">
-          {([1, 2] as const).map((team, idx) => (
-            <div key={team} className={`flex items-center gap-2 ${idx === 1 ? "flex-row-reverse" : ""}`}>
+          {([1, 2] as const).map((team) => (
+            <div key={team} className="flex items-center gap-2">
               <button
                 onClick={() => onScore(match.id, team, -1)}
                 className="h-10 w-10 cursor-pointer rounded-lg border border-line2 bg-card2 text-lg font-extrabold text-sub active:scale-95"
@@ -119,8 +119,8 @@ function MatchCard({
                 className={`flex items-center justify-center gap-2 ${set3Disabled ? "pointer-events-none opacity-30" : ""}`}
               >
                 <span className="w-10 text-[10px] font-bold uppercase text-mut">Set {setIdx + 1}</span>
-                {([1, 2] as const).map((team, idx) => (
-                  <div key={team} className={`flex items-center gap-1.5 ${idx === 1 ? "flex-row-reverse" : ""}`}>
+                {([1, 2] as const).map((team) => (
+                  <div key={team} className="flex items-center gap-1.5">
                     <button
                       onClick={() => onSetScore(match.id, setIdx, team, -1)}
                       className="h-8 w-8 cursor-pointer rounded-md border border-line2 bg-card2 text-sm font-extrabold text-sub"
