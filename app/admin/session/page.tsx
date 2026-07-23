@@ -428,7 +428,7 @@ export default function SessionLive() {
                 {
                   date: state.sessionArchivedAt || new Date().toISOString(),
                   teams: state.teams,
-                  matches: [],
+                  matches: state.matches.filter((m) => m.status === "finished"),
                   label: (state.label as string) || "6/7",
                 },
                 scores

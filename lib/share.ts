@@ -1,6 +1,21 @@
 import { rankTeamsInSession } from "./scoring";
 import { formatDateLong, teamLabel } from "./format";
-import type { CombinedRankingRow, PlayerSessionScore, SessionHistoryEntry } from "./types";
+import type {
+  CombinedRankingRow,
+  Match,
+  PlayerSessionScore,
+  SessionHistoryEntry,
+} from "./types";
+
+function matchScoreStr(m: Match): string {
+  if (m.scoreType === "sets" && m.sets) {
+    return m.sets
+      .filter((s) => s[0] + s[1] > 0)
+      .map((s) => `${s[0]}-${s[1]}`)
+      .join("/");
+  }
+  return `${m.score1}-${m.score2}`;
+}
 
 export function openWhatsApp(text: string): void {
   window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
@@ -55,6 +70,21 @@ export function formatSessionText(
     const diff = (t.pointsFor || 0) - (t.pointsAgainst || 0);
     lines.push(`${rank} ${teamLabel(t.name, t.players)} — ${pts} pts (${diff >= 0 ? "+" : ""}${diff})`);
   });
+
+  const matches = entry.matches || [];
+  if (matches.length) {
+    lines.push("", "🎯 *Matchs*");
+    matches
+      .slice()
+      .sort((a, b) => (a.roundNum || 0) - (b.roundNum || 0) || (a.court || 0) - (b.court || 0))
+      .forEach((m) => {
+        const t1 = entry.teams.find((t) => t.id === m.team1Id);
+        const t2 = entry.teams.find((t) => t.id === m.team2Id);
+        const n1 = (t1?.players || []).filter(Boolean).join("/") || "?";
+        const n2 = (t2?.players || []).filter(Boolean).join("/") || "?";
+        lines.push(`R${m.roundNum} · ${n1} ${matchScoreStr(m)} ${n2}`);
+      });
+  }
 
   const pts = scores
     .filter((r) => r.session_id === entry.date)
