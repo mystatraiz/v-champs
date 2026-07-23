@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
+  adminResetPassword,
   listProfiles,
   markUserNotificationRead,
   renamePlayer,
@@ -17,7 +18,7 @@ import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import { isTestMode, setTestMode } from "@/lib/test-mode";
 import { isOwner } from "@/lib/owner";
 import type { Profile, Role } from "@/lib/types";
-import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
+import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, Modal, SectionTitle, Select } from "@/components/ui";
 
 // Encart : mode test (bac à sable) — réservé au propriétaire.
 function TestModeCard() {
@@ -427,10 +428,30 @@ export default function AdminJoueurs() {
   const { data, reload: reloadData } = useAppData();
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [resetting, setResetting] = useState<string | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ name: string; password: string } | null>(null);
 
   const reload = useCallback(async () => {
     setProfiles(await listProfiles());
   }, []);
+
+  async function resetPwd(p: Profile) {
+    if (
+      !confirm(
+        `Réinitialiser le mot de passe de ${p.first_name} ${p.last_name} ?\nUn mot de passe temporaire sera généré à lui transmettre.`
+      )
+    )
+      return;
+    setResetting(p.id);
+    try {
+      const password = await adminResetPassword(p.id);
+      setResetInfo({ name: `${p.first_name} ${p.last_name}`, password });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur lors de la réinitialisation.");
+    } finally {
+      setResetting(null);
+    }
+  }
 
   useEffect(() => {
     reload();
@@ -564,10 +585,36 @@ export default function AdminJoueurs() {
                   ))}
                 </Select>
               </div>
+
+              <div className="mt-2">
+                <Btn size="sm" variant="ghost" disabled={resetting === p.id} onClick={() => resetPwd(p)}>
+                  🔑 {resetting === p.id ? "Réinitialisation…" : "Réinitialiser le mot de passe"}
+                </Btn>
+              </div>
             </Card>
           ))}
         </div>
       </div>
+
+      <Modal open={!!resetInfo} onClose={() => setResetInfo(null)}>
+        <div className="text-center">
+          <div className="mb-2 text-4xl">🔑</div>
+          <h3 className="mb-1 text-lg font-extrabold text-bright">Mot de passe réinitialisé</h3>
+          <p className="text-sm text-sub">
+            Nouveau mot de passe temporaire pour <b className="text-body">{resetInfo?.name}</b> :
+          </p>
+          <div className="my-4 select-all rounded-xl border border-gold/50 bg-gold/10 py-3 text-2xl font-extrabold tracking-widest text-gold">
+            {resetInfo?.password}
+          </div>
+          <p className="text-xs leading-5 text-mut">
+            Transmets-le-lui (WhatsApp, SMS…). Il se connecte avec son numéro habituel et ce mot de
+            passe.
+          </p>
+          <Btn className="mt-4 w-full" onClick={() => setResetInfo(null)}>
+            J&apos;ai noté
+          </Btn>
+        </div>
+      </Modal>
 
       <div>
         <SectionTitle className="text-bad">⚠️ Zone dangereuse</SectionTitle>

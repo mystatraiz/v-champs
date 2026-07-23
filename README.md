@@ -62,6 +62,7 @@ Settings → Environment Variables :
 | `WEBPUSH_VAPID_PUBLIC` | clé publique VAPID (voir `lib/push-config.ts`) |
 | `WEBPUSH_VAPID_PRIVATE` | clé privée VAPID |
 | `WEBPUSH_SUBJECT` | `mailto:votre@email` |
+| `SUPABASE_SERVICE_ROLE_KEY` | clé **service_role** Supabase (Settings → API) — requise pour la réinitialisation des mots de passe par l'admin. **Secrète** : jamais côté client, uniquement en variable d'environnement serveur. |
 
 (Sans ces variables, l'app utilise les valeurs par défaut intégrées. Pour la
 production, il est recommandé de régénérer une paire VAPID —

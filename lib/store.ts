@@ -184,6 +184,24 @@ export async function updateProfile(id: string, patch: Partial<Profile>): Promis
   if (error) throw error;
 }
 
+// Réinitialise le mot de passe d'un joueur (via la route serveur sécurisée) et
+// renvoie le mot de passe temporaire à lui communiquer.
+export async function adminResetPassword(userId: string): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Session expirée — reconnecte-toi.");
+  const res = await fetch("/api/admin/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ userId }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || "Échec de la réinitialisation.");
+  return j.password as string;
+}
+
 // ─── Fusion / correction d'un nom de joueur ───
 // Corrige un nom mal saisi (ex. « fredv ») vers le bon (ex. « Fred V ») dans
 // TOUTES les données : historique des sessions, points V-Champs, joueurs connus,
