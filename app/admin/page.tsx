@@ -58,7 +58,6 @@ export default function AdminTournaments() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [showPast, setShowPast] = useState(false);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -87,17 +86,13 @@ export default function AdminTournaments() {
   }, [reload]);
 
   const today = localDateStr(new Date());
-  const { upcoming, past } = useMemo(() => {
-    const list = tournaments ?? [];
-    return {
-      upcoming: list
+  const upcoming = useMemo(
+    () =>
+      (tournaments ?? [])
         .filter((t) => t.date >= today && t.status !== "done" && t.status !== "cancelled")
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
-      past: list
-        .filter((t) => t.date < today || t.status === "done" || t.status === "cancelled")
-        .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)),
-    };
-  }, [tournaments, today]);
+    [tournaments, today]
+  );
 
   const sessionActive = session?.sessionStarted && !session.sessionFinished;
 
@@ -248,18 +243,6 @@ export default function AdminTournaments() {
           <div className="space-y-2.5">{upcoming.map((t) => renderCard(t, false))}</div>
         )}
       </div>
-
-      {past.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowPast(!showPast)}
-            className="mb-2.5 cursor-pointer text-[11px] font-bold uppercase tracking-[2px] text-mut hover:text-sub"
-          >
-            {showPast ? "▲" : "▼"} Tournois passés ({past.length})
-          </button>
-          {showPast && <div className="space-y-2.5">{past.slice(0, 15).map((t) => renderCard(t, true))}</div>}
-        </div>
-      )}
 
       {error && (
         <Card tone="danger" className="p-3 text-xs text-bad">

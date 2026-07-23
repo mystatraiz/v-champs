@@ -127,13 +127,13 @@ export function Reglement() {
             <tbody>
               {(
                 [
-                  ["Équipe largement plus forte (≥ +300)", "×0.90"],
-                  ["Plus forte (≥ +200)", "×0.95"],
-                  ["Légèrement plus forte (≥ +100)", "×0.98"],
+                  ["Équipe largement plus forte (≥ +300)", "×0.95"],
+                  ["Plus forte (≥ +200)", "×0.97"],
+                  ["Légèrement plus forte (≥ +100)", "×0.99"],
                   ["Équilibré (-99 à +99)", "×1.00"],
-                  ["Légèrement outsider (≥ -199)", "×1.02"],
-                  ["Outsider (≥ -299)", "×1.05"],
-                  ["Largement outsider (< -299)", "×1.10"],
+                  ["Légèrement outsider (≥ -199)", "×1.01"],
+                  ["Outsider (≥ -299)", "×1.03"],
+                  ["Largement outsider (< -299)", "×1.05"],
                 ] as const
               ).map(([label, coeff]) => (
                 <tr key={label} className="border-b border-line/50 text-sub last:border-0">
