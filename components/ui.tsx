@@ -34,6 +34,53 @@ export function SectionTitle({ children, className = "" }: { children: ReactNode
   );
 }
 
+// Carte-catégorie dépliable : en-tête tappable + corps révélé au clic.
+export function CollapsibleCard({
+  icon,
+  title,
+  subtitle,
+  badge,
+  defaultOpen = false,
+  tone = "default",
+  children,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  badge?: number;
+  defaultOpen?: boolean;
+  tone?: "default" | "danger";
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const border = tone === "danger" ? "border-bad/50" : "border-line";
+  return (
+    <div className={`overflow-hidden rounded-xl border ${border} bg-card shadow-lg shadow-black/20`}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+      >
+        <span className="text-xl leading-none">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block text-sm font-extrabold ${tone === "danger" ? "text-bad" : "text-bright"}`}
+          >
+            {title}
+          </span>
+          {subtitle && <span className="block truncate text-[11px] text-mut">{subtitle}</span>}
+        </span>
+        {!!badge && badge > 0 && (
+          <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+        <span className={`text-sm text-mut transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
+      </button>
+      {open && <div className="border-t border-line px-4 py-4">{children}</div>}
+    </div>
+  );
+}
+
 type BtnVariant = "primary" | "secondary" | "success" | "danger" | "ghost";
 
 const btnStyles: Record<BtnVariant, string> = {

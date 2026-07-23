@@ -19,7 +19,19 @@ import { isTestMode, setTestMode } from "@/lib/test-mode";
 import { isOwner } from "@/lib/owner";
 import { ChangePassword } from "@/components/ChangePassword";
 import type { Profile, Role } from "@/lib/types";
-import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, Modal, SectionTitle, Select } from "@/components/ui";
+import {
+  Avatar,
+  Badge,
+  Btn,
+  Card,
+  CollapsibleCard,
+  EmptyState,
+  Input,
+  Loader,
+  Modal,
+  SectionTitle,
+  Select,
+} from "@/components/ui";
 
 // Encart : mode test (bac à sable) — réservé au propriétaire.
 function TestModeCard() {
@@ -431,6 +443,7 @@ export default function AdminJoueurs() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<string | null>(null);
   const [resetInfo, setResetInfo] = useState<{ name: string; password: string } | null>(null);
+  const [search, setSearch] = useState("");
 
   const reload = useCallback(async () => {
     setProfiles(await listProfiles());
@@ -462,6 +475,15 @@ export default function AdminJoueurs() {
 
   const pending = profiles.filter((p) => p.role === "pending");
   const others = profiles.filter((p) => p.role !== "pending");
+  const q = search.trim().toLowerCase();
+  const filteredOthers = q
+    ? others.filter((p) =>
+        [p.first_name, p.last_name, p.nickname, p.linked_player_name || ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      )
+    : others;
 
   async function patch(p: Profile, patchData: Partial<Profile>) {
     await updateProfile(p.id, patchData);
@@ -471,59 +493,16 @@ export default function AdminJoueurs() {
   }
 
   return (
-    <div className="fade-up space-y-6">
-      {isOwner(user?.email) && (
-        <div>
-          <SectionTitle>🧪 Mode test</SectionTitle>
-          <TestModeCard />
-        </div>
-      )}
-
-      <div>
-        <SectionTitle>🔔 Notifications</SectionTitle>
-        <BadgeSettings role={me?.role || "admin"} />
-      </div>
-
-      <div>
-        <SectionTitle>🔒 Mon mot de passe</SectionTitle>
-        <ChangePassword />
-      </div>
-
-      <div>
-        <SectionTitle>✏️ Modifier les noms de joueurs</SectionTitle>
-        <NamesManager
-          data={data}
-          onDone={() => {
-            reloadData();
-            reload();
-          }}
-        />
-      </div>
-
-      <div>
-        <SectionTitle>🔗 Fusion rapide de deux noms</SectionTitle>
-        <MergeTool
-          data={data}
-          onDone={() => {
-            reloadData();
-            reload();
-          }}
-        />
-      </div>
-
-      <div>
-        <SectionTitle>
-          Comptes en attente{" "}
-          {pending.length > 0 && (
-            <span className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white">
-              {pending.length}
-            </span>
-          )}
-        </SectionTitle>
+    <div className="fade-up space-y-3">
+      <CollapsibleCard
+        icon="👤"
+        title="Comptes à valider"
+        subtitle="Nouveaux comptes en attente"
+        badge={pending.length}
+        defaultOpen={pending.length > 0}
+      >
         {!pending.length ? (
-          <Card>
-            <EmptyState>Aucun compte en attente.</EmptyState>
-          </Card>
+          <EmptyState>Aucun compte en attente.</EmptyState>
         ) : (
           <div className="space-y-3">
             {pending.map((p) => (
@@ -531,76 +510,146 @@ export default function AdminJoueurs() {
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div>
-        <SectionTitle>Tous les profils ({others.length})</SectionTitle>
-        <div className="space-y-2.5">
-          {others.map((p) => (
-            <Card key={p.id} className="p-3.5">
-              <div className="flex items-center gap-3">
-                <Avatar name={`${p.first_name} ${p.last_name}`} size={38} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-bold text-bright">
-                    {p.first_name} «{p.nickname}» {p.last_name.toUpperCase()}
-                    {p.id === me?.id && <span className="ml-2 text-[10px] text-mut">(vous)</span>}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                    <Badge color={p.role === "admin" ? "bad" : p.role === "organisateur" ? "gold" : "sub"}>
-                      {ROLE_LABEL[p.role]}
-                    </Badge>
-                    {p.linked_player_name && <Badge color="ok">→ {p.linked_player_name}</Badge>}
-                    {savedId === p.id && <span className="text-[11px] font-bold text-ok">✓ Enregistré</span>}
+      <CollapsibleCard
+        icon="👥"
+        title="Joueurs & comptes"
+        subtitle={`${others.length} profil${others.length > 1 ? "s" : ""} · rôles, niveaux, mots de passe`}
+      >
+        <Input
+          placeholder="Rechercher un joueur…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mb-3"
+        />
+        {!filteredOthers.length ? (
+          <EmptyState>Aucun profil trouvé.</EmptyState>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredOthers.map((p) => (
+              <Card key={p.id} className="p-3.5" tone="flat">
+                <div className="flex items-center gap-3">
+                  <Avatar name={`${p.first_name} ${p.last_name}`} size={38} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold text-bright">
+                      {p.first_name} «{p.nickname}» {p.last_name.toUpperCase()}
+                      {p.id === me?.id && <span className="ml-2 text-[10px] text-mut">(vous)</span>}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <Badge color={p.role === "admin" ? "bad" : p.role === "organisateur" ? "gold" : "sub"}>
+                        {ROLE_LABEL[p.role]}
+                      </Badge>
+                      {p.linked_player_name && <Badge color="ok">→ {p.linked_player_name}</Badge>}
+                      {savedId === p.id && <span className="text-[11px] font-bold text-ok">✓ Enregistré</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <Select
-                  value={p.role}
-                  disabled={p.id === me?.id}
-                  onChange={(e) => patch(p, { role: e.target.value as Role })}
-                  className="text-xs"
-                >
-                  <option value="player">Joueur</option>
-                  <option value="organisateur">Organisateur</option>
-                  <option value="admin">Admin</option>
-                  <option value="pending">En attente</option>
-                </Select>
-                <Select
-                  value={p.level ?? ""}
-                  onChange={(e) => patch(p, { level: e.target.value ? Number(e.target.value) : null })}
-                  className="text-xs"
-                >
-                  <option value="">Niveau —</option>
-                  {PLAYER_LEVELS.map((l) => (
-                    <option key={l} value={l}>Niveau {l}</option>
-                  ))}
-                </Select>
-                <Select
-                  value={p.linked_player_name ?? ""}
-                  onChange={(e) => patch(p, { linked_player_name: e.target.value || null })}
-                  className="text-xs"
-                >
-                  <option value="">Non lié</option>
-                  {!data.knownPlayers.includes(p.nickname) && (
-                    <option value={p.nickname}>{p.nickname} (surnom)</option>
-                  )}
-                  {[...data.knownPlayers].sort().map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </Select>
-              </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <Select
+                    value={p.role}
+                    disabled={p.id === me?.id}
+                    onChange={(e) => patch(p, { role: e.target.value as Role })}
+                    className="text-xs"
+                  >
+                    <option value="player">Joueur</option>
+                    <option value="organisateur">Organisateur</option>
+                    <option value="admin">Admin</option>
+                    <option value="pending">En attente</option>
+                  </Select>
+                  <Select
+                    value={p.level ?? ""}
+                    onChange={(e) => patch(p, { level: e.target.value ? Number(e.target.value) : null })}
+                    className="text-xs"
+                  >
+                    <option value="">Niveau —</option>
+                    {PLAYER_LEVELS.map((l) => (
+                      <option key={l} value={l}>Niveau {l}</option>
+                    ))}
+                  </Select>
+                  <Select
+                    value={p.linked_player_name ?? ""}
+                    onChange={(e) => patch(p, { linked_player_name: e.target.value || null })}
+                    className="text-xs"
+                  >
+                    <option value="">Non lié</option>
+                    {!data.knownPlayers.includes(p.nickname) && (
+                      <option value={p.nickname}>{p.nickname} (surnom)</option>
+                    )}
+                    {[...data.knownPlayers].sort().map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </Select>
+                </div>
 
-              <div className="mt-2">
-                <Btn size="sm" variant="ghost" disabled={resetting === p.id} onClick={() => resetPwd(p)}>
-                  🔑 {resetting === p.id ? "Réinitialisation…" : "Réinitialiser le mot de passe"}
-                </Btn>
-              </div>
-            </Card>
-          ))}
+                <div className="mt-2">
+                  <Btn size="sm" variant="ghost" disabled={resetting === p.id} onClick={() => resetPwd(p)}>
+                    🔑 {resetting === p.id ? "Réinitialisation…" : "Réinitialiser le mot de passe"}
+                  </Btn>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </CollapsibleCard>
+
+      <CollapsibleCard icon="✏️" title="Noms des joueurs" subtitle="Corriger, renommer, fusionner">
+        <div className="space-y-4">
+          <div>
+            <SectionTitle>Corriger / renommer</SectionTitle>
+            <NamesManager
+              data={data}
+              onDone={() => {
+                reloadData();
+                reload();
+              }}
+            />
+          </div>
+          <div>
+            <SectionTitle>Fusion rapide de deux noms</SectionTitle>
+            <MergeTool
+              data={data}
+              onDone={() => {
+                reloadData();
+                reload();
+              }}
+            />
+          </div>
         </div>
-      </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard icon="🔔" title="Notifications" subtitle="Alertes & pastille sur l'icône">
+        <BadgeSettings role={me?.role || "admin"} />
+      </CollapsibleCard>
+
+      <CollapsibleCard icon="🔒" title="Mon mot de passe" subtitle="Changer mon mot de passe">
+        <ChangePassword />
+      </CollapsibleCard>
+
+      {isOwner(user?.email) && (
+        <CollapsibleCard icon="🧪" title="Mode test" subtitle="Bac à sable (propriétaire)">
+          <TestModeCard />
+        </CollapsibleCard>
+      )}
+
+      <CollapsibleCard icon="⚠️" title="Zone dangereuse" subtitle="Réinitialiser le classement" tone="danger">
+        <p className="mb-3 text-xs leading-5 text-sub">
+          Remet le classement V-Champs à zéro (les scores antérieurs sont ignorés, l&apos;historique
+          des sessions est conservé). Irréversible.
+        </p>
+        <Btn
+          variant="danger"
+          onClick={async () => {
+            if (!confirm("Remettre le classement V-Champs à zéro ? Cette action est irréversible.")) return;
+            if (!confirm("Confirmez une seconde fois : réinitialiser TOUS les scores ?")) return;
+            await resetAllScores();
+            alert("✓ Classement réinitialisé.");
+          }}
+        >
+          🗑 Remettre le classement à zéro
+        </Btn>
+      </CollapsibleCard>
 
       <Modal open={!!resetInfo} onClose={() => setResetInfo(null)}>
         <div className="text-center">
@@ -621,27 +670,6 @@ export default function AdminJoueurs() {
           </Btn>
         </div>
       </Modal>
-
-      <div>
-        <SectionTitle className="text-bad">⚠️ Zone dangereuse</SectionTitle>
-        <Card tone="danger" className="p-4">
-          <p className="mb-3 text-xs leading-5 text-sub">
-            Remet le classement V-Champs à zéro (les scores antérieurs sont ignorés, l&apos;historique
-            des sessions est conservé). Irréversible.
-          </p>
-          <Btn
-            variant="danger"
-            onClick={async () => {
-              if (!confirm("Remettre le classement V-Champs à zéro ? Cette action est irréversible.")) return;
-              if (!confirm("Confirmez une seconde fois : réinitialiser TOUS les scores ?")) return;
-              await resetAllScores();
-              alert("✓ Classement réinitialisé.");
-            }}
-          >
-            🗑 Remettre le classement à zéro
-          </Btn>
-        </Card>
-      </div>
     </div>
   );
 }
