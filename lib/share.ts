@@ -6,6 +6,18 @@ export function openWhatsApp(text: string): void {
   window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
 }
 
+// Adresse de l'appli (l'origine courante = l'URL de production quand on y accède).
+function appUrl(): string {
+  return typeof window !== "undefined" ? window.location.origin : "";
+}
+
+// Invitation à rejoindre l'appli, ajoutée en fin de message partagé.
+function callToAction(): string[] {
+  const url = appUrl();
+  if (!url) return [];
+  return ["", "🎾 Rejoins V-Champs, suis le classement et inscris-toi aux tournois :", url];
+}
+
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 // Message WhatsApp du classement général V-Champs.
@@ -21,6 +33,7 @@ export function formatRankingText(
     lines.push(`${rank} ${p.name} — *${p.score} pts* (${p.v}V)`);
   });
   if (rows.length > limit) lines.push(`… +${rows.length - limit} joueurs`);
+  lines.push(...callToAction());
   return lines.join("\n");
 }
 
@@ -50,5 +63,6 @@ export function formatSessionText(
     lines.push("", "⭐ *Points V-Champs*");
     pts.forEach((r) => lines.push(`• ${r.player_name} +${r.points_earned}`));
   }
+  lines.push(...callToAction());
   return lines.join("\n");
 }
