@@ -7,6 +7,7 @@ import { buildAllPlayerStats } from "@/lib/stats";
 import { Avatar, Badge, Btn, Card, DonutTriple, Loader, SectionTitle, StatPill } from "@/components/ui";
 import { PlayerSheet } from "@/components/PlayerSheet";
 import { NotifToggle } from "@/components/NotifToggle";
+import { ChangePassword } from "@/components/ChangePassword";
 
 export default function PlayerProfil() {
   const { profile } = useAuth();
@@ -102,6 +103,11 @@ export default function PlayerProfil() {
           profileId={profile.id}
           intro="Sois prévenu(e) quand ton compte est validé et quand ta place à un tournoi est confirmée."
         />
+      </div>
+
+      <div>
+        <SectionTitle>🔒 Mot de passe</SectionTitle>
+        <ChangePassword />
       </div>
 
       <PlayerSheet

@@ -17,6 +17,7 @@ import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import { isTestMode, setTestMode } from "@/lib/test-mode";
 import { isOwner } from "@/lib/owner";
+import { ChangePassword } from "@/components/ChangePassword";
 import type { Profile, Role } from "@/lib/types";
 import { Avatar, Badge, Btn, Card, EmptyState, Input, Loader, Modal, SectionTitle, Select } from "@/components/ui";
 
@@ -481,6 +482,11 @@ export default function AdminJoueurs() {
       <div>
         <SectionTitle>🔔 Notifications</SectionTitle>
         <BadgeSettings role={me?.role || "admin"} />
+      </div>
+
+      <div>
+        <SectionTitle>🔒 Mon mot de passe</SectionTitle>
+        <ChangePassword />
       </div>
 
       <div>
