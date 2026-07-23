@@ -14,13 +14,15 @@ export const RANKING_WINDOW_MS = 180 * 24 * 60 * 60 * 1000; // 180 jours
 export const RETAINED_PERFS = 8; // 8 meilleures performances retenues
 
 export function getDiffCoeff(diff: number): number {
-  if (diff >= 300) return 0.8;
-  if (diff >= 200) return 0.9;
-  if (diff >= 100) return 0.95;
+  // Plage resserrée (0.90–1.10) : la force des adversaires ajuste le score sans
+  // jamais inverser l'ordre des positions (un 1er finit toujours devant un 2e).
+  if (diff >= 300) return 0.9;
+  if (diff >= 200) return 0.95;
+  if (diff >= 100) return 0.98;
   if (diff >= -99) return 1.0;
-  if (diff >= -199) return 1.05;
-  if (diff >= -299) return 1.1;
-  return 1.2;
+  if (diff >= -199) return 1.02;
+  if (diff >= -299) return 1.05;
+  return 1.1;
 }
 
 // Score servant au coefficient de force : 0 tant que le joueur a < 3 sessions valides.
