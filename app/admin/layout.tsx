@@ -79,6 +79,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {isAdmin ? "Administration" : "Organisation"}
           </div>
         </div>
+        <Link
+          href="/player"
+          title="Voir l'application en tant que joueur"
+          className="cursor-pointer rounded-lg border border-line2 px-2.5 py-1.5 text-xs font-bold text-sub hover:text-body"
+        >
+          👁 Joueur
+        </Link>
         <button
           onClick={async () => {
             await signOut();

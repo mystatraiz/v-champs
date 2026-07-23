@@ -97,6 +97,15 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
             Espace joueur
           </div>
         </div>
+        {(profile.role === "admin" || profile.role === "organisateur") && (
+          <Link
+            href="/admin"
+            title="Retour à l'espace admin"
+            className="cursor-pointer rounded-lg border border-gold/50 px-2.5 py-1.5 text-xs font-bold text-gold hover:bg-gold/10"
+          >
+            ← Admin
+          </Link>
+        )}
         <button
           onClick={async () => {
             await signOut();
