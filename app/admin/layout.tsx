@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { countPendingProfiles, countPendingRegistrations } from "@/lib/store";
 import { updateAppBadge } from "@/lib/badge";
+import { isOwner } from "@/lib/owner";
 import { Loader } from "@/components/ui";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -79,13 +80,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {isAdmin ? "Administration" : "Organisation"}
           </div>
         </div>
-        <Link
-          href="/player"
-          title="Voir l'application en tant que joueur"
-          className="cursor-pointer rounded-lg border border-line2 px-2.5 py-1.5 text-xs font-bold text-sub hover:text-body"
-        >
-          👁 Joueur
-        </Link>
+        {isOwner(user?.email) && (
+          <Link
+            href="/player"
+            title="Voir l'application en tant que joueur"
+            className="cursor-pointer rounded-lg border border-line2 px-2.5 py-1.5 text-xs font-bold text-sub hover:text-body"
+          >
+            👁 Joueur
+          </Link>
+        )}
         <button
           onClick={async () => {
             await signOut();

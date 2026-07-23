@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { isOwner } from "@/lib/owner";
 import { Btn, Loader, Modal } from "@/components/ui";
 
 // Message de bienvenue affiché une seule fois quand le compte vient d'être lié
@@ -97,7 +98,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
             Espace joueur
           </div>
         </div>
-        {(profile.role === "admin" || profile.role === "organisateur") && (
+        {isOwner(user?.email) && (
           <Link
             href="/admin"
             title="Retour à l'espace admin"
