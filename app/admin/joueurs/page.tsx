@@ -13,7 +13,7 @@ import {
 import { useAppData } from "@/lib/use-app-data";
 import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
-import { playerIdentity } from "@/lib/format";
+import { playerIdentity, uniquePlayerIdentity } from "@/lib/format";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import { isTestMode, setTestMode } from "@/lib/test-mode";
@@ -341,10 +341,12 @@ const ROLE_LABEL: Record<Role, string> = {
 function PendingCard({
   p,
   knownPlayers,
+  takenNames,
   onValidated,
 }: {
   p: Profile;
   knownPlayers: string[];
+  takenNames: string[];
   onValidated: () => void;
 }) {
   const [role, setRole] = useState<Role>("player");
@@ -352,14 +354,16 @@ function PendingCard({
   const [linked, setLinked] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Identité unique proposée pour un nouveau joueur (allongée si collision).
+  const suggested = uniquePlayerIdentity(p.first_name, p.last_name, takenNames);
+
   async function validate() {
     setBusy(true);
     try {
       await updateProfile(p.id, {
         role,
         level: role === "player" && level ? Number(level) : p.level,
-        linked_player_name:
-          role === "player" ? linked || playerIdentity(p.first_name, p.last_name) : null,
+        linked_player_name: role === "player" ? linked || suggested : null,
       });
       await markUserNotificationRead(p.id);
       notifyPlayer(
@@ -422,7 +426,7 @@ function PendingCard({
               Lier au joueur
             </label>
             <Select value={linked} onChange={(e) => setLinked(e.target.value)}>
-              <option value="">Nouveau : {playerIdentity(p.first_name, p.last_name)}</option>
+              <option value="">Nouveau : {suggested}</option>
               {[...knownPlayers].sort().map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
@@ -477,6 +481,12 @@ export default function AdminJoueurs() {
 
   const pending = profiles.filter((p) => p.role === "pending");
   const others = profiles.filter((p) => p.role !== "pending");
+  // Noms déjà pris : joueurs connus + comptes déjà liés (pour éviter les
+  // collisions « Prénom + Initiale » lors de la validation d'un nouveau compte).
+  const takenNames = [
+    ...data.knownPlayers,
+    ...profiles.map((p) => p.linked_player_name || ""),
+  ].filter(Boolean);
   const q = search.trim().toLowerCase();
   const filteredOthers = q
     ? others.filter((p) =>
@@ -518,7 +528,13 @@ export default function AdminJoueurs() {
         ) : (
           <div className="space-y-3">
             {pending.map((p) => (
-              <PendingCard key={p.id} p={p} knownPlayers={data.knownPlayers} onValidated={reload} />
+              <PendingCard
+                key={p.id}
+                p={p}
+                knownPlayers={data.knownPlayers}
+                takenNames={takenNames}
+                onValidated={reload}
+              />
             ))}
           </div>
         )}

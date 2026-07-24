@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getTournament, listRegistrations, requestRegistration } from "@/lib/store";
 import { notifyAdmins } from "@/lib/push";
-import { formatDateLong, playerIdentity } from "@/lib/format";
+import { formatDateLong, uniquePlayerIdentity } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, Input, Loader } from "@/components/ui";
 
@@ -48,6 +48,10 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
   const gridNames = (tournament?.teams || []).flatMap((tm) => tm.players).filter((p) => p?.trim());
   const confirmed = [...new Set([...approved.map((r) => r.player_name), ...gridNames])];
   const free = tournament ? Math.max(0, tournament.capacity - confirmed.length) : 0;
+  // Tous les noms déjà présents sur cette session (inscriptions + grille) : sert
+  // à générer une identité unique et à afficher un aperçu fidèle.
+  const takenNames = [...regs.map((r) => r.player_name), ...confirmed];
+  const previewIdentity = uniquePlayerIdentity(name, lastName, takenNames);
 
   // Voie recommandée : on emmène vers la création de compte, pseudo pré-rempli,
   // et l'inscription à ce tournoi se fera automatiquement après la création.
@@ -64,12 +68,8 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
     if (!tournament) return;
     if (!name.trim()) return setError("Saisis ton prénom.");
     if (!lastName.trim()) return setError("Saisis ton nom (au moins la 1re lettre).");
-    const identity = playerIdentity(name, lastName);
-    const key = identity.toLowerCase().trim();
-    const allNames = regs.map((r) => r.player_name.toLowerCase().trim());
-    if (allNames.includes(key) || confirmed.some((c) => c.toLowerCase().trim() === key)) {
-      return setError("Ce joueur est déjà inscrit !");
-    }
+    // Identité unique : allongée automatiquement en cas d'homonyme (Alex C. → Alex Ca.).
+    const identity = uniquePlayerIdentity(name, lastName, takenNames);
     setBusy(true);
     try {
       await requestRegistration(tournament.id, identity, profile?.id ?? null, !profile);
@@ -102,7 +102,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
             <div className="mb-3 text-5xl">✅</div>
             <h2 className="mb-1 text-lg font-extrabold text-bright">Demande envoyée !</h2>
             <p className="text-sm text-sub">
-              L&apos;organisateur validera ta place — <b className="text-gold">{playerIdentity(name, lastName)}</b>.
+              L&apos;organisateur validera ta place — <b className="text-gold">{previewIdentity}</b>.
             </p>
           </Card>
         ) : (
@@ -144,7 +144,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
                   />
                 </div>
                 <p className="text-center text-[11px] text-mut">
-                  Tu apparaîtras en <b className="text-sub">{playerIdentity(name, lastName) || "Prénom N."}</b>{" "}
+                  Tu apparaîtras en <b className="text-sub">{previewIdentity || "Prénom N."}</b>{" "}
                   (pour te distinguer des homonymes).
                 </p>
                 {error && <p className="text-sm font-semibold text-bad">{error}</p>}

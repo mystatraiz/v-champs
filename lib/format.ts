@@ -39,6 +39,34 @@ export function playerIdentity(first: string, last: string): string {
   return (fc + li).trim();
 }
 
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
+
+// Identité UNIQUE : « Prénom + Initiale », allongée si nécessaire (Alex C. →
+// Alex Ca. → Alex Carello) jusqu'à ne plus entrer en collision avec `taken`.
+export function uniquePlayerIdentity(first: string, last: string, taken: string[]): string {
+  const fc = cap((first || "").trim());
+  const l = (last || "").trim();
+  const takenLow = new Set(taken.map((t) => t.toLowerCase().trim()).filter(Boolean));
+
+  if (!l) {
+    if (!takenLow.has(fc.toLowerCase())) return fc;
+    let i = 2;
+    while (takenLow.has(`${fc} ${i}`.toLowerCase())) i++;
+    return `${fc} ${i}`;
+  }
+  // Allonge la portion du nom jusqu'à l'unicité.
+  for (let n = 1; n <= l.length; n++) {
+    const part = n < l.length ? `${cap(l.slice(0, n))}.` : cap(l);
+    const candidate = `${fc} ${part}`;
+    if (!takenLow.has(candidate.toLowerCase().trim())) return candidate;
+  }
+  // Nom complet déjà pris → numérote.
+  let i = 2;
+  let candidate = `${fc} ${cap(l)} ${i}`;
+  while (takenLow.has(candidate.toLowerCase().trim())) candidate = `${fc} ${cap(l)} ${++i}`;
+  return candidate;
+}
+
 // Un nom d'équipe « Équipe 1 », « Équipe 2 »… est un libellé par défaut.
 export function isGenericTeamName(name?: string): boolean {
   return !name || /^équipe\s*\d+$/i.test(name.trim());
