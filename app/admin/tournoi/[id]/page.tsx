@@ -18,6 +18,7 @@ import {
 } from "@/lib/store";
 import { notifyPlayer, notifyTournamentFull } from "@/lib/push";
 import { computeCombinedRanking } from "@/lib/scoring";
+import { LEVEL_LABELS } from "@/lib/levels";
 import { autoPlace, emptyTeam, normalizeName, pairKey, rebalanceTeams } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
 import type { AppData } from "@/lib/store";
@@ -296,8 +297,24 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
           <div className="font-extrabold text-bright">
             {formatDateLong(t.date)} · <span className="text-gold">{t.time}</span>
           </div>
-          <div className="mt-0.5 flex items-center gap-2">
-            <Badge color="gold">Niveau {t.level}</Badge>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 rounded-lg border border-gold/50 px-2 py-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gold">Niveau</span>
+              <select
+                value={t.level}
+                onChange={async (e) => {
+                  await updateTournament(t.id, { level: e.target.value });
+                  reload();
+                }}
+                className="bg-transparent text-xs font-extrabold text-gold outline-none"
+              >
+                {LEVEL_LABELS.map((l) => (
+                  <option key={l} value={l} className="bg-surface text-body">
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Badge>{t.courts} terrain{t.courts > 1 ? "s" : ""}</Badge>
             <span className={`text-xs font-bold ${gridFull ? "text-ok" : "text-sub"}`}>
               {filledCount}/{t.courts * 4} placés

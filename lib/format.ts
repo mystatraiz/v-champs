@@ -15,6 +15,16 @@ export function localDateStr(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
+// Dimanche qui clôt la semaine suivante (semaines démarrant le lundi).
+// Sert de borne haute pour n'afficher que la semaine en cours + la suivante.
+export function endOfNextWeekStr(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const isoDay = d.getDay() === 0 ? 7 : d.getDay(); // lundi=1 … dimanche=7
+  d.setDate(d.getDate() + (14 - isoDay));
+  return localDateStr(d);
+}
+
 export function positionLabel(pos: number): string {
   return pos === 1 ? "1er" : `${pos}e`;
 }

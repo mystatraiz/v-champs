@@ -12,7 +12,7 @@ import {
 } from "@/lib/store";
 import { notifyNewTournament } from "@/lib/push";
 import { LEVEL_LABELS } from "@/lib/levels";
-import { TIME_SLOTS, formatDateLong, localDateStr } from "@/lib/format";
+import { TIME_SLOTS, endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type { Registration, SessionState, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
 
@@ -81,6 +81,7 @@ export default function AdminTournaments() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showFar, setShowFar] = useState(false);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -109,12 +110,22 @@ export default function AdminTournaments() {
   }, [reload]);
 
   const today = localDateStr(new Date());
-  const upcoming = useMemo(
+  const windowEnd = endOfNextWeekStr();
+  const activeTournaments = useMemo(
     () =>
       (tournaments ?? [])
         .filter((t) => t.date >= today && t.status !== "done" && t.status !== "cancelled")
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
     [tournaments, today]
+  );
+  // Semaine en cours + semaine suivante uniquement ; le reste est repliable.
+  const upcoming = useMemo(
+    () => activeTournaments.filter((t) => t.date <= windowEnd),
+    [activeTournaments, windowEnd]
+  );
+  const farUpcoming = useMemo(
+    () => activeTournaments.filter((t) => t.date > windowEnd),
+    [activeTournaments, windowEnd]
   );
 
   const sessionActive = session?.sessionStarted && !session.sessionFinished;
@@ -260,10 +271,24 @@ export default function AdminTournaments() {
 
         {!upcoming.length ? (
           <Card>
-            <EmptyState>Aucun tournoi planifié.</EmptyState>
+            <EmptyState>Aucun tournoi cette semaine ni la semaine prochaine.</EmptyState>
           </Card>
         ) : (
           <div className="space-y-2.5">{upcoming.map((t) => renderCard(t, false))}</div>
+        )}
+
+        {farUpcoming.length > 0 && (
+          <div className="mt-3">
+            <button
+              onClick={() => setShowFar((v) => !v)}
+              className="cursor-pointer text-[11px] font-bold uppercase tracking-[2px] text-mut hover:text-sub"
+            >
+              {showFar ? "▲" : "▼"} Tournois plus lointains ({farUpcoming.length})
+            </button>
+            {showFar && (
+              <div className="mt-2.5 space-y-2.5">{farUpcoming.map((t) => renderCard(t, false))}</div>
+            )}
+          </div>
         )}
       </div>
 

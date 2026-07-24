@@ -10,7 +10,7 @@ import {
 } from "@/lib/store";
 import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
 import { labelIncludesPlayer } from "@/lib/levels";
-import { formatDateLong, localDateStr } from "@/lib/format";
+import { endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
 
@@ -67,16 +67,16 @@ export default function PlayerTournaments() {
   const upcoming = useMemo(() => {
     if (!tournaments) return [];
     const today = localDateStr(new Date());
+    const windowEnd = endOfNextWeekStr();
     return tournaments
       .filter((t) => t.date >= today && (t.status === "open" || t.status === "locked"))
-      .filter(
-        (t) =>
-          // Niveau non défini → tous les tournois ; sinon ceux de son niveau ;
-          // et TOUJOURS ceux où il est déjà inscrit (quel que soit le niveau).
-          profile?.level == null ||
-          labelIncludesPlayer(t.level, profile.level) ||
-          myTournamentIds.has(t.id)
-      );
+      .filter((t) => {
+        // Fenêtre : semaine en cours + semaine suivante.
+        const inWindow = t.date <= windowEnd;
+        const levelOk = profile?.level == null || labelIncludesPlayer(t.level, profile.level);
+        // Affiché si dans la fenêtre ET du bon niveau, OU déjà inscrit (exception).
+        return (inWindow && levelOk) || myTournamentIds.has(t.id);
+      });
   }, [tournaments, profile, myTournamentIds]);
 
   async function toggleRegistration(t: Tournament, mine: Registration | undefined) {
