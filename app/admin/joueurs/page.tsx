@@ -486,7 +486,17 @@ export default function AdminJoueurs() {
     : others;
 
   async function patch(p: Profile, patchData: Partial<Profile>) {
-    await updateProfile(p.id, patchData);
+    try {
+      await updateProfile(p.id, patchData);
+    } catch (e) {
+      alert(
+        e instanceof Error
+          ? `Échec de l'enregistrement : ${e.message}`
+          : "Échec de l'enregistrement."
+      );
+      reload();
+      return;
+    }
     setSavedId(p.id);
     setTimeout(() => setSavedId(null), 1500);
     reload();

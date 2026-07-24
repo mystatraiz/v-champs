@@ -6,9 +6,11 @@
 --  les deux applications continuent de partager la même base.
 -- ═════════════════════════════════════════════════════════════════════════
 
--- ── 1. Niveau du joueur (attribué par l'admin, 4 à 8) ──────────────────────
-alter table public.profiles
-  add column if not exists level int check (level between 4 and 8);
+-- ── 1. Niveau du joueur (attribué par l'admin, 1 à 10) ─────────────────────
+alter table public.profiles add column if not exists level int;
+-- Contrainte 1..10 (remplace l'ancienne 4..8 le cas échéant). Idempotent.
+alter table public.profiles drop constraint if exists profiles_level_check;
+alter table public.profiles add constraint profiles_level_check check (level between 1 and 10);
 
 -- ── 2. Tournois planifiés (remplace le JSON planned_tournaments de la v1) ──
 create table if not exists public.tournaments (
