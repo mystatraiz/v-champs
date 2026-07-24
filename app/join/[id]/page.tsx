@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getTournament, listRegistrations, requestRegistration } from "@/lib/store";
 import { notifyAdmins } from "@/lib/push";
-import { formatDateLong } from "@/lib/format";
+import { formatDateLong, playerIdentity } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, Input, Loader } from "@/components/ui";
 
@@ -19,6 +19,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
   const [tournament, setTournament] = useState<Tournament | null | undefined>(undefined);
   const [regs, setRegs] = useState<Registration[]>([]);
   const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -53,7 +54,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
   function goCreateAccount() {
     const n = name.trim();
     if (!n) {
-      setError("Saisis ton prénom / pseudo d'abord.");
+      setError("Saisis au moins ton prénom d'abord.");
       return;
     }
     router.push(`/login?join=${id}&pseudo=${encodeURIComponent(n)}&tab=register`);
@@ -61,16 +62,18 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
 
   async function submitGuest() {
     if (!tournament) return;
-    const n = name.trim();
-    if (!n) return setError("Saisis ton prénom.");
+    if (!name.trim()) return setError("Saisis ton prénom.");
+    if (!lastName.trim()) return setError("Saisis ton nom (au moins la 1re lettre).");
+    const identity = playerIdentity(name, lastName);
+    const key = identity.toLowerCase().trim();
     const allNames = regs.map((r) => r.player_name.toLowerCase().trim());
-    if (allNames.includes(n.toLowerCase()) || confirmed.some((c) => c.toLowerCase().trim() === n.toLowerCase())) {
-      return setError("Ce prénom est déjà inscrit !");
+    if (allNames.includes(key) || confirmed.some((c) => c.toLowerCase().trim() === key)) {
+      return setError("Ce joueur est déjà inscrit !");
     }
     setBusy(true);
     try {
-      await requestRegistration(tournament.id, n, profile?.id ?? null, !profile);
-      notifyAdmins("registration", n); // push aux admins (non bloquant)
+      await requestRegistration(tournament.id, identity, profile?.id ?? null, !profile);
+      notifyAdmins("registration", identity); // push aux admins (non bloquant)
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors de l'inscription");
@@ -99,7 +102,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
             <div className="mb-3 text-5xl">✅</div>
             <h2 className="mb-1 text-lg font-extrabold text-bright">Demande envoyée !</h2>
             <p className="text-sm text-sub">
-              L&apos;organisateur validera ta place — <b className="text-gold">{name.trim()}</b>.
+              L&apos;organisateur validera ta place — <b className="text-gold">{playerIdentity(name, lastName)}</b>.
             </p>
           </Card>
         ) : (
@@ -127,12 +130,23 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
 
             {free > 0 && (
               <div className="mt-5 space-y-3">
-                <Input
-                  placeholder="Ton prénom / pseudo"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && goCreateAccount()}
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Prénom"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Nom (ex : V)"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && goCreateAccount()}
+                  />
+                </div>
+                <p className="text-center text-[11px] text-mut">
+                  Tu apparaîtras en <b className="text-sub">{playerIdentity(name, lastName) || "Prénom N."}</b>{" "}
+                  (pour te distinguer des homonymes).
+                </p>
                 {error && <p className="text-sm font-semibold text-bad">{error}</p>}
 
                 {/* Voie principale : créer un compte pour fixer le pseudo + stats + niveau */}

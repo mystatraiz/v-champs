@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { fetchProfile, requestRegistration } from "@/lib/store";
 import { notifyAdmins } from "@/lib/push";
+import { playerIdentity } from "@/lib/format";
 import { Btn, Card, Input, Loader, Select } from "@/components/ui";
 
 type Mode = "login" | "register" | "complete";
@@ -61,7 +62,12 @@ function LoginInner() {
       let regName = preferredName?.trim();
       if (!regName && u) {
         const prof = await fetchProfile(u.id);
-        regName = prof?.linked_player_name || prof?.nickname || pseudo || "";
+        regName =
+          prof?.linked_player_name ||
+          (prof ? playerIdentity(prof.first_name, prof.last_name) : "") ||
+          prof?.nickname ||
+          pseudo ||
+          "";
       }
       if (!regName) regName = pseudo || "";
       if (!regName) return;
@@ -98,7 +104,7 @@ function LoginInner() {
           preferred_side: side,
         });
         if (err) return setError(err);
-        await finishJoin(nickname.trim());
+        await finishJoin(playerIdentity(firstName.trim(), lastName.trim()));
         router.replace("/pending");
       }
     } finally {

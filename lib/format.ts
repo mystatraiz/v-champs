@@ -29,6 +29,16 @@ export function positionLabel(pos: number): string {
   return pos === 1 ? "1er" : `${pos}e`;
 }
 
+// Identité affichée d'un joueur : « Prénom + Initiale du nom » (ex. « Alex V. »),
+// pour distinguer les homonymes. Sert de nom unique dans les classements/équipes.
+export function playerIdentity(first: string, last: string): string {
+  const f = (first || "").trim();
+  const l = (last || "").trim();
+  const fc = f ? f.charAt(0).toUpperCase() + f.slice(1) : "";
+  const li = l ? ` ${l.charAt(0).toUpperCase()}.` : "";
+  return (fc + li).trim();
+}
+
 // Un nom d'équipe « Équipe 1 », « Équipe 2 »… est un libellé par défaut.
 export function isGenericTeamName(name?: string): boolean {
   return !name || /^équipe\s*\d+$/i.test(name.trim());

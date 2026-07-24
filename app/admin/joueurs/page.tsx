@@ -13,6 +13,7 @@ import {
 import { useAppData } from "@/lib/use-app-data";
 import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
+import { playerIdentity } from "@/lib/format";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import { isTestMode, setTestMode } from "@/lib/test-mode";
@@ -357,7 +358,8 @@ function PendingCard({
       await updateProfile(p.id, {
         role,
         level: role === "player" && level ? Number(level) : p.level,
-        linked_player_name: role === "player" ? linked || p.nickname : null,
+        linked_player_name:
+          role === "player" ? linked || playerIdentity(p.first_name, p.last_name) : null,
       });
       await markUserNotificationRead(p.id);
       notifyPlayer(
@@ -420,7 +422,7 @@ function PendingCard({
               Lier au joueur
             </label>
             <Select value={linked} onChange={(e) => setLinked(e.target.value)}>
-              <option value="">Nouveau : «{p.nickname}»</option>
+              <option value="">Nouveau : {playerIdentity(p.first_name, p.last_name)}</option>
               {[...knownPlayers].sort().map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
@@ -584,9 +586,17 @@ export default function AdminJoueurs() {
                     className="text-xs"
                   >
                     <option value="">Non lié</option>
-                    {!data.knownPlayers.includes(p.nickname) && (
-                      <option value={p.nickname}>{p.nickname} (surnom)</option>
-                    )}
+                    {(() => {
+                      const identity = playerIdentity(p.first_name, p.last_name);
+                      const extras = [identity, p.nickname].filter(
+                        (n, i, arr) => n && arr.indexOf(n) === i && !data.knownPlayers.includes(n)
+                      );
+                      return extras.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ));
+                    })()}
                     {[...data.knownPlayers].sort().map((n) => (
                       <option key={n} value={n}>{n}</option>
                     ))}

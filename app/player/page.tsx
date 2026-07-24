@@ -10,7 +10,7 @@ import {
 } from "@/lib/store";
 import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
 import { labelIncludesPlayer } from "@/lib/levels";
-import { endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
+import { endOfNextWeekStr, formatDateLong, localDateStr, playerIdentity } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
 
@@ -48,7 +48,11 @@ export default function PlayerTournaments() {
     reload();
   }, [reload]);
 
-  const myName = profile?.linked_player_name || profile?.nickname || "";
+  const myName =
+    profile?.linked_player_name ||
+    (profile ? playerIdentity(profile.first_name, profile.last_name) : "") ||
+    profile?.nickname ||
+    "";
 
   // Tournois où le joueur a déjà une inscription (par compte ou par nom).
   const myTournamentIds = useMemo(() => {
