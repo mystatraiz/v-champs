@@ -33,6 +33,15 @@ async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
   const today = localDateStr(new Date());
   let created = false;
 
+  // Créneaux (date + heure) déjà occupés par un tournoi, TOUS niveaux confondus.
+  // On ne crée jamais un tournoi récurrent sur un créneau déjà pris : ainsi,
+  // changer le niveau d'un tournoi ne provoque pas de doublon sur le même jour.
+  const occupied = new Set(
+    tournaments
+      .filter((t) => t.status !== "cancelled")
+      .map((t) => `${t.date}|${t.time}`)
+  );
+
   for (const rule of RECURRENCES) {
     const upcoming = tournaments.filter((t) => {
       const d = new Date(t.date + "T00:00:00");
@@ -47,16 +56,14 @@ async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
     let need = rule.count - upcoming.length;
     if (need <= 0) continue;
 
-    const existingDates = new Set(
-      tournaments.filter((t) => t.time === rule.time && t.level === rule.level).map((t) => t.date)
-    );
     const cursor = new Date();
     cursor.setDate(cursor.getDate() + 1);
     let safety = 0;
     while (need > 0 && safety < 120) {
       safety++;
       const dateStr = localDateStr(cursor);
-      if (rule.days.includes(cursor.getDay()) && !existingDates.has(dateStr)) {
+      const slot = `${dateStr}|${rule.time}`;
+      if (rule.days.includes(cursor.getDay()) && !occupied.has(slot)) {
         await createTournament({
           date: dateStr,
           time: rule.time,
@@ -64,7 +71,7 @@ async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
           courts: rule.courts,
           capacity: rule.courts * 4,
         });
-        existingDates.add(dateStr);
+        occupied.add(slot);
         need--;
         created = true;
       }
