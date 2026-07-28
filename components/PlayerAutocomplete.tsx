@@ -45,7 +45,7 @@ export function PlayerAutocomplete({
   const show = focused && suggestions.length > 0 && !exact;
 
   return (
-    <div className="relative flex-1">
+    <div className="min-w-0 flex-1">
       <Input
         placeholder={placeholder}
         value={value}
@@ -56,13 +56,16 @@ export function PlayerAutocomplete({
         onKeyDown={(e) => e.key === "Enter" && onPick(value)}
         autoComplete="off"
       />
+      {/* Liste en flux normal (et non en survol absolu) : les cartes parentes
+          utilisent overflow-hidden, qui découperait un menu positionné. */}
       {show && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-line2 bg-card shadow-xl shadow-black/40">
+        <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-line2 bg-surface">
           {suggestions.map((n) => (
             <button
               key={n}
-              // onMouseDown : se déclenche avant le blur du champ.
-              onMouseDown={(e) => {
+              // pointerdown : se déclenche avant le blur du champ, au doigt
+              // comme à la souris.
+              onPointerDown={(e) => {
                 e.preventDefault();
                 onChange(n);
                 setFocused(false);
