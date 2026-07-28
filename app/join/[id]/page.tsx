@@ -99,10 +99,22 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
           </Card>
         ) : done ? (
           <Card tone="gold" className="p-7 text-center">
-            <div className="mb-3 text-5xl">✅</div>
-            <h2 className="mb-1 text-lg font-extrabold text-bright">Demande envoyée !</h2>
+            <div className="mb-3 text-5xl">{free === 0 ? "⏳" : "✅"}</div>
+            <h2 className="mb-1 text-lg font-extrabold text-bright">
+              {free === 0 ? "Tu es en liste d'attente !" : "Demande envoyée !"}
+            </h2>
             <p className="text-sm text-sub">
-              L&apos;organisateur validera ta place — <b className="text-gold">{previewIdentity}</b>.
+              {free === 0 ? (
+                <>
+                  <b className="text-gold">{previewIdentity}</b> — tu seras prévenu(e) en priorité
+                  si une place se libère. Rien n&apos;est garanti d&apos;ici là.
+                </>
+              ) : (
+                <>
+                  L&apos;organisateur validera ta place —{" "}
+                  <b className="text-gold">{previewIdentity}</b>.
+                </>
+              )}
             </p>
           </Card>
         ) : (
@@ -128,7 +140,20 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
               </div>
             )}
 
-            {free > 0 && (
+            {free === 0 && (
+              <div className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-3">
+                <p className="text-[11px] font-bold leading-4 text-gold">
+                  ⏳ Liste d&apos;attente
+                </p>
+                <p className="mt-1 text-[11px] leading-4 text-sub">
+                  Toutes les places sont prises. Tu peux quand même t&apos;inscrire, mais{" "}
+                  <b className="text-body">aucune place n&apos;est garantie</b> : elle ne se libère
+                  que si un joueur se désiste. Tu seras prévenu(e) en priorité si ça arrive.
+                </p>
+              </div>
+            )}
+
+            {(
               <div className="mt-5 space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <Input
@@ -151,7 +176,9 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
 
                 {/* Voie principale : créer un compte pour fixer le pseudo + stats + niveau */}
                 <Btn size="lg" onClick={goCreateAccount} disabled={busy}>
-                  🎾 M&apos;inscrire &amp; créer mon compte
+                  {free === 0
+                    ? "⏳ Rejoindre la liste d'attente"
+                    : "🎾 M'inscrire & créer mon compte"}
                 </Btn>
                 <p className="text-center text-[11px] leading-4 text-mut">
                   Ton pseudo est conservé pour la prochaine fois, avec tes stats et ton classement.
@@ -169,7 +196,9 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
                   disabled={busy}
                   className="w-full cursor-pointer text-center text-xs font-semibold text-sub underline underline-offset-2 hover:text-body disabled:opacity-50"
                 >
-                  M&apos;inscrire juste pour cette fois (invité)
+                  {free === 0
+                    ? "Rejoindre la liste d'attente en invité"
+                    : "M'inscrire juste pour cette fois (invité)"}
                 </button>
               </div>
             )}

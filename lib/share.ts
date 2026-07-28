@@ -65,8 +65,16 @@ export function formatLessonText(lesson: Lesson, confirmedNames: string[]): stri
         : `🟢 *${free} place${free > 1 ? "s" : ""} disponible${free > 1 ? "s" : ""}*`,
   ];
 
-  if (!locked && free > 0 && url) {
-    lines.push("", `👉 Réserve ta place sur V-Champs : ${url}`);
+  // Verrouillée : aucun lien, la porte est fermée. Complète : on assume la
+  // liste d'attente plutôt que de promettre une place.
+  if (!locked && url) {
+    if (free > 0) lines.push("", `👉 Réserve ta place sur V-Champs : ${url}`);
+    else
+      lines.push(
+        "",
+        "⏳ *Liste d'attente* — tu peux t'inscrire, mais aucune place n'est garantie : elle ne se libère que si un joueur se désiste.",
+        `👉 ${url}`
+      );
   }
   return lines.filter((l) => l !== null).join("\n");
 }

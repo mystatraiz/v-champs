@@ -230,7 +230,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       ``,
       free === 0 ? `🔴 *Complet !*` : `🟢 *${free} place${free > 1 ? "s" : ""} disponible${free > 1 ? "s" : ""}*`,
       ``,
-      `👉 Inscription : ${window.location.origin}/join/${t.id}`,
+      // Complet : on assume la liste d'attente plutôt que de promettre une place.
+      free === 0
+        ? `⏳ *Liste d'attente* — tu peux t'inscrire, mais aucune place n'est garantie : elle ne se libère que si un joueur se désiste.`
+        : null,
+      free === 0
+        ? `👉 ${window.location.origin}/join/${t.id}`
+        : `👉 Inscription : ${window.location.origin}/join/${t.id}`,
     ].filter((l) => l !== null);
     window.open("https://wa.me/?text=" + encodeURIComponent(lines.join("\n")), "_blank");
   }
