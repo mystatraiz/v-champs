@@ -21,6 +21,18 @@ export function updateAppBadge(count: number): void {
   }
 }
 
+// L'app tourne-t-elle depuis l'icône de l'écran d'accueil (et non un onglet) ?
+// Sur iOS, seul `navigator.standalone` répond ; ailleurs c'est le media query.
+export function isStandalone(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    const nav = navigator as Navigator & { standalone?: boolean };
+    return window.matchMedia?.("(display-mode: standalone)").matches || nav.standalone === true;
+  } catch {
+    return false;
+  }
+}
+
 export function notificationPermission(): NotificationPermission | "unsupported" {
   if (typeof Notification === "undefined") return "unsupported";
   return Notification.permission;

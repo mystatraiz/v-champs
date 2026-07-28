@@ -6,12 +6,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { isOwner } from "@/lib/owner";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { TestModeBanner } from "@/components/TestModeBanner";
 import { Btn, Loader, Modal } from "@/components/ui";
 
 // Message de bienvenue affiché une seule fois quand le compte vient d'être lié
 // à un joueur (par l'admin) — ses stats/classement deviennent disponibles.
-function LinkNotice() {
+function LinkNotice({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
   const { profile } = useAuth();
   const [show, setShow] = useState(false);
   const linked = profile?.linked_player_name || null;
@@ -20,11 +21,14 @@ function LinkNotice() {
     if (!profile || !linked) return;
     try {
       const key = `vchamps_link_seen_${profile.id}`;
-      if (localStorage.getItem(key) !== linked) setShow(true);
+      if (localStorage.getItem(key) !== linked) {
+        setShow(true);
+        onOpenChange(true);
+      }
     } catch {
       /* localStorage indisponible : on n'affiche rien */
     }
-  }, [profile, linked]);
+  }, [profile, linked, onOpenChange]);
 
   function dismiss() {
     try {
@@ -33,6 +37,7 @@ function LinkNotice() {
       /* ignore */
     }
     setShow(false);
+    onOpenChange(false);
   }
 
   if (!linked) return null;
@@ -73,6 +78,9 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
   const { user, profile, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  // Évite de superposer deux fenêtres : le rappel d'installation attend que le
+  // message de liaison de compte soit refermé.
+  const [linkNoticeOpen, setLinkNoticeOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -121,7 +129,8 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
         </button>
       </header>
 
-      <LinkNotice />
+      <LinkNotice onOpenChange={setLinkNoticeOpen} />
+      <InstallPrompt role="player" profileId={profile.id} paused={linkNoticeOpen} />
 
       <main className="flex-1 px-4 py-5 pb-24">{children}</main>
 
