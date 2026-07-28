@@ -34,6 +34,46 @@ export function SectionTitle({ children, className = "" }: { children: ReactNode
   );
 }
 
+// Bandeau de section : rend deux listes voisines immédiatement distinguables
+// (icône, couleur d'accent, sous-titre, compteur).
+export function SectionBanner({
+  icon,
+  title,
+  subtitle,
+  count,
+  accent = "gold",
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  count?: number;
+  accent?: "gold" | "coach";
+}) {
+  const gold = accent === "gold";
+  return (
+    <div
+      className={`mb-2.5 flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 ${
+        gold ? "border-l-4 border-l-gold" : "border-l-4 border-l-coach"
+      }`}
+    >
+      <span className="text-2xl leading-none">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className={`text-sm font-extrabold ${gold ? "text-gold" : "text-coach"}`}>{title}</div>
+        {subtitle && <div className="text-[11px] leading-4 text-mut">{subtitle}</div>}
+      </div>
+      {count != null && (
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${
+            gold ? "bg-gold/15 text-gold" : "bg-coach/15 text-coach"
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Carte-catégorie dépliable : en-tête tappable + corps révélé au clic.
 export function CollapsibleCard({
   icon,
@@ -136,7 +176,7 @@ export function Badge({
   className = "",
 }: {
   children: ReactNode;
-  color?: "sub" | "gold" | "ok" | "bad" | "left" | "right";
+  color?: "sub" | "gold" | "ok" | "bad" | "left" | "right" | "coach";
   className?: string;
 }) {
   const colors = {
@@ -146,6 +186,7 @@ export function Badge({
     bad: "border-bad/60 text-bad",
     left: "border-left/60 text-left",
     right: "border-right/60 text-right",
+    coach: "border-coach/60 text-coach",
   };
   return (
     <span

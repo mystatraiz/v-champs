@@ -17,7 +17,7 @@ import { labelIncludesPlayer } from "@/lib/levels";
 import { lessonIncludesPlayer, lessonKind } from "@/lib/lessons";
 import { endOfNextWeekStr, formatDateLong, localDateStr, playerIdentity } from "@/lib/format";
 import type { Lesson, LessonRegistration, Registration, Tournament } from "@/lib/types";
-import { Badge, Btn, Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
+import { Badge, Btn, Card, EmptyState, Loader, SectionBanner } from "@/components/ui";
 
 const STATUS_UI: Record<
   Registration["status"],
@@ -170,7 +170,13 @@ export default function PlayerTournaments() {
   return (
     <div className="fade-up space-y-5">
       <div>
-        <SectionTitle>Tournois à venir</SectionTitle>
+        <SectionBanner
+          icon="🎾"
+          title="Tournois à venir"
+          subtitle="Matchs & points au classement V-Champs"
+          count={upcoming.length}
+          accent="gold"
+        />
 
         {!upcoming.length ? (
           <Card>
@@ -196,7 +202,7 @@ export default function PlayerTournaments() {
               const locked = t.status === "locked";
 
               return (
-                <Card key={t.id} className="overflow-hidden">
+                <Card key={t.id} className="overflow-hidden border-l-4 border-l-gold">
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -275,7 +281,13 @@ export default function PlayerTournaments() {
 
       {upcomingLessons.length > 0 && (
         <div>
-          <SectionTitle>Leçons à venir</SectionTitle>
+          <SectionBanner
+            icon="🎓"
+            title="Leçons à venir"
+            subtitle="Coaching — phases de jeu & panier (sans points)"
+            count={upcomingLessons.length}
+            accent="coach"
+          />
           <div className="space-y-3">
             {upcomingLessons.map((l) => {
               const lRegs = lessonRegs.filter((r) => r.lesson_id === l.id);
@@ -290,7 +302,7 @@ export default function PlayerTournaments() {
               const k = lessonKind(l.kind);
 
               return (
-                <Card key={l.id} className="overflow-hidden">
+                <Card key={l.id} className="overflow-hidden border-l-4 border-l-coach">
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -299,7 +311,7 @@ export default function PlayerTournaments() {
                           <span className="ml-2 text-gold">{l.time}</span>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <Badge color="gold">
+                          <Badge color="coach">
                             {k.icon} {k.label}
                           </Badge>
                           <span className={`text-[11px] font-bold ${full ? "text-bad" : "text-ok"}`}>

@@ -19,18 +19,22 @@ import {
   lessonLevelsLabel,
 } from "@/lib/lessons";
 import { PLAYER_LEVELS } from "@/lib/levels";
+import { useAppData } from "@/lib/use-app-data";
 import { TIME_SLOTS, endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type { Lesson, LessonKind, LessonRegistration } from "@/lib/types";
+import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
 import { Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
 
 // Détail d'une leçon : demandes à valider + joueurs confirmés.
 function LessonDetail({
   lesson,
   regs,
+  knownPlayers,
   onChange,
 }: {
   lesson: Lesson;
   regs: LessonRegistration[];
+  knownPlayers: string[];
   onChange: () => void;
 }) {
   const [manual, setManual] = useState("");
@@ -51,8 +55,8 @@ function LessonDetail({
     }
   }
 
-  async function addManual() {
-    const n = manual.trim();
+  async function addManual(name = manual) {
+    const n = name.trim();
     if (!n) return;
     await act(async () => {
       await addApprovedLessonPlayer(lesson.id, n);
@@ -156,14 +160,21 @@ function LessonDetail({
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Input
-          placeholder="Ajouter un joueur…"
+      <div className="flex items-start gap-2">
+        <PlayerAutocomplete
           value={manual}
-          onChange={(e) => setManual(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addManual()}
+          onChange={setManual}
+          onPick={(n) => addManual(n)}
+          options={knownPlayers}
+          exclude={regs.map((r) => r.player_name)}
+          placeholder="Ajouter un joueur…"
         />
-        <Btn size="sm" variant="secondary" disabled={busy || !manual.trim()} onClick={addManual}>
+        <Btn
+          size="sm"
+          variant="secondary"
+          disabled={busy || !manual.trim()}
+          onClick={() => addManual()}
+        >
           + Ajouter
         </Btn>
       </div>
@@ -172,6 +183,7 @@ function LessonDetail({
 }
 
 export default function AdminLessons() {
+  const { data: appData } = useAppData();
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [regs, setRegs] = useState<LessonRegistration[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +303,14 @@ export default function AdminLessons() {
           </button>
         </div>
 
-        {open && <LessonDetail lesson={l} regs={lRegs} onChange={reload} />}
+        {open && (
+          <LessonDetail
+            lesson={l}
+            regs={lRegs}
+            knownPlayers={appData?.knownPlayers ?? []}
+            onChange={reload}
+          />
+        )}
 
         <div className="h-[3px] bg-line">
           <div
