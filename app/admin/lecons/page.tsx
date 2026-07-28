@@ -316,13 +316,13 @@ export default function AdminLessons() {
         {showForm && (
           <Card className="mb-3 space-y-3 p-4">
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="min-w-0">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
                   Date
                 </label>
                 <Input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
                   Heure
                 </label>

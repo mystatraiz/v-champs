@@ -115,7 +115,7 @@ export function Btn({
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-lg border border-line2 bg-surface px-3.5 py-2.5 text-sm text-body placeholder:text-mut outline-none focus:border-gold/60 transition-colors ${className}`}
+      className={`w-full min-w-0 rounded-lg border border-line2 bg-surface px-3.5 py-2.5 text-sm text-body placeholder:text-mut outline-none focus:border-gold/60 transition-colors ${className}`}
       {...props}
     />
   );
@@ -124,7 +124,7 @@ export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInpu
 export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`w-full rounded-lg border border-line2 bg-surface px-3 py-2.5 text-sm text-body outline-none focus:border-gold/60 transition-colors ${className}`}
+      className={`w-full min-w-0 rounded-lg border border-line2 bg-surface px-3 py-2.5 text-sm text-body outline-none focus:border-gold/60 transition-colors ${className}`}
       {...props}
     />
   );

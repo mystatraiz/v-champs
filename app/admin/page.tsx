@@ -243,11 +243,11 @@ export default function AdminTournaments() {
         {showForm && (
           <Card className="mb-3 space-y-3 p-4">
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="min-w-0">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">Date</label>
                 <Input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">Heure</label>
                 <Select value={fTime} onChange={(e) => setFTime(e.target.value)}>
                   {TIME_SLOTS.map((s) => (
@@ -255,7 +255,7 @@ export default function AdminTournaments() {
                   ))}
                 </Select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">Niveau</label>
                 <Select value={fLevel} onChange={(e) => setFLevel(e.target.value)}>
                   {LEVEL_LABELS.map((l) => (
@@ -263,7 +263,7 @@ export default function AdminTournaments() {
                   ))}
                 </Select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">Terrains</label>
                 <Select value={fCourts} onChange={(e) => setFCourts(Number(e.target.value))}>
                   <option value={1}>1 terrain (4 joueurs)</option>
