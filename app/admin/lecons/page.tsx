@@ -9,6 +9,7 @@ import {
   listLessonRegistrations,
   listLessons,
   setLessonRegistrationStatus,
+  updateLesson,
 } from "@/lib/store";
 import { notifyNewLesson } from "@/lib/push";
 import {
@@ -44,6 +45,7 @@ function LessonDetail({
   const approved = regs.filter((r) => r.status === "approved");
   const waitlist = regs.filter((r) => r.status === "waitlist");
   const full = approved.length >= lesson.capacity;
+  const locked = lesson.status === "locked";
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -53,6 +55,17 @@ function LessonDetail({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Verrou : plus aucune demande ni liste d'attente possible côté joueur.
+  async function toggleLock() {
+    await act(() => updateLesson(lesson.id, { status: locked ? "open" : "locked" }));
+  }
+
+  async function setCapacity(n: number) {
+    const v = Math.max(1, Math.min(12, n));
+    if (v === lesson.capacity) return;
+    await act(() => updateLesson(lesson.id, { capacity: v }));
   }
 
   async function addManual(name = manual) {
@@ -66,6 +79,38 @@ function LessonDetail({
 
   return (
     <div className="border-t border-line px-3.5 py-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface p-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-mut">Places</span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCapacity(lesson.capacity - 1)}
+            disabled={busy || lesson.capacity <= 1}
+            className="h-7 w-7 cursor-pointer rounded-lg border border-line2 font-bold text-sub disabled:opacity-40 hover:text-body"
+          >
+            −
+          </button>
+          <span className="w-8 text-center text-sm font-extrabold text-bright">
+            {lesson.capacity}
+          </span>
+          <button
+            onClick={() => setCapacity(lesson.capacity + 1)}
+            disabled={busy || lesson.capacity >= 12}
+            className="h-7 w-7 cursor-pointer rounded-lg border border-line2 font-bold text-sub disabled:opacity-40 hover:text-body"
+          >
+            +
+          </button>
+        </div>
+        <Btn size="sm" variant={locked ? "danger" : "secondary"} disabled={busy} onClick={toggleLock}>
+          {locked ? "🔒 Verrouillée — rouvrir" : "🔓 Verrouiller"}
+        </Btn>
+      </div>
+      {locked && (
+        <p className="mb-3 rounded-lg bg-bad/10 px-3 py-2 text-[11px] font-semibold leading-4 text-bad">
+          Inscriptions bloquées : les joueurs ne peuvent plus demander de place, ni rejoindre la
+          liste d&apos;attente.
+        </p>
+      )}
+
       {pending.length > 0 && (
         <div className="mb-3">
           <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-mut">
@@ -198,6 +243,13 @@ export default function AdminLessons() {
   const [fKind, setFKind] = useState<LessonKind>("phases");
   const [fCourts, setFCourts] = useState(1);
   const [fLevels, setFLevels] = useState<number[]>([]);
+  const [fCapacity, setFCapacity] = useState(lessonCapacity("phases", 1));
+
+  // Le nombre de places suit le type et les terrains, puis reste ajustable
+  // à la main (leçon individuelle, duo…).
+  useEffect(() => {
+    setFCapacity(lessonCapacity(fKind, fCourts));
+  }, [fKind, fCourts]);
 
   const reload = useCallback(async () => {
     try {
@@ -227,8 +279,6 @@ export default function AdminLessons() {
   const upcoming = useMemo(() => active.filter((l) => l.date <= windowEnd), [active, windowEnd]);
   const far = useMemo(() => active.filter((l) => l.date > windowEnd), [active, windowEnd]);
 
-  const capacity = lessonCapacity(fKind, fCourts);
-
   function toggleLevel(n: number) {
     setFLevels((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort((a, b) => a - b)));
   }
@@ -241,7 +291,7 @@ export default function AdminLessons() {
         levels: fLevels,
         kind: fKind,
         courts: fCourts,
-        capacity,
+        capacity: fCapacity,
       });
       notifyNewLesson(fLevels, fKind, fDate, fTime); // prévient les joueurs ciblés
       setShowForm(false);
@@ -276,6 +326,7 @@ export default function AdminLessons() {
                   {pending}
                 </span>
               )}
+              {l.status === "locked" && <Badge color="bad">🔒 Verrouillée</Badge>}
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-sub">
               <Badge color="gold">
@@ -402,6 +453,46 @@ export default function AdminLessons() {
 
             <div>
               <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Nombre de places
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setFCapacity((c) => Math.max(1, c - 1))}
+                    className="h-9 w-9 cursor-pointer rounded-lg border border-line2 font-bold text-sub hover:text-body"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center text-lg font-extrabold text-bright">
+                    {fCapacity}
+                  </span>
+                  <button
+                    onClick={() => setFCapacity((c) => Math.min(12, c + 1))}
+                    className="h-9 w-9 cursor-pointer rounded-lg border border-line2 font-bold text-sub hover:text-body"
+                  >
+                    +
+                  </button>
+                </div>
+                <Btn
+                  size="sm"
+                  variant={fCapacity === 1 ? "primary" : "secondary"}
+                  onClick={() => {
+                    setFCourts(1);
+                    setFCapacity(1);
+                  }}
+                >
+                  👤 Leçon individuelle
+                </Btn>
+              </div>
+              <p className="mt-1.5 text-[11px] text-mut">
+                {fCapacity === lessonCapacity(fKind, fCourts)
+                  ? "Calculé d'après le type et les terrains — ajustable."
+                  : `Personnalisé (${lessonCapacity(fKind, fCourts)} par défaut). Une fois les ${fCapacity} place${fCapacity > 1 ? "s prises" : " prise"}, plus personne ne peut entrer.`}
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
                 Niveaux concernés
               </label>
               <div className="grid grid-cols-5 gap-1.5">
@@ -427,7 +518,7 @@ export default function AdminLessons() {
             </div>
 
             <Btn size="lg" onClick={handleCreate}>
-              Créer la leçon ({capacity} places)
+              Créer la leçon ({fCapacity} place{fCapacity > 1 ? "s" : ""})
             </Btn>
           </Card>
         )}
