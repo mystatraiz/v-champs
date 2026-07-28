@@ -119,9 +119,13 @@ export default function PlayerTournaments() {
     return lessons
       .filter((l) => l.date >= today && (l.status === "open" || l.status === "locked"))
       .filter((l) => {
+        const mine = myLessonIds.has(l.id);
+        // Verrouillée : la leçon disparaît pour tout le monde, sauf pour les
+        // joueurs qui y sont déjà inscrits (ils doivent garder leur créneau).
+        if (l.status === "locked" && !mine) return false;
         const inWindow = l.date <= windowEnd;
         const levelOk = lessonIncludesPlayer(l.levels, profile?.level ?? null);
-        return (inWindow && levelOk) || myLessonIds.has(l.id);
+        return (inWindow && levelOk) || mine;
       });
   }, [lessons, profile, myLessonIds]);
 

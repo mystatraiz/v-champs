@@ -20,6 +20,7 @@ import {
   lessonLevelsLabel,
 } from "@/lib/lessons";
 import { PLAYER_LEVELS } from "@/lib/levels";
+import { formatLessonText, openWhatsApp } from "@/lib/share";
 import { useAppData } from "@/lib/use-app-data";
 import { TIME_SLOTS, endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type { Lesson, LessonKind, LessonRegistration } from "@/lib/types";
@@ -102,6 +103,13 @@ function LessonDetail({
         </div>
         <Btn size="sm" variant={locked ? "danger" : "secondary"} disabled={busy} onClick={toggleLock}>
           {locked ? "🔒 Verrouillée — rouvrir" : "🔓 Verrouiller"}
+        </Btn>
+        <Btn
+          size="sm"
+          variant="secondary"
+          onClick={() => openWhatsApp(formatLessonText(lesson, approved.map((r) => r.player_name)))}
+        >
+          📤 Partager
         </Btn>
       </div>
       {locked && (

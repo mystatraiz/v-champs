@@ -1,7 +1,9 @@
 import { rankTeamsInSession } from "./scoring";
+import { lessonKind, lessonLevelsLabel } from "./lessons";
 import { formatDateLong, teamLabel } from "./format";
 import type {
   CombinedRankingRow,
+  Lesson,
   Match,
   PlayerSessionScore,
   SessionHistoryEntry,
@@ -34,6 +36,40 @@ function callToAction(): string[] {
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+const PLAYER_EMOJIS = ["🎾", "🏅", "⚡", "🔥", "💪", "🎯", "🌟", "👊"];
+
+// Message WhatsApp d'annonce d'une leçon.
+export function formatLessonText(lesson: Lesson, confirmedNames: string[]): string {
+  const k = lessonKind(lesson.kind);
+  const free = Math.max(0, lesson.capacity - confirmedNames.length);
+  const locked = lesson.status === "locked";
+  const url = appUrl();
+
+  const lines: (string | null)[] = [
+    `🎓 *Leçon — ${k.label}*`,
+    "",
+    `📅 *${formatDateLong(lesson.date)}*`,
+    `⏰ *${lesson.time}*`,
+    `🎯 ${lessonLevelsLabel(lesson.levels)}`,
+    `🏟 ${lesson.courts} terrain${lesson.courts > 1 ? "s" : ""} · ${lesson.capacity} place${
+      lesson.capacity > 1 ? "s" : ""
+    }`,
+    "",
+    confirmedNames.length ? `👥 *Inscrits (${confirmedNames.length}/${lesson.capacity}) :*` : null,
+    ...confirmedNames.map((p, i) => `${PLAYER_EMOJIS[i % PLAYER_EMOJIS.length]} ${p}`),
+    confirmedNames.length ? "" : null,
+    locked
+      ? "🔒 *Leçon fermée — inscriptions closes*"
+      : free === 0
+        ? "🔴 *Complet !*"
+        : `🟢 *${free} place${free > 1 ? "s" : ""} disponible${free > 1 ? "s" : ""}*`,
+  ];
+
+  if (!locked && free > 0 && url) {
+    lines.push("", `👉 Réserve ta place sur V-Champs : ${url}`);
+  }
+  return lines.filter((l) => l !== null).join("\n");
+}
 
 // Message WhatsApp du classement général V-Champs.
 export function formatRankingText(
