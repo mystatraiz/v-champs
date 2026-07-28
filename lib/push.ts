@@ -97,6 +97,14 @@ export const notifyPlayer = (profileId: string, title: string, body: string) =>
 export const notifyNewTournament = (level: string, date: string, time: string) =>
   post({ type: "new-tournament", level, date, time });
 
+// Nouvelle leçon → joueurs des niveaux ciblés (liste vide = tous).
+export const notifyNewLesson = (
+  levels: number[],
+  kind: string,
+  date: string,
+  time: string
+) => post({ type: "new-lesson", levels, kind, date, time });
+
 // Place libérée → joueurs en liste d'attente du tournoi.
 export const notifySpotFreed = (tournamentId: string, date: string) =>
   post({ type: "spot-freed", tournamentId, date });

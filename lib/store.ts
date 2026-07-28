@@ -3,6 +3,8 @@ import { supabase } from "./supabase";
 import { computeSessionScores } from "./scoring";
 import { isTestMode, nsKey } from "./test-mode";
 import type {
+  Lesson,
+  LessonRegistration,
   PlayerSessionScore,
   Profile,
   Registration,
@@ -520,7 +522,205 @@ export async function deleteRegistration(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Leçons (coaching) ───
+const TEST_LESSONS = "test_lessons";
+const TEST_LESSON_REG = "test_lesson_registrations";
+
+export async function listLessons(): Promise<Lesson[]> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Lesson>(TEST_LESSONS);
+    return arr.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  }
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("*")
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
+  if (error) throw error;
+  return (data as Lesson[]) || [];
+}
+
+export async function createLesson(
+  l: Pick<Lesson, "date" | "time" | "levels" | "kind" | "courts" | "capacity">
+): Promise<Lesson> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Lesson>(TEST_LESSONS);
+    const created: Lesson = {
+      id: newId(),
+      ...l,
+      status: "open",
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_LESSONS, [...arr, created]);
+    return created;
+  }
+  const { data, error } = await supabase
+    .from("lessons")
+    .insert({ ...l, status: "open" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Lesson;
+}
+
+export async function updateLesson(id: string, patch: Partial<Lesson>): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<Lesson>(TEST_LESSONS);
+    await writeJsonKey(
+      TEST_LESSONS,
+      arr.map((l) => (l.id === id ? { ...l, ...patch } : l))
+    );
+    return;
+  }
+  const { error } = await supabase.from("lessons").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteLesson(id: string): Promise<void> {
+  if (isTestMode()) {
+    const [lessons, regs] = await Promise.all([
+      readJsonKey<Lesson>(TEST_LESSONS),
+      readJsonKey<LessonRegistration>(TEST_LESSON_REG),
+    ]);
+    await writeJsonKey(
+      TEST_LESSONS,
+      lessons.filter((l) => l.id !== id)
+    );
+    await writeJsonKey(
+      TEST_LESSON_REG,
+      regs.filter((r) => r.lesson_id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("lessons").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function listLessonRegistrations(lessonId?: string): Promise<LessonRegistration[]> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    return (lessonId ? arr.filter((r) => r.lesson_id === lessonId) : arr).sort((a, b) =>
+      (a.created_at || "").localeCompare(b.created_at || "")
+    );
+  }
+  let q = supabase.from("lesson_registrations").select("*").order("created_at", { ascending: true });
+  if (lessonId) q = q.eq("lesson_id", lessonId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data as LessonRegistration[]) || [];
+}
+
+export async function requestLessonRegistration(
+  lessonId: string,
+  playerName: string,
+  profileId: string | null,
+  isGuest = false
+): Promise<LessonRegistration> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    const created: LessonRegistration = {
+      id: newId(),
+      lesson_id: lessonId,
+      profile_id: profileId,
+      player_name: playerName,
+      status: "pending",
+      is_guest: isGuest,
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_LESSON_REG, [...arr, created]);
+    return created;
+  }
+  const { data, error } = await supabase
+    .from("lesson_registrations")
+    .insert({
+      lesson_id: lessonId,
+      profile_id: profileId,
+      player_name: playerName,
+      status: "pending",
+      is_guest: isGuest,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as LessonRegistration;
+}
+
+export async function setLessonRegistrationStatus(
+  id: string,
+  status: RegistrationStatus
+): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    await writeJsonKey(
+      TEST_LESSON_REG,
+      arr.map((r) => (r.id === id ? { ...r, status } : r))
+    );
+    return;
+  }
+  const { error } = await supabase.from("lesson_registrations").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteLessonRegistration(id: string): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    await writeJsonKey(
+      TEST_LESSON_REG,
+      arr.filter((r) => r.id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("lesson_registrations").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Ajout manuel par le coach : inscription directement confirmée.
+export async function addApprovedLessonPlayer(lessonId: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const existing = await listLessonRegistrations(lessonId);
+  const dup = existing.find((r) => r.player_name.toLowerCase().trim() === trimmed.toLowerCase());
+  if (dup) {
+    if (dup.status !== "approved") await setLessonRegistrationStatus(dup.id, "approved");
+    return;
+  }
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    arr.push({
+      id: newId(),
+      lesson_id: lessonId,
+      profile_id: null,
+      player_name: trimmed,
+      status: "approved",
+      is_guest: false,
+      created_at: new Date().toISOString(),
+    });
+    await writeJsonKey(TEST_LESSON_REG, arr);
+    return;
+  }
+  const { error } = await supabase.from("lesson_registrations").insert({
+    lesson_id: lessonId,
+    profile_id: null,
+    player_name: trimmed,
+    status: "approved",
+    is_guest: false,
+  });
+  if (error) throw error;
+}
+
 // ─── Compteurs pour les pastilles de notification (admin) ───
+
+export async function countPendingLessonRegistrations(): Promise<number> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    return arr.filter((r) => r.status === "pending").length;
+  }
+  const { count } = await supabase
+    .from("lesson_registrations")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
+  return count || 0;
+}
 
 export async function countPendingRegistrations(): Promise<number> {
   if (isTestMode()) {

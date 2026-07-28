@@ -70,7 +70,62 @@ drop policy if exists "registrations_write" on public.registrations;
 create policy "registrations_write" on public.registrations
   for all to authenticated using (true) with check (true);
 
--- ── 5. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
+-- ── 5. Leçons (coaching) ───────────────────────────────────────────────────
+-- Une leçon cible un ou plusieurs niveaux de joueurs (1..10) et se décline en
+-- deux types : « phases » (phases de jeu, 4 joueurs/terrain) et « panier »
+-- (3 joueurs/terrain).
+create table if not exists public.lessons (
+  id         uuid primary key default gen_random_uuid(),
+  date       date not null,
+  time       text not null default '12:30',
+  levels     int[] not null default '{}',
+  kind       text not null default 'phases' check (kind in ('phases','panier')),
+  courts     int  not null default 1,
+  capacity   int  not null default 4,
+  status     text not null default 'open'
+             check (status in ('open','locked','done','cancelled')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.lesson_registrations (
+  id          uuid primary key default gen_random_uuid(),
+  lesson_id   uuid not null references public.lessons(id) on delete cascade,
+  profile_id  uuid references public.profiles(id) on delete set null,
+  player_name text not null,
+  status      text not null default 'pending'
+              check (status in ('pending','approved','declined','waitlist')),
+  is_guest    boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+-- Un même nom ne peut s'inscrire qu'une fois par leçon
+create unique index if not exists lesson_registrations_unique_name
+  on public.lesson_registrations (lesson_id, lower(trim(player_name)));
+
+alter table public.lessons              enable row level security;
+alter table public.lesson_registrations enable row level security;
+
+drop policy if exists "lessons_select" on public.lessons;
+create policy "lessons_select" on public.lessons
+  for select using (true);
+
+drop policy if exists "lessons_write" on public.lessons;
+create policy "lessons_write" on public.lessons
+  for all to authenticated using (true) with check (true);
+
+drop policy if exists "lesson_regs_select" on public.lesson_registrations;
+create policy "lesson_regs_select" on public.lesson_registrations
+  for select using (true);
+
+drop policy if exists "lesson_regs_insert_guest" on public.lesson_registrations;
+create policy "lesson_regs_insert_guest" on public.lesson_registrations
+  for insert to anon with check (status = 'pending');
+
+drop policy if exists "lesson_regs_write" on public.lesson_registrations;
+create policy "lesson_regs_write" on public.lesson_registrations
+  for all to authenticated using (true) with check (true);
+
+-- ── 6. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
 insert into public.tournaments (date, time, level, courts, capacity, status, teams)
 select
   (elem->>'date')::date,

@@ -115,6 +115,33 @@ export interface Registration {
   created_at: string;
 }
 
+// ─── Leçons (coaching) ───────────────────────────────────────────────────────
+
+export type LessonKind = "phases" | "panier";
+export type LessonStatus = "open" | "locked" | "done" | "cancelled";
+
+export interface Lesson {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  levels: number[]; // niveaux de joueurs ciblés (1..10) ; vide = tous niveaux
+  kind: LessonKind;
+  courts: number;
+  capacity: number;
+  status: LessonStatus;
+  created_at?: string;
+}
+
+export interface LessonRegistration {
+  id: string;
+  lesson_id: string;
+  profile_id: string | null;
+  player_name: string;
+  status: RegistrationStatus;
+  is_guest: boolean;
+  created_at: string;
+}
+
 export interface AggPlayerStats {
   wins: number;
   losses: number;

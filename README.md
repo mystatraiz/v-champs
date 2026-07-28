@@ -44,6 +44,7 @@ et exécutez le contenu de [`supabase/migration.sql`](supabase/migration.sql).
 Le script est **idempotent** et **ne touche à aucune donnée v1**. Il :
 - ajoute la colonne `level` aux profils,
 - crée les tables `tournaments` et `registrations` (avec RLS),
+- crée les tables `lessons` et `lesson_registrations` (leçons de coaching),
 - importe les tournois planifiés à venir de la v1.
 
 ### 2. Déploiement sur Vercel

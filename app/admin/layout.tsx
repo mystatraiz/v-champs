@@ -5,7 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { countPendingProfiles, countPendingRegistrations } from "@/lib/store";
+import {
+  countPendingLessonRegistrations,
+  countPendingProfiles,
+  countPendingRegistrations,
+} from "@/lib/store";
 import { updateAppBadge } from "@/lib/badge";
 import { isOwner } from "@/lib/owner";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -19,6 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Compteurs des pastilles (demandes d'inscription + comptes à valider).
   const [pendingRegs, setPendingRegs] = useState(0);
+  const [pendingLessons, setPendingLessons] = useState(0);
   const [pendingAccounts, setPendingAccounts] = useState(0);
 
   const isReady = !loading && !!profile && (profile.role === "admin" || profile.role === "organisateur");
@@ -27,13 +32,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const refreshBadges = useCallback(async () => {
     if (!isReady) return;
     try {
-      const [regs, accs] = await Promise.all([
+      const [regs, lessons, accs] = await Promise.all([
         countPendingRegistrations(),
+        countPendingLessonRegistrations(),
         canModerate ? countPendingProfiles() : Promise.resolve(0),
       ]);
       setPendingRegs(regs);
+      setPendingLessons(lessons);
       setPendingAccounts(accs);
-      updateAppBadge(regs + accs); // badge sur l'icône de l'app (si installée)
+      updateAppBadge(regs + lessons + accs); // badge sur l'icône de l'app (si installée)
     } catch {
       /* silencieux : les pastilles ne doivent jamais casser la navigation */
     }
@@ -65,6 +72,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isAdmin = profile.role === "admin";
   const tabs: { href: string; label: string; icon: string; badge?: number }[] = [
     { href: "/admin", label: "Tournois", icon: "🎾", badge: pendingRegs },
+    { href: "/admin/lecons", label: "Leçons", icon: "🎓", badge: pendingLessons },
     { href: "/admin/classement", label: "Classement", icon: "🏆" },
     { href: "/admin/reglement", label: "Règlement", icon: "📖" },
     ...(isAdmin

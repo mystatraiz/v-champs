@@ -12,6 +12,8 @@ interface Body {
   title?: string;
   body?: string;
   level?: string;
+  levels?: number[];
+  kind?: string;
   date?: string;
   time?: string;
   tournamentId?: string;
@@ -55,6 +57,28 @@ export async function POST(req: Request) {
       await sendToSubs(db, subs, targets, {
         title: "Nouveau tournoi 🎾",
         body: `Niveau ${level} — ${frDate(body.date)}${body.time ? ` à ${body.time}` : ""}. Inscris-toi vite !`,
+        url: "/player",
+      })
+    );
+  }
+
+  // ── Nouvelle leçon → joueurs des niveaux ciblés (liste vide = tous) ──
+  if (body.type === "new-lesson") {
+    const lvls = Array.isArray(body.levels) ? body.levels : [];
+    const { data: profs } = await db.from("profiles").select("id,level,role").eq("role", "player");
+    const eligible = new Set(
+      (profs || [])
+        .filter((p) => !lvls.length || p.level == null || lvls.includes(p.level as number))
+        .map((p) => p.id as string)
+    );
+    const targets = subs.filter(
+      (s) => s.role === "player" && s.profileId && eligible.has(s.profileId)
+    );
+    const kindLabel = body.kind === "panier" ? "Panier" : "Phases de jeu";
+    return j(
+      await sendToSubs(db, subs, targets, {
+        title: "Nouvelle leçon 🎓",
+        body: `${kindLabel} — ${frDate(body.date)}${body.time ? ` à ${body.time}` : ""}. Réserve ta place !`,
         url: "/player",
       })
     );
@@ -131,11 +155,15 @@ export async function POST(req: Request) {
 
   // ── Broadcast admin par défaut : nouvelle demande / nouveau compte ──
   const type = body.type === "account" ? "account" : "registration";
-  const [regsRes, accsRes] = await Promise.all([
+  const [regsRes, lessonRegsRes, accsRes] = await Promise.all([
     db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    db
+      .from("lesson_registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
     db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
   ]);
-  const total = (regsRes.count || 0) + (accsRes.count || 0);
+  const total = (regsRes.count || 0) + (lessonRegsRes.count || 0) + (accsRes.count || 0);
   const sent = await sendToSubs(db, subs, admins, {
     title: type === "account" ? "Nouveau compte à valider" : "Nouvelle demande d'inscription",
     body: body.name
