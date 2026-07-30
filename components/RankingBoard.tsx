@@ -88,18 +88,13 @@ export function RankingBoard({
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
                   <th className="px-3 py-2.5">#</th>
                   <th className="px-2 py-2.5">Joueur</th>
-                  <th className="px-2 py-2.5">Score</th>
-                  <th className="px-2 py-2.5">M</th>
-                  <th className="px-2 py-2.5">V</th>
-                  <th className="px-2 py-2.5">D</th>
-                  <th className="px-2 py-2.5">N</th>
-                  <th className="px-2 py-2.5">+/-</th>
+                  <th className="px-3 py-2.5 text-right">V-Points</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,26 +115,16 @@ export function RankingBoard({
                         <RankBadge rank={i + 1} />
                         <Trend curr={i + 1} prev={prevRank} isNew={isNew} />
                       </td>
-                      <td className="px-2 py-2.5">
+                      <td className="w-full px-2 py-2.5">
                         <button
                           onClick={() => setOpenPlayer(p.name)}
-                          className="cursor-pointer font-semibold text-body underline-offset-2 hover:text-gold hover:underline"
+                          className="cursor-pointer text-left font-semibold text-body underline-offset-2 hover:text-gold hover:underline"
                         >
                           {p.name}
                         </button>
                       </td>
-                      <td className="px-2 py-2.5 text-[15px] font-extrabold">{p.score || "—"}</td>
-                      <td className="px-2 py-2.5 text-sub">{p.m}</td>
-                      <td className="px-2 py-2.5 font-semibold text-ok">{p.v}</td>
-                      <td className="px-2 py-2.5 font-semibold text-bad">{p.d}</td>
-                      <td className="px-2 py-2.5 text-sub">{p.n}</td>
-                      <td
-                        className={`px-2 py-2.5 font-bold ${
-                          p.jDiff > 0 ? "text-ok" : p.jDiff < 0 ? "text-bad" : "text-sub"
-                        }`}
-                      >
-                        {p.jDiff > 0 ? "+" : ""}
-                        {p.jDiff}
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-[15px] font-extrabold text-gold">
+                        {p.score || "—"}
                       </td>
                     </tr>
                   );
