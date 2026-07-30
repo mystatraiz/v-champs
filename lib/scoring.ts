@@ -283,10 +283,8 @@ export function computeMentions(
   if (withMatches.length) {
     const mostWins = [...withMatches].sort((a, b) => b.v - a.v)[0];
     const bestDiff = [...withMatches].sort((a, b) => b.jDiff - a.jDiff)[0];
-    const mostPlayed = [...withMatches].sort((a, b) => b.m - a.m)[0];
     mentions.push({ icon: "🏆", label: "Plus de victoires", name: mostWins.name, val: `${mostWins.v}V` });
     mentions.push({ icon: "📈", label: "Meilleur +/-", name: bestDiff.name, val: `+${bestDiff.jDiff}` });
-    mentions.push({ icon: "💪", label: "Plus de matchs", name: mostPlayed.name, val: `${mostPlayed.m}M` });
   }
   const sideMap = computeAllSideStats(history, current);
   const bestGauche = Object.entries(sideMap)
