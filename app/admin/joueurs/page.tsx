@@ -7,13 +7,15 @@ import {
   listProfiles,
   markUserNotificationRead,
   renamePlayer,
+  replacePlayerInSession,
   resetAllScores,
   updateProfile,
 } from "@/lib/store";
 import { useAppData } from "@/lib/use-app-data";
 import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
-import { playerIdentity, uniquePlayerIdentity } from "@/lib/format";
+import { formatDateShort, playerIdentity, uniquePlayerIdentity } from "@/lib/format";
+import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import { isTestMode, setTestMode } from "@/lib/test-mode";
@@ -235,6 +237,134 @@ function NamesManager({ data, onDone }: { data: AppData; onDone: () => void }) {
           )}
         </div>
       )}
+    </Card>
+  );
+}
+
+// Outil admin : corriger un joueur sur UNE session (erreur d'homonyme le jour J).
+// Les autres sessions de ce joueur ne bougent pas.
+function SessionFixTool({ data, onDone }: { data: AppData; onDone: () => void }) {
+  const [sessionId, setSessionId] = useState("");
+  const [wrong, setWrong] = useState("");
+  const [right, setRight] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // Sessions les plus récentes d'abord.
+  const sessions = useMemo(
+    () => [...data.history].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30),
+    [data.history]
+  );
+  const session = sessions.find((s) => s.date === sessionId);
+  const participants = useMemo(
+    () =>
+      session
+        ? [...new Set((session.teams || []).flatMap((t) => t.players).filter(Boolean))].sort()
+        : [],
+    [session]
+  );
+  const knownNames = useMemo(() => collectPlayerNames(data).map((n) => n.name), [data]);
+
+  async function apply() {
+    if (!sessionId || !wrong || !right.trim()) return;
+    if (wrong.toLowerCase().trim() === right.toLowerCase().trim()) {
+      setMsg("Les deux noms sont identiques.");
+      return;
+    }
+    if (
+      !confirm(
+        `Sur la session du ${formatDateShort(sessionId)} uniquement :\n« ${wrong} » devient « ${right.trim()} ».\n\nLes matchs et les points V-Champs de cette session passent à ${right.trim()}. Les autres sessions de « ${wrong} » ne changent pas.\n\nContinuer ?`
+      )
+    )
+      return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await replacePlayerInSession(sessionId, wrong, right.trim());
+      setMsg(`✓ Corrigé sur la session du ${formatDateShort(sessionId)}.`);
+      setWrong("");
+      setRight("");
+      onDone();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Erreur pendant la correction.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-4">
+      <p className="mb-3 text-xs leading-5 text-sub">
+        L&apos;organisateur s&apos;est trompé de joueur sur une session (deux homonymes, par
+        exemple) ? Remplace-le <b className="text-body">sur cette session seulement</b> : les
+        matchs et les points V-Champs du jour passent au bon joueur, tout son autre historique
+        reste intact.
+      </p>
+      <div className="space-y-2">
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+            Session concernée
+          </label>
+          <Select
+            value={sessionId}
+            onChange={(e) => {
+              setSessionId(e.target.value);
+              setWrong("");
+              setMsg(null);
+            }}
+          >
+            <option value="">— Choisir la session —</option>
+            {sessions.map((s) => (
+              <option key={s.date} value={s.date}>
+                {formatDateShort(s.date)} · {s.label || "?"}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {sessionId && (
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Joueur inscrit par erreur
+            </label>
+            <Select value={wrong} onChange={(e) => setWrong(e.target.value)}>
+              <option value="">— Choisir le joueur à remplacer —</option>
+              {participants.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+        {wrong && (
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Joueur qui a réellement joué
+            </label>
+            <PlayerAutocomplete
+              value={right}
+              onChange={setRight}
+              onPick={setRight}
+              options={knownNames}
+              exclude={participants}
+              placeholder="Nom du bon joueur"
+            />
+          </div>
+        )}
+      </div>
+      {msg && (
+        <p className={`mt-2 text-xs font-semibold ${msg.startsWith("✓") ? "text-ok" : "text-bad"}`}>
+          {msg}
+        </p>
+      )}
+      <Btn
+        className="mt-3"
+        size="lg"
+        disabled={busy || !sessionId || !wrong || !right.trim()}
+        onClick={apply}
+      >
+        {busy ? "Correction en cours…" : "Corriger cette session"}
+      </Btn>
     </Card>
   );
 }
@@ -635,6 +765,16 @@ export default function AdminJoueurs() {
           <div>
             <SectionTitle>Corriger / renommer</SectionTitle>
             <NamesManager
+              data={data}
+              onDone={() => {
+                reloadData();
+                reload();
+              }}
+            />
+          </div>
+          <div>
+            <SectionTitle>Erreur de joueur sur une session</SectionTitle>
+            <SessionFixTool
               data={data}
               onDone={() => {
                 reloadData();

@@ -323,6 +323,78 @@ export async function renamePlayer(
   return result;
 }
 
+// ─── Correction d'un joueur sur UNE SEULE session ───
+// Cas typique : l'organisateur s'est trompé d'homonyme le jour J. Contrairement
+// à renamePlayer, rien n'est modifié sur les autres sessions : seuls l'équipe de
+// cette session et les points V-Champs correspondants changent de main.
+export async function replacePlayerInSession(
+  sessionId: string,
+  oldName: string,
+  newName: string
+): Promise<void> {
+  const oldKey = oldName.toLowerCase().trim();
+  const newTrim = newName.trim();
+  if (!oldKey || !newTrim || oldKey === newTrim.toLowerCase()) return;
+
+  // 1) Historique : uniquement l'entrée de cette session.
+  const { data } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", nsKey("session_history"))
+    .maybeSingle();
+  const history = (data?.value as SessionHistoryEntry[]) || [];
+  let found = false;
+  const updated = history.map((s) => {
+    if (s.date !== sessionId) return s;
+    found = true;
+    return {
+      ...s,
+      teams: (s.teams || []).map((t) => ({
+        ...t,
+        players: (t.players || []).map((p) =>
+          p && p.toLowerCase().trim() === oldKey ? newTrim : p
+        ) as [string, string],
+      })),
+    };
+  });
+  if (!found) throw new Error("Session introuvable dans l'historique.");
+  await saveHistory(updated);
+
+  // 2) Points V-Champs de cette session (la clé unique est nom + session).
+  const { data: rows } = await supabase
+    .from("player_session_scores")
+    .select("*")
+    .eq("session_id", sessionId);
+  const scores = (rows as PlayerSessionScore[]) || [];
+  const target = scores.find((r) => (r.player_name || "").toLowerCase().trim() === oldKey);
+  if (target) {
+    const clash = scores.find(
+      (r) => (r.player_name || "").toLowerCase().trim() === newTrim.toLowerCase()
+    );
+    // Le bon joueur a déjà des points sur cette session → on supprime le doublon.
+    if (clash) {
+      await supabase
+        .from("player_session_scores")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("player_name", target.player_name);
+    } else {
+      await supabase
+        .from("player_session_scores")
+        .update({ player_name: newTrim })
+        .eq("session_id", sessionId)
+        .eq("player_name", target.player_name);
+    }
+  }
+
+  // 3) Le bon joueur rejoint les joueurs connus s'il n'y était pas.
+  try {
+    await supabase.from("known_players").upsert({ name: newTrim });
+  } catch {
+    /* sans conséquence pour la correction */
+  }
+}
+
 // ─── Tournois ───
 // En mode test : stockés dans app_state (clé « test_tournaments »). Sinon : table.
 const TEST_TOURN = "test_tournaments";
