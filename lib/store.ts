@@ -473,6 +473,32 @@ export async function deleteTournament(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Retire un joueur de la grille de composition d'un tournoi. Indispensable en
+// cas de désistement : la fiche du tournoi affiche les joueurs d'après la
+// grille, pas d'après les inscriptions — sans ça, un joueur désinscrit resterait
+// visible et compterait dans les places prises.
+export async function removeFromTournamentGrid(
+  tournamentId: string,
+  playerName: string
+): Promise<void> {
+  const key = (playerName || "").toLowerCase().trim();
+  if (!key) return;
+  const t = await getTournament(tournamentId);
+  if (!t?.teams?.length) return;
+  let touched = false;
+  const teams = t.teams.map((tm) => ({
+    ...tm,
+    players: (tm.players || []).map((p) => {
+      if (p && p.toLowerCase().trim() === key) {
+        touched = true;
+        return "";
+      }
+      return p;
+    }) as [string, string],
+  }));
+  if (touched) await updateTournament(tournamentId, { teams });
+}
+
 // ─── Inscriptions ───
 
 export async function listRegistrations(tournamentId?: string): Promise<Registration[]> {

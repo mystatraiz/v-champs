@@ -9,6 +9,7 @@ import {
   listLessons,
   listRegistrations,
   listTournaments,
+  removeFromTournamentGrid,
   requestLessonRegistration,
   requestRegistration,
 } from "@/lib/store";
@@ -153,6 +154,9 @@ export default function PlayerTournaments() {
       if (mine) {
         const wasApproved = mine.status === "approved";
         await deleteRegistration(mine.id);
+        // Le joueur avait pu être placé dans la grille : l'en retirer aussi,
+        // sinon l'organisateur continue de le voir inscrit.
+        await removeFromTournamentGrid(t.id, mine.player_name);
         // Désistement : prévient les admins, et si une place confirmée se libère,
         // prévient les joueurs en liste d'attente.
         notifyWithdrawal(myName, t.date, t.time);

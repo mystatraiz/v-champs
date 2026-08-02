@@ -11,6 +11,7 @@ import {
   listProfiles,
   listRegistrations,
   loadAppData,
+  removeFromTournamentGrid,
   savePairNames,
   saveSessionState,
   setRegistrationStatus,
@@ -174,6 +175,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
 
   async function declineRegistration(r: Registration) {
     await setRegistrationStatus(r.id, "declined");
+    await removeFromTournamentGrid(t.id, r.player_name); // s'il avait déjà été placé
     if (r.profile_id)
       notifyPlayer(
         r.profile_id,
@@ -199,9 +201,10 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     }));
     setTeams(next);
     await updateTournament(t.id, { teams: next });
+    // Sorti de la grille → remis en liste d'attente. Sans inscription
+    // correspondante (joueur désisté), on n'en recrée pas une fantôme.
     const reg = regs.find((r) => r.player_name.toLowerCase().trim() === key);
     if (reg) await setRegistrationStatus(reg.id, "waitlist");
-    else await addApprovedPlayer(t.id, name, "waitlist");
     reload();
   }
 
@@ -387,6 +390,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                     variant="ghost"
                     onClick={async () => {
                       await deleteRegistration(r.id);
+                      await removeFromTournamentGrid(t.id, r.player_name);
                       reload();
                     }}
                   >
