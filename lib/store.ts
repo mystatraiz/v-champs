@@ -834,6 +834,10 @@ export async function getPushSubscriptions(): Promise<StoredPushSub[]> {
 
 export async function savePushSubscription(sub: StoredPushSub): Promise<void> {
   const subs = await getPushSubscriptions();
+  // Déjà enregistré à l'identique : on évite une réécriture inutile de la liste
+  // (elle est réenregistrée à chaque ouverture de l'app).
+  const same = subs.find((s) => s.endpoint === sub.endpoint);
+  if (same && same.role === sub.role && same.profileId === sub.profileId) return;
   const next = [...subs.filter((s) => s.endpoint !== sub.endpoint), sub];
   await supabase.from("app_state").upsert({
     key: "push_subscriptions",

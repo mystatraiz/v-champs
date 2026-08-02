@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { isOwner } from "@/lib/owner";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { PushKeepAlive } from "@/components/PushKeepAlive";
 import { TestModeBanner } from "@/components/TestModeBanner";
 import { Btn, Loader, Modal } from "@/components/ui";
 
@@ -129,6 +130,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
         </button>
       </header>
 
+      <PushKeepAlive role="player" profileId={profile.id} />
       <LinkNotice onOpenChange={setLinkNoticeOpen} />
       <InstallPrompt role="player" profileId={profile.id} paused={linkNoticeOpen} />
 

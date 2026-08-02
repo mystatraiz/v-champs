@@ -13,6 +13,7 @@ import {
 import { updateAppBadge } from "@/lib/badge";
 import { isOwner } from "@/lib/owner";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { PushKeepAlive } from "@/components/PushKeepAlive";
 import { TestModeBanner } from "@/components/TestModeBanner";
 import { Loader } from "@/components/ui";
 
@@ -112,6 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </button>
       </header>
 
+      <PushKeepAlive role={profile.role} profileId={profile.id} />
       <InstallPrompt role={profile.role} profileId={profile.id} />
 
       <main className="flex-1 px-4 py-5 pb-24">{children}</main>
