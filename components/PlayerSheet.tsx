@@ -61,13 +61,18 @@ export function PlayerSheet({
           gauche: {
             wins: acc.gauche.wins + all[k].gauche.wins,
             played: acc.gauche.played + all[k].gauche.played,
+            diff: acc.gauche.diff + all[k].gauche.diff,
           },
           droite: {
             wins: acc.droite.wins + all[k].droite.wins,
             played: acc.droite.played + all[k].droite.played,
+            diff: acc.droite.diff + all[k].droite.diff,
           },
         }),
-        { gauche: { wins: 0, played: 0 }, droite: { wins: 0, played: 0 } }
+        {
+          gauche: { wins: 0, played: 0, diff: 0 },
+          droite: { wins: 0, played: 0, diff: 0 },
+        }
       );
     } catch {
       return null;
@@ -167,6 +172,16 @@ export function PlayerSheet({
                         ({s.wins}V / {s.played}M)
                       </span>
                     </div>
+                    {s.played > 0 && (
+                      <div
+                        className={`text-xs font-bold ${
+                          s.diff > 0 ? "text-ok" : s.diff < 0 ? "text-bad" : "text-mut"
+                        }`}
+                      >
+                        {s.diff > 0 ? "+" : ""}
+                        {s.diff} de +/-
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

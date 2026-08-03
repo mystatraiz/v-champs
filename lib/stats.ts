@@ -138,11 +138,12 @@ export function buildTeamStats(
 }
 
 export interface SideStats {
-  gauche: { wins: number; played: number };
-  droite: { wins: number; played: number };
+  gauche: { wins: number; played: number; diff: number };
+  droite: { wins: number; played: number; diff: number };
 }
 
-// Stats victoire par côté (gauche / droite) pour chaque joueur.
+// Stats par côté (gauche / droite) pour chaque joueur : victoires, matchs joués
+// et différence de jeux (+/-) réalisée sur ce côté.
 export function computeAllSideStats(
   history: SessionHistoryEntry[],
   current: SessionState | null
@@ -162,10 +163,11 @@ export function computeAllSideStats(
           const side = idx === 0 ? "gauche" : "droite";
           if (!sideMap[player])
             sideMap[player] = {
-              gauche: { wins: 0, played: 0 },
-              droite: { wins: 0, played: 0 },
+              gauche: { wins: 0, played: 0, diff: 0 },
+              droite: { wins: 0, played: 0, diff: 0 },
             };
           sideMap[player][side].played++;
+          sideMap[player][side].diff += myScore - oppScore;
           if (won) sideMap[player][side].wins++;
         });
       }

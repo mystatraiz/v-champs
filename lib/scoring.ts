@@ -282,28 +282,46 @@ export function computeMentions(
   const withMatches = combined.filter((p) => p.m >= 3);
   if (withMatches.length) {
     const mostWins = [...withMatches].sort((a, b) => b.v - a.v)[0];
-    const bestDiff = [...withMatches].sort((a, b) => b.jDiff - a.jDiff)[0];
     mentions.push({ icon: "🏆", label: "Plus de victoires", name: mostWins.name, val: `${mostWins.v}V` });
-    mentions.push({ icon: "📈", label: "Meilleur +/-", name: bestDiff.name, val: `+${bestDiff.jDiff}` });
   }
+
+  // Mentions +/- : toutes calculées sur la même base (différence de jeux par
+  // côté), pour que gauche + droite = total et que les trois soient comparables.
+  const signed = (n: number) => `${n > 0 ? "+" : ""}${n}`;
   const sideMap = computeAllSideStats(history, current);
-  const bestGauche = Object.entries(sideMap)
+  const entries = Object.entries(sideMap);
+
+  const bestOverall = entries
+    .filter(([, s]) => s.gauche.played + s.droite.played >= 5)
+    .sort((a, b) => b[1].gauche.diff + b[1].droite.diff - (a[1].gauche.diff + a[1].droite.diff))[0];
+  if (bestOverall) {
+    const total = bestOverall[1].gauche.diff + bestOverall[1].droite.diff;
+    mentions.push({ icon: "📈", label: "Meilleur +/-", name: bestOverall[0], val: signed(total) });
+  }
+
+  const bestGauche = entries
     .filter(([, s]) => s.gauche.played >= 5)
-    .sort(
-      (a, b) => b[1].gauche.wins / b[1].gauche.played - a[1].gauche.wins / a[1].gauche.played
-    )[0];
-  const bestDroite = Object.entries(sideMap)
+    .sort((a, b) => b[1].gauche.diff - a[1].gauche.diff)[0];
+  const bestDroite = entries
     .filter(([, s]) => s.droite.played >= 5)
-    .sort(
-      (a, b) => b[1].droite.wins / b[1].droite.played - a[1].droite.wins / a[1].droite.played
-    )[0];
+    .sort((a, b) => b[1].droite.diff - a[1].droite.diff)[0];
   if (bestGauche) {
-    const wr = Math.round((bestGauche[1].gauche.wins / bestGauche[1].gauche.played) * 100);
-    mentions.push({ icon: "◀", label: "Meilleur côté gauche", name: bestGauche[0], val: `${wr}%`, color: "#3b82f6" });
+    mentions.push({
+      icon: "◀",
+      label: "Meilleur +/- à gauche",
+      name: bestGauche[0],
+      val: signed(bestGauche[1].gauche.diff),
+      color: "#3b82f6",
+    });
   }
   if (bestDroite) {
-    const wr = Math.round((bestDroite[1].droite.wins / bestDroite[1].droite.played) * 100);
-    mentions.push({ icon: "▶", label: "Meilleur côté droite", name: bestDroite[0], val: `${wr}%`, color: "#f97316" });
+    mentions.push({
+      icon: "▶",
+      label: "Meilleur +/- à droite",
+      name: bestDroite[0],
+      val: signed(bestDroite[1].droite.diff),
+      color: "#f97316",
+    });
   }
   return mentions;
 }
