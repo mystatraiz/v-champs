@@ -31,6 +31,7 @@ const RECURRENCES: {
 // Maintient les prochains tournois récurrents (crée ceux qui manquent).
 async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
   const today = localDateStr(new Date());
+  const windowEnd = endOfNextWeekStr();
   let created = false;
 
   // Créneaux (date + heure) déjà occupés par un tournoi, TOUS niveaux confondus.
@@ -71,6 +72,9 @@ async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
           courts: rule.courts,
           capacity: rule.courts * 4,
         });
+        // Notification uniquement pour les tournois déjà visibles côté joueur :
+        // la récurrence en crée aussi de plus lointains, masqués chez eux.
+        if (dateStr <= windowEnd) notifyNewTournament(rule.level, dateStr, rule.time);
         occupied.add(slot);
         need--;
         created = true;

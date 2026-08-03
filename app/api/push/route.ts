@@ -42,17 +42,24 @@ export async function POST(req: Request) {
     );
   }
 
-  // ── Nouveau tournoi → joueurs du bon niveau (ou sans niveau défini) ──
+  // ── Nouveau tournoi → tout compte dont le niveau correspond ──
   if (body.type === "new-tournament") {
     const level = String(body.level || "");
     const lvls = levelsOfLabel(level);
-    const { data: profs } = await db.from("profiles").select("id,level,role").eq("role", "player");
+    const { data: profs } = await db.from("profiles").select("id,level,role").neq("role", "pending");
     const eligible = new Set(
       (profs || [])
-        .filter((p) => p.level == null || lvls.includes(p.level as number))
+        .filter((p) => {
+          // Sans niveau attribué : réservé aux joueurs, qui voient tous les
+          // tournois. Un organisateur sans niveau ne veut pas tout recevoir.
+          if (p.level == null) return p.role === "player";
+          return lvls.includes(p.level as number);
+        })
         .map((p) => p.id as string)
     );
-    const targets = subs.filter((s) => s.role === "player" && s.profileId && eligible.has(s.profileId));
+    // Ciblage par compte et non par rôle d'abonnement : un admin est souvent
+    // joueur aussi, et le rôle stocké dépend du dernier espace ouvert.
+    const targets = subs.filter((s) => s.profileId && eligible.has(s.profileId));
     return j(
       await sendToSubs(db, subs, targets, {
         title: "Nouveau tournoi 🎾",
@@ -65,15 +72,17 @@ export async function POST(req: Request) {
   // ── Nouvelle leçon → joueurs des niveaux ciblés (liste vide = tous) ──
   if (body.type === "new-lesson") {
     const lvls = Array.isArray(body.levels) ? body.levels : [];
-    const { data: profs } = await db.from("profiles").select("id,level,role").eq("role", "player");
+    const { data: profs } = await db.from("profiles").select("id,level,role").neq("role", "pending");
     const eligible = new Set(
       (profs || [])
-        .filter((p) => !lvls.length || p.level == null || lvls.includes(p.level as number))
+        .filter((p) => {
+          if (!lvls.length) return true; // leçon ouverte à tous les niveaux
+          if (p.level == null) return p.role === "player";
+          return lvls.includes(p.level as number);
+        })
         .map((p) => p.id as string)
     );
-    const targets = subs.filter(
-      (s) => s.role === "player" && s.profileId && eligible.has(s.profileId)
-    );
+    const targets = subs.filter((s) => s.profileId && eligible.has(s.profileId));
     const kindLabel = body.kind === "panier" ? "Panier" : "Phases de jeu";
     return j(
       await sendToSubs(db, subs, targets, {
