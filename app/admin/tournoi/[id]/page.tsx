@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   addApprovedPlayer,
   addKnownPlayers,
+  cancelTournament,
   deleteRegistration,
-  deleteTournament,
   getTournament,
   listProfiles,
   listRegistrations,
@@ -439,8 +439,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
           <Btn
             variant="ghost"
             onClick={async () => {
-              if (!confirm("Supprimer ce tournoi ?")) return;
-              await deleteTournament(t.id);
+              if (
+                !confirm(
+                  "Annuler ce tournoi ?\n\nIl disparaîtra pour les joueurs, les demandes en cours seront effacées et il ne sera pas recréé automatiquement."
+                )
+              )
+                return;
+              await cancelTournament(t.id);
               router.push("/admin");
             }}
           >

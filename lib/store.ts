@@ -460,6 +460,24 @@ export async function updateTournament(id: string, patch: Partial<Tournament>): 
   if (error) throw error;
 }
 
+// Annule un tournoi. On ne le supprime pas : le créneau reste enregistré pour
+// que la maintenance des récurrences ne le recrée pas aussitôt. Il disparaît des
+// listes (organisateur comme joueur) et ses demandes sont effacées, sinon la
+// pastille des inscriptions en attente compterait des demandes fantômes.
+export async function cancelTournament(id: string): Promise<void> {
+  await updateTournament(id, { status: "cancelled" });
+  if (isTestMode()) {
+    const arr = await readJsonKey<Registration>(TEST_REG);
+    await writeJsonKey(
+      TEST_REG,
+      arr.filter((r) => r.tournament_id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("registrations").delete().eq("tournament_id", id);
+  if (error) throw error;
+}
+
 export async function deleteTournament(id: string): Promise<void> {
   if (isTestMode()) {
     const arr = await readJsonKey<Tournament>(TEST_TOURN);

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  cancelTournament,
   createTournament,
-  deleteTournament,
   listRegistrations,
   listTournaments,
   loadAppData,
@@ -34,14 +34,11 @@ async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
   const windowEnd = endOfNextWeekStr();
   let created = false;
 
-  // Créneaux (date + heure) déjà occupés par un tournoi, TOUS niveaux confondus.
-  // On ne crée jamais un tournoi récurrent sur un créneau déjà pris : ainsi,
-  // changer le niveau d'un tournoi ne provoque pas de doublon sur le même jour.
-  const occupied = new Set(
-    tournaments
-      .filter((t) => t.status !== "cancelled")
-      .map((t) => `${t.date}|${t.time}`)
-  );
+  // Créneaux (date + heure) déjà pris, TOUS niveaux et TOUS statuts confondus.
+  // On ne crée jamais un tournoi récurrent sur un créneau déjà occupé : changer
+  // le niveau d'un tournoi ne crée donc pas de doublon le même jour, et un
+  // tournoi annulé par l'organisateur n'est pas ressuscité aussitôt.
+  const occupied = new Set(tournaments.map((t) => `${t.date}|${t.time}`));
 
   for (const rule of RECURRENCES) {
     const upcoming = tournaments.filter((t) => {
@@ -196,8 +193,13 @@ export default function AdminTournaments() {
           {!isPast && (
             <button
               onClick={async () => {
-                if (!confirm("Supprimer ce tournoi planifié ?")) return;
-                await deleteTournament(t.id);
+                if (
+                  !confirm(
+                    "Annuler ce tournoi ?\n\nIl disparaîtra pour les joueurs, les demandes en cours seront effacées et il ne sera pas recréé automatiquement."
+                  )
+                )
+                  return;
+                await cancelTournament(t.id);
                 reload();
               }}
               className="cursor-pointer px-2 py-1 text-mut hover:text-bad"
