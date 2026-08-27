@@ -287,8 +287,14 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     }
   }
 
-  const regRow = (r: Registration, actions: React.ReactNode) => (
+  // `rank` : rang d'arrivée, affiché pour la liste d'attente.
+  const regRow = (r: Registration, actions: React.ReactNode, rank?: number) => (
     <div key={r.id} className="flex items-center gap-2.5 border-b border-line/60 px-3.5 py-2.5 last:border-0">
+      {rank != null && (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-card2 text-[11px] font-extrabold text-sub">
+          {rank}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <span className="text-sm font-bold text-body">{r.player_name}</span>
         {r.is_guest && <span className="ml-2 text-[10px] font-bold uppercase text-mut">invité</span>}
@@ -373,7 +379,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         <div>
           <SectionTitle>Liste d&apos;attente ({waitlist.length})</SectionTitle>
           <Card className="overflow-hidden">
-            {waitlist.map((r) =>
+            {waitlist.map((r, i) =>
               regRow(
                 r,
                 <>
@@ -396,10 +402,15 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                   >
                     ✕
                   </Btn>
-                </>
+                </>,
+                i + 1
               )
             )}
           </Card>
+          <p className="mt-1.5 px-1 text-[11px] text-mut">
+            Numérotés par ordre d&apos;arrivée : le n°1 est le premier à faire monter si une place
+            se libère.
+          </p>
         </div>
       )}
 

@@ -185,11 +185,14 @@ function LessonDetail({
       {waitlist.length > 0 && (
         <div className="mb-3">
           <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-mut">
-            Liste d&apos;attente ({waitlist.length})
+            Liste d&apos;attente ({waitlist.length}) — par ordre d&apos;arrivée
           </div>
           <div className="space-y-1.5">
-            {waitlist.map((r) => (
+            {waitlist.map((r, i) => (
               <div key={r.id} className="flex items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-card2 text-[11px] font-extrabold text-sub">
+                  {i + 1}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-sm text-sub">{r.player_name}</span>
                 <Btn
                   size="sm"

@@ -16,7 +16,13 @@ import {
 import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
 import { labelIncludesPlayer } from "@/lib/levels";
 import { lessonIncludesPlayer, lessonKind } from "@/lib/lessons";
-import { endOfNextWeekStr, formatDateLong, localDateStr, playerIdentity } from "@/lib/format";
+import {
+  endOfNextWeekStr,
+  formatDateLong,
+  localDateStr,
+  playerIdentity,
+  positionLabel,
+} from "@/lib/format";
 import type { Lesson, LessonRegistration, Registration, Tournament } from "@/lib/types";
 import { Badge, Btn, Card, EmptyState, Loader, SectionBanner } from "@/components/ui";
 
@@ -29,6 +35,17 @@ const STATUS_UI: Record<
   declined: { label: "Demande refusée", color: "bad" },
   waitlist: { label: "Liste d'attente", color: "sub" },
 };
+
+// Libellé du statut, enrichi du rang d'arrivée quand on est en liste d'attente.
+function statusLabel(
+  mine: { id: string; status: Registration["status"] },
+  all: { id: string; status: Registration["status"] }[]
+): string {
+  const base = STATUS_UI[mine.status].label;
+  if (mine.status !== "waitlist") return base;
+  const pos = all.filter((r) => r.status === "waitlist").findIndex((r) => r.id === mine.id) + 1;
+  return pos > 0 ? `${base} — ${positionLabel(pos)}` : base;
+}
 
 // Tournois à venir — uniquement ceux qui comprennent le niveau du joueur.
 export default function PlayerTournaments() {
@@ -229,7 +246,11 @@ export default function PlayerTournaments() {
                           </span>
                         </div>
                       </div>
-                      {mine && <Badge color={STATUS_UI[mine.status].color}>{STATUS_UI[mine.status].label}</Badge>}
+                      {mine && (
+                        <Badge color={STATUS_UI[mine.status].color}>
+                          {statusLabel(mine, tRegs)}
+                        </Badge>
+                      )}
                     </div>
 
                     {confirmedNames.length > 0 && (
@@ -330,7 +351,7 @@ export default function PlayerTournaments() {
                       </div>
                       {mine && (
                         <Badge color={STATUS_UI[mine.status].color}>
-                          {STATUS_UI[mine.status].label}
+                          {statusLabel(mine, lRegs)}
                         </Badge>
                       )}
                     </div>
