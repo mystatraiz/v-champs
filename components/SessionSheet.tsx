@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { rankTeamsInSession } from "@/lib/scoring";
 import { formatDateLong, teamLabel } from "@/lib/format";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
+import { updateSessionMatchScore } from "@/lib/store";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
-import { Badge, Modal, SectionTitle } from "./ui";
+import { Badge, Btn, Modal, SectionTitle } from "./ui";
 
 function matchScoreStr(m: Match): string {
   if (m.scoreType === "sets" && m.sets) {
@@ -18,17 +19,94 @@ function matchScoreStr(m: Match): string {
 }
 
 // Résultats détaillés d'une session archivée.
+// Édition du score d'un match : saisie des deux camps + inversion en un geste.
+function MatchScoreEditor({
+  m,
+  busy,
+  onSave,
+}: {
+  m: Match;
+  busy: boolean;
+  onSave: (s1: number, s2: number) => void;
+}) {
+  const [a, setA] = useState(String(m.score1));
+  const [b, setB] = useState(String(m.score2));
+
+  // Le score affiché change sous nos pieds après enregistrement : on resynchronise.
+  useEffect(() => {
+    setA(String(m.score1));
+    setB(String(m.score2));
+  }, [m.score1, m.score2]);
+
+  const n = (v: string) => Math.max(0, parseInt(v, 10) || 0);
+  const dirty = n(a) !== m.score1 || n(b) !== m.score2;
+
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      <input
+        inputMode="numeric"
+        value={a}
+        onChange={(e) => setA(e.target.value.replace(/\D/g, "").slice(0, 2))}
+        className="w-8 rounded border border-line2 bg-surface px-1 py-0.5 text-center font-mono text-xs text-body outline-none focus:border-gold/60"
+      />
+      <button
+        onClick={() => onSave(m.score2, m.score1)}
+        disabled={busy}
+        title="Inverser le score"
+        className="cursor-pointer px-0.5 text-xs text-mut hover:text-gold disabled:opacity-40"
+      >
+        ⇄
+      </button>
+      <input
+        inputMode="numeric"
+        value={b}
+        onChange={(e) => setB(e.target.value.replace(/\D/g, "").slice(0, 2))}
+        className="w-8 rounded border border-line2 bg-surface px-1 py-0.5 text-center font-mono text-xs text-body outline-none focus:border-gold/60"
+      />
+      {dirty && (
+        <Btn size="sm" variant="success" disabled={busy} onClick={() => onSave(n(a), n(b))}>
+          ✓
+        </Btn>
+      )}
+    </span>
+  );
+}
+
 export function SessionSheet({
   entry,
   scores,
   onClose,
   canShare = false,
+  canEdit = false,
+  onEdited,
 }: {
   entry: SessionHistoryEntry | null;
   scores: PlayerSessionScore[];
   onClose: () => void;
   canShare?: boolean;
+  canEdit?: boolean;
+  onEdited?: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Correction d'un score : le classement de la session et les points V-Champs
+  // sont recalculés côté store, on recharge ensuite les données.
+  async function fixScore(matchId: number, s1: number, s2: number) {
+    if (!entry) return;
+    setBusyId(matchId);
+    setErr(null);
+    try {
+      await updateSessionMatchScore(entry.date, matchId, s1, s2);
+      onEdited?.();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Erreur pendant la correction.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const ranked = useMemo(() => (entry ? rankTeamsInSession(entry.teams || []) : []), [entry]);
   const points = useMemo(() => {
     if (!entry) return [];
@@ -134,7 +212,27 @@ export function SessionSheet({
         </>
       )}
 
-      <SectionTitle>Matchs ({finished.length})</SectionTitle>
+      <div className="flex items-center justify-between">
+        <SectionTitle className="mb-0">Matchs ({finished.length})</SectionTitle>
+        {canEdit && finished.length > 0 && (
+          <button
+            onClick={() => {
+              setEditing((v) => !v);
+              setErr(null);
+            }}
+            className="mb-2.5 cursor-pointer text-[11px] font-bold uppercase tracking-wider text-gold"
+          >
+            {editing ? "✓ Terminer" : "✏️ Corriger"}
+          </button>
+        )}
+      </div>
+      {editing && (
+        <p className="mb-2 text-[11px] leading-4 text-mut">
+          Corrige un score mal saisi. Le classement de la session et les points V-Champs sont
+          recalculés automatiquement.
+        </p>
+      )}
+      {err && <p className="mb-2 text-xs font-semibold text-bad">{err}</p>}
       <div className="overflow-hidden rounded-xl border border-line">
         {finished.length === 0 ? (
           <div className="px-3.5 py-3 text-sm text-mut">Aucun match enregistré.</div>
@@ -157,7 +255,15 @@ export function SessionSheet({
                 <span className={`flex-1 truncate text-right ${w1 ? "font-bold text-gold" : "text-sub"}`}>
                   {(t1?.players || []).filter(Boolean).join(" / ") || "?"}
                 </span>
-                <span className="shrink-0 px-1 font-mono text-xs text-mut">{matchScoreStr(m)}</span>
+                {editing ? (
+                  <MatchScoreEditor
+                    m={m}
+                    busy={busyId === m.id}
+                    onSave={(a, b) => fixScore(m.id, a, b)}
+                  />
+                ) : (
+                  <span className="shrink-0 px-1 font-mono text-xs text-mut">{matchScoreStr(m)}</span>
+                )}
                 <span className={`flex-1 truncate ${w2 ? "font-bold text-gold" : "text-sub"}`}>
                   {(t2?.players || []).filter(Boolean).join(" / ") || "?"}
                 </span>

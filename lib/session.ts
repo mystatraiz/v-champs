@@ -149,6 +149,56 @@ export function matchIsScored(m: Match): boolean {
     : m.score1 > 0 || m.score2 > 0;
 }
 
+// Recalcule de zéro les statistiques agrégées des équipes à partir des matchs
+// terminés. Sert après correction d'un score archivé : les compteurs stockés
+// (victoires, jeux pour/contre…) pilotent le classement de la session, ils ne
+// peuvent pas rester sur les anciennes valeurs.
+export function recomputeTeamStats(teams: Team[], matches: Match[]): Team[] {
+  const next = teams.map((t) => ({
+    ...t,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    matchesPlayed: 0,
+  }));
+  const byId = new Map(next.map((t) => [t.id, t]));
+
+  matches
+    .filter((m) => m.status === "finished")
+    .forEach((m) => {
+      const t1 = byId.get(m.team1Id);
+      const t2 = byId.get(m.team2Id);
+      if (!t1 || !t2) return;
+      t1.matchesPlayed++;
+      t2.matchesPlayed++;
+
+      let jFor1 = m.score1;
+      let jAgainst1 = m.score2;
+      if (m.scoreType === "sets" && m.sets) {
+        jFor1 = m.sets.reduce((s, r) => s + r[0], 0);
+        jAgainst1 = m.sets.reduce((s, r) => s + r[1], 0);
+      }
+      t1.pointsFor += jFor1;
+      t1.pointsAgainst += jAgainst1;
+      t2.pointsFor += jAgainst1;
+      t2.pointsAgainst += jFor1;
+
+      if (m.score1 > m.score2) {
+        t1.wins++;
+        t2.losses++;
+      } else if (m.score2 > m.score1) {
+        t2.wins++;
+        t1.losses++;
+      } else {
+        t1.draws++;
+        t2.draws++;
+      }
+    });
+  return next;
+}
+
 export function allActiveScored(state: SessionState): boolean {
   const active = state.matches.filter((m) => m.status === "active");
   return active.length > 0 && active.every(matchIsScored);

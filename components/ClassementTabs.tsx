@@ -14,10 +14,14 @@ export function ClassementTabs({
   data,
   highlightPlayer,
   canShare = false,
+  canEdit = false,
+  onEdited,
 }: {
   data: AppData;
   highlightPlayer?: string | null;
   canShare?: boolean;
+  canEdit?: boolean;
+  onEdited?: () => void;
 }) {
   const [tab, setTab] = useState<"vchamps" | "equipes" | "sessions">("vchamps");
   const [openSession, setOpenSession] = useState<SessionHistoryEntry | null>(null);
@@ -167,6 +171,11 @@ export function ClassementTabs({
         scores={data.scores}
         onClose={() => setOpenSession(null)}
         canShare={canShare}
+        canEdit={canEdit}
+        onEdited={() => {
+          setOpenSession(null);
+          onEdited?.();
+        }}
       />
     </div>
   );

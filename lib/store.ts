@@ -1,6 +1,7 @@
 // ═══ Accès données Supabase — clés et formats identiques à la v1 ═══
 import { supabase } from "./supabase";
 import { computeSessionScores } from "./scoring";
+import { recomputeTeamStats } from "./session";
 import { isTestMode, nsKey } from "./test-mode";
 import type {
   Lesson,
@@ -74,6 +75,22 @@ export async function loadAppData(): Promise<AppData> {
     knownPlayers: ((kd.data as { name: string }[]) || []).map((r) => r.name),
     pairNames,
   };
+}
+
+// Points V-Champs seuls, avec les mêmes règles que loadAppData (espace de test
+// et remise à zéro du classement prises en compte).
+export async function loadScores(): Promise<PlayerSessionScore[]> {
+  const rsd = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", nsKey("scores_reset_at"))
+    .maybeSingle();
+  const raw = isTestMode()
+    ? await readJsonKey<PlayerSessionScore>("test_player_session_scores")
+    : ((await supabase.from("player_session_scores").select("*")).data as PlayerSessionScore[]) ||
+      [];
+  const resetAt = rsd.data?.value ? new Date(rsd.data.value as string).getTime() : 0;
+  return resetAt ? raw.filter((r) => new Date(r.created_at).getTime() > resetAt) : raw;
 }
 
 export async function saveSessionState(state: SessionState): Promise<void> {
@@ -321,6 +338,53 @@ export async function renamePlayer(
   }
 
   return result;
+}
+
+// ─── Correction du score d'un match archivé ───
+// Corrige un score saisi de travers (score inversé, faute de frappe) sur une
+// session déjà terminée. Tout ce qui en découle est recalculé : statistiques des
+// équipes, classement de la session, puis points V-Champs de chaque joueur.
+export async function updateSessionMatchScore(
+  sessionId: string,
+  matchId: number,
+  score1: number,
+  score2: number
+): Promise<void> {
+  const { data } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", nsKey("session_history"))
+    .maybeSingle();
+  const history = (data?.value as SessionHistoryEntry[]) || [];
+  const entry = history.find((s) => s.date === sessionId);
+  if (!entry) throw new Error("Session introuvable dans l'historique.");
+  const match = (entry.matches || []).find((m) => m.id === matchId);
+  if (!match) throw new Error("Match introuvable dans cette session.");
+
+  const s1 = Math.max(0, Math.round(score1));
+  const s2 = Math.max(0, Math.round(score2));
+  const matches = (entry.matches || []).map((m) => {
+    if (m.id !== matchId) return m;
+    // Score en sets : on conserve la nature du match en inversant les manches
+    // lorsque le correctif revient à échanger les deux camps.
+    const sets =
+      m.scoreType === "sets" && m.sets && s1 === m.score2 && s2 === m.score1
+        ? (m.sets.map(([a, b]) => [b, a]) as [number, number][])
+        : m.sets;
+    return { ...m, score1: s1, score2: s2, sets };
+  });
+
+  const updatedEntry: SessionHistoryEntry = {
+    ...entry,
+    matches,
+    teams: recomputeTeamStats(entry.teams || [], matches),
+  };
+  await saveHistory(history.map((s) => (s.date === sessionId ? updatedEntry : s)));
+
+  // Les positions finales ont pu changer : on rejoue le calcul des points.
+  const allScores = await loadScores();
+  const records = computeSessionScores(updatedEntry, sessionId, allScores);
+  await upsertSessionScores(records);
 }
 
 // ─── Correction d'un joueur sur UNE SEULE session ───
