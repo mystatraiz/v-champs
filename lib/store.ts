@@ -490,7 +490,8 @@ export async function getTournament(id: string): Promise<Tournament | null> {
 }
 
 export async function createTournament(
-  t: Pick<Tournament, "date" | "time" | "level" | "courts" | "capacity">
+  t: Pick<Tournament, "date" | "time" | "level" | "courts" | "capacity"> &
+    Partial<Pick<Tournament, "created_by">>
 ): Promise<Tournament> {
   if (isTestMode()) {
     const arr = await readJsonKey<Tournament>(TEST_TOURN);
@@ -724,7 +725,7 @@ export async function listLessons(): Promise<Lesson[]> {
 
 export async function createLesson(
   l: Pick<Lesson, "date" | "time" | "levels" | "kind" | "courts" | "capacity"> &
-    Partial<Pick<Lesson, "theme">>
+    Partial<Pick<Lesson, "theme" | "created_by">>
 ): Promise<Lesson> {
   if (isTestMode()) {
     const arr = await readJsonKey<Lesson>(TEST_LESSONS);
@@ -910,7 +911,8 @@ export async function listMatchSlots(): Promise<MatchSlot[]> {
 }
 
 export async function createMatchSlot(
-  m: Pick<MatchSlot, "date" | "time" | "levels" | "courts" | "capacity">
+  m: Pick<MatchSlot, "date" | "time" | "levels" | "courts" | "capacity"> &
+    Partial<Pick<MatchSlot, "created_by">>
 ): Promise<MatchSlot> {
   if (isTestMode()) {
     const arr = await readJsonKey<MatchSlot>(TEST_MATCHES);

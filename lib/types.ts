@@ -100,6 +100,7 @@ export interface Tournament {
   capacity: number;
   status: TournamentStatus;
   teams: Team[] | null; // grille brouillon de composition
+  created_by?: string | null; // profil de l'organisateur (vide si récurrence auto)
   created_at?: string;
 }
 
@@ -130,6 +131,7 @@ export interface Lesson {
   courts: number;
   capacity: number;
   status: LessonStatus;
+  created_by?: string | null;
   created_at?: string;
 }
 
@@ -153,6 +155,7 @@ export interface MatchSlot {
   courts: number;
   capacity: number;
   status: LessonStatus;
+  created_by?: string | null;
   created_at?: string;
 }
 

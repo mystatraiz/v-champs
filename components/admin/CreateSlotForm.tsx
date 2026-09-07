@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { createLesson, createMatchSlot, createTournament } from "@/lib/store";
 import { notifyNewLesson, notifyNewMatchSlot, notifyNewTournament } from "@/lib/push";
 import { AGENDA_KINDS, type AgendaKind } from "@/lib/agenda";
@@ -70,6 +71,7 @@ function Counter({ value, onChange }: { value: number; onChange: (n: number) => 
 
 // Création unifiée : un seul formulaire, un sélecteur de type en tête.
 export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
+  const { profile } = useAuth();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -116,7 +118,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
     setError(null);
     try {
       if (kind === "tournament") {
-        await createTournament({ date, time, level, courts, capacity });
+        await createTournament({ date, time, level, courts, capacity, created_by: profile?.id });
         notifyNewTournament(level, date, time);
       } else if (kind === "lesson") {
         await createLesson({
@@ -127,10 +129,11 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
           theme: theme.trim() || null,
           courts,
           capacity,
+          created_by: profile?.id,
         });
         notifyNewLesson(levels, lessonType, date, time);
       } else {
-        await createMatchSlot({ date, time, levels, courts, capacity });
+        await createMatchSlot({ date, time, levels, courts, capacity, created_by: profile?.id });
         notifyNewMatchSlot(levels, date, time);
       }
       setLevels([]);

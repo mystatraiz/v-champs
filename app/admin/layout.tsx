@@ -76,6 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const tabs: { href: string; label: string; icon: string; badge?: number }[] = [
     { href: "/admin", label: "Agenda", icon: "📅", badge: pendingAgenda },
     { href: "/admin/classement", label: "Classement", icon: "🏆" },
+    { href: "/admin/stats", label: "Stats", icon: "📊" },
     { href: "/admin/reglement", label: "Règlement", icon: "📖" },
     ...(isAdmin
       ? [{ href: "/admin/joueurs", label: "Réglages", icon: "⚙️", badge: pendingAccounts }]

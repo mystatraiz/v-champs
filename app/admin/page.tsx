@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
   cancelTournament,
   createTournament,
@@ -12,6 +13,7 @@ import {
   listLessons,
   listMatchSlotRegistrations,
   listMatchSlots,
+  listProfiles,
   listRegistrations,
   listTournaments,
   loadAppData,
@@ -30,6 +32,7 @@ import { lessonKind } from "@/lib/lessons";
 import { endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type {
   Lesson,
+  Profile,
   LessonRegistration,
   MatchSlot,
   MatchSlotRegistration,
@@ -111,7 +114,11 @@ async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
 
 export default function AdminAgenda() {
   const router = useRouter();
+  const { profile: me } = useAuth();
   const { data: appData } = useAppData();
+  // Qui a créé quoi : réservé aux admins.
+  const isAdmin = me?.role === "admin";
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
   const [tournaments, setTournaments] = useState<Tournament[] | null>(null);
   const [regs, setRegs] = useState<Registration[]>([]);
@@ -163,6 +170,13 @@ export default function AdminAgenda() {
     reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    listProfiles()
+      .then(setProfiles)
+      .catch(() => setProfiles([]));
+  }, [isAdmin]);
+
   const today = localDateStr(new Date());
   const windowEnd = endOfNextWeekStr();
 
@@ -203,6 +217,18 @@ export default function AdminAgenda() {
   const sessionActive = session?.sessionStarted && !session.sessionFinished;
   const knownPlayers = appData?.knownPlayers ?? [];
 
+  // Étiquette « créé par » — visible des seuls admins. Un créneau sans auteur
+  // vient de la génération automatique des récurrences.
+  const authorTag = (createdBy?: string | null) => {
+    if (!isAdmin) return null;
+    const p = createdBy ? profiles.find((x) => x.id === createdBy) : null;
+    return (
+      <span className="text-[10px] font-semibold text-mut">
+        {p ? `par ${p.first_name} ${p.last_name.charAt(0).toUpperCase()}.` : "auto"}
+      </span>
+    );
+  };
+
   // ── En-tête commun à toutes les cartes de l'agenda ──
   const cardHeader = (
     kind: AgendaKind,
@@ -212,7 +238,8 @@ export default function AdminAgenda() {
     filled: number,
     capacity: number,
     onClick: () => void,
-    onDelete: () => void
+    onDelete: () => void,
+    author?: React.ReactNode
   ) => {
     const ready = filled >= capacity;
     return (
@@ -227,12 +254,13 @@ export default function AdminAgenda() {
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-xs">
+          <div className="mt-0.5 flex items-center gap-2 text-xs">
             <span
               className={`font-bold ${ready ? "text-ok" : filled > 0 ? "text-gold" : "text-mut"}`}
             >
               {filled}/{capacity} joueurs
             </span>
+            {author}
           </div>
         </button>
         <button
@@ -345,7 +373,8 @@ export default function AdminAgenda() {
                         return;
                       await cancelTournament(t.id);
                       reload();
-                    }
+                    },
+                    authorTag(t.created_by)
                   )}
                   {progress(filled, t.capacity)}
                 </Card>
@@ -380,7 +409,8 @@ export default function AdminAgenda() {
                       if (!confirm("Supprimer cette leçon ?")) return;
                       await deleteLesson(l.id);
                       reload();
-                    }
+                    },
+                    authorTag(l.created_by)
                   )}
                   {open && (
                     <LessonDetail
@@ -417,7 +447,8 @@ export default function AdminAgenda() {
                       if (!confirm("Supprimer ce créneau de match ?")) return;
                       await deleteMatchSlot(m.id);
                       reload();
-                    }
+                    },
+                    authorTag(m.created_by)
                   )}
                   {open && (
                     <MatchSlotDetail

@@ -182,7 +182,17 @@ drop policy if exists "match_regs_write" on public.match_slot_registrations;
 create policy "match_regs_write" on public.match_slot_registrations
   for all to authenticated using (true) with check (true);
 
--- ── 7. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
+-- ── 7. Qui a créé le créneau ───────────────────────────────────────────────
+-- Renseigné à la création ; reste vide pour les tournois générés
+-- automatiquement par les règles de récurrence.
+alter table public.tournaments add column if not exists created_by uuid
+  references public.profiles(id) on delete set null;
+alter table public.lessons     add column if not exists created_by uuid
+  references public.profiles(id) on delete set null;
+alter table public.match_slots add column if not exists created_by uuid
+  references public.profiles(id) on delete set null;
+
+-- ── 8. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
 insert into public.tournaments (date, time, level, courts, capacity, status, teams)
 select
   (elem->>'date')::date,
