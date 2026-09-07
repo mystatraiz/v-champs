@@ -78,3 +78,30 @@ select {
 .pulse-soft {
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
+
+/* Champs date/heure natifs — correctif Safari iOS.
+   Safari applique à ces champs une largeur intrinsèque qu'il refuse de réduire :
+   sans `appearance: none`, ils ignorent `width: 100%` et débordent de leur
+   conteneur. Le défaut n'apparaît ni sous Chromium ni sous Firefox. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  /* Safari centre la valeur et lui ajoute des marges : on la cale à gauche. */
+  text-align: left;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+
+/* L'icône de calendrier est repoussée à droite plutôt que collée à la valeur. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  margin-left: auto;
+  opacity: 0.55;
+}
