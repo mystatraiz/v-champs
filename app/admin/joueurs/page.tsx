@@ -14,6 +14,7 @@ import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
 import { formatDateShort, playerIdentity, uniquePlayerIdentity } from "@/lib/format";
 import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
+import { StatsPanel } from "@/components/admin/StatsPanel";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
 import type { Profile, Role } from "@/lib/types";
@@ -395,6 +396,8 @@ export default function AdminJoueurs() {
 
   const pending = profiles.filter((p) => p.role === "pending");
   const others = profiles.filter((p) => p.role !== "pending");
+  // Sans niveau, un compte validé voit tous les créneaux : à traiter en priorité.
+  const noLevel = others.filter((p) => p.level == null);
   // Noms déjà pris : joueurs connus + comptes déjà liés (pour éviter les
   // collisions « Prénom + Initiale » lors de la validation d'un nouveau compte).
   const takenNames = [
@@ -451,6 +454,56 @@ export default function AdminJoueurs() {
               />
             ))}
           </div>
+        )}
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        icon="🎯"
+        title="Joueurs sans niveau"
+        subtitle="Sans niveau, ils voient tous les créneaux"
+        badge={noLevel.length}
+        defaultOpen={noLevel.length > 0}
+      >
+        {!noLevel.length ? (
+          <EmptyState>Tous les joueurs ont un niveau attribué.</EmptyState>
+        ) : (
+          <>
+            <p className="mb-3 text-xs leading-5 text-sub">
+              Tant qu&apos;un joueur n&apos;a pas de niveau, il voit{" "}
+              <b className="text-body">tous les tournois, leçons et matchs</b>, quel que soit son
+              vrai niveau. Attribue-le ici pour qu&apos;il ne reçoive que ce qui le concerne.
+            </p>
+            <div className="space-y-2">
+              {noLevel.map((p) => (
+                <div key={p.id} className="flex items-center gap-2.5">
+                  <Avatar name={`${p.first_name} ${p.last_name}`} size={34} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold text-bright">
+                      {p.first_name} {p.last_name.toUpperCase()}
+                    </div>
+                    <div className="text-[11px] text-mut">{ROLE_LABEL[p.role]}</div>
+                  </div>
+                  {savedId === p.id && (
+                    <span className="text-[11px] font-bold text-ok">✓</span>
+                  )}
+                  <Select
+                    value=""
+                    className="w-32 text-xs"
+                    onChange={(e) =>
+                      e.target.value && patch(p, { level: Number(e.target.value) })
+                    }
+                  >
+                    <option value="">Niveau —</option>
+                    {PLAYER_LEVELS.map((l) => (
+                      <option key={l} value={l}>
+                        Niveau {l}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </CollapsibleCard>
 
@@ -542,6 +595,14 @@ export default function AdminJoueurs() {
             ))}
           </div>
         )}
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        icon="📊"
+        title="Statistiques"
+        subtitle="Activité, remplissage, joueurs à relancer"
+      >
+        <StatsPanel />
       </CollapsibleCard>
 
       <CollapsibleCard

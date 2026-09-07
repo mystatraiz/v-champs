@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
   listLessonRegistrations,
@@ -86,7 +85,7 @@ function Bar({ label, rate, detail }: { label: string; rate: number; detail: str
   );
 }
 
-export default function AdminStats() {
+export function StatsPanel() {
   const { profile: me } = useAuth();
   const { data: appData } = useAppData();
   const isAdmin = me?.role === "admin";
@@ -202,7 +201,7 @@ export default function AdminStats() {
   const dormant = stats.players.filter((p) => (p.daysSince ?? 0) >= 60).slice(0, 8);
 
   return (
-    <div className="fade-up space-y-5">
+    <div className="space-y-5">
       {/* ── À traiter ── */}
       {(stats.todo.total > 0 || stats.accounts.pending > 0 || stats.accounts.withoutLevel > 0) && (
         <div>
@@ -227,14 +226,6 @@ export default function AdminStats() {
               tone={stats.accounts.withoutLevel ? "gold" : "body"}
             />
           </div>
-          {stats.accounts.withoutLevel > 0 && (
-            <Link
-              href="/admin/joueurs"
-              className="mt-2 inline-block text-[11px] font-bold text-gold underline"
-            >
-              Attribuer les niveaux →
-            </Link>
-          )}
         </div>
       )}
 
