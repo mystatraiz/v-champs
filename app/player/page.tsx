@@ -32,10 +32,13 @@ import type {
   LessonRegistration,
   MatchSlot,
   MatchSlotRegistration,
+  Profile,
   Registration,
   Tournament,
 } from "@/lib/types";
-import { Badge, Btn, Card, EmptyState, Loader, SectionBanner } from "@/components/ui";
+import { buildAgenda, countsByDay, slidingDays, type AgendaKind } from "@/lib/agenda";
+import { KindFilter, WeekStrip } from "@/components/WeekStrip";
+import { Badge, Btn, Card, EmptyState, Loader } from "@/components/ui";
 
 const STATUS_UI: Record<
   Registration["status"],
@@ -58,8 +61,259 @@ function statusLabel(
   return pos > 0 ? `${base} — ${positionLabel(pos)}` : base;
 }
 
-// Tournois à venir — uniquement ceux qui comprennent le niveau du joueur.
-export default function PlayerTournaments() {
+
+// ─── Cartes de l'agenda joueur ───
+// Chaque type garde son liseré et son badge de couleur : dans une liste
+// chronologique mêlant les trois, la couleur est ce qui les distingue au vol.
+
+function ActionRow({
+  mine,
+  locked,
+  full,
+  busy,
+  lockedText,
+  joinText,
+  onToggle,
+}: {
+  mine?: { status: Registration["status"] };
+  locked: boolean;
+  full: boolean;
+  busy: boolean;
+  lockedText: string;
+  joinText: string;
+  onToggle: () => void;
+}) {
+  if (mine) {
+    if (mine.status === "declined") return null;
+    return (
+      <Btn variant="ghost" size="sm" disabled={busy} onClick={onToggle}>
+        ✕ Annuler ma {mine.status === "approved" ? "participation" : "demande"}
+      </Btn>
+    );
+  }
+  if (locked) return <p className="text-xs font-semibold text-mut">{lockedText}</p>;
+  return (
+    <Btn size="sm" disabled={busy} onClick={onToggle}>
+      {full ? "Rejoindre la liste d'attente" : joinText}
+    </Btn>
+  );
+}
+
+function CardShell({
+  edge,
+  time,
+  badges,
+  names,
+  filled,
+  capacity,
+  children,
+}: {
+  edge: string;
+  time: string;
+  badges: React.ReactNode;
+  names: string[];
+  filled: number;
+  capacity: number;
+  children: React.ReactNode;
+}) {
+  const full = filled >= capacity;
+  return (
+    <Card className={`overflow-hidden border-l-4 ${edge}`}>
+      <div className="p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-base font-extrabold text-gold">{time}</span>
+          {badges}
+          <span className={`text-[11px] font-bold ${full ? "text-bad" : "text-ok"}`}>
+            {filled}/{capacity}
+          </span>
+        </div>
+
+        {names.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {names.map((n) => (
+              <span
+                key={n}
+                className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4">{children}</div>
+      </div>
+      <div className="h-1 bg-line">
+        <div
+          className={`h-full transition-all ${full ? "bg-ok" : "bg-gold"}`}
+          style={{ width: `${Math.min(100, Math.round((filled / capacity) * 100))}%` }}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function TournamentCard({
+  t,
+  regs,
+  profile,
+  myName,
+  busy,
+  onToggle,
+}: {
+  t: Tournament;
+  regs: Registration[];
+  profile: Profile;
+  myName: string;
+  busy: string | null;
+  onToggle: (t: Tournament, mine: Registration | undefined) => void;
+}) {
+  const tRegs = regs.filter((r) => r.tournament_id === t.id);
+  const approved = tRegs.filter((r) => r.status === "approved");
+  const mine = tRegs.find(
+    (r) =>
+      r.profile_id === profile.id ||
+      (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
+  );
+  // La grille de composition fait foi une fois les équipes formées.
+  const gridNames = (t.teams || []).flatMap((tm) => tm.players).filter((p) => p?.trim());
+  const names = [...new Set([...approved.map((r) => r.player_name), ...gridNames])];
+
+  return (
+    <CardShell
+      edge="border-l-gold"
+      time={t.time}
+      filled={names.length}
+      capacity={t.capacity}
+      names={names}
+      badges={
+        <>
+          <Badge color="gold">🎾 Tournoi · niveau {t.level}</Badge>
+          {mine && <Badge color={STATUS_UI[mine.status].color}>{statusLabel(mine, tRegs)}</Badge>}
+        </>
+      }
+    >
+      <ActionRow
+        mine={mine}
+        locked={t.status === "locked"}
+        full={names.length >= t.capacity}
+        busy={busy === t.id}
+        lockedText="Inscriptions clôturées par l'organisateur."
+        joinText="🎾 Demander ma place"
+        onToggle={() => onToggle(t, mine)}
+      />
+    </CardShell>
+  );
+}
+
+function LessonCard({
+  l,
+  regs,
+  profile,
+  myName,
+  busy,
+  onToggle,
+}: {
+  l: Lesson;
+  regs: LessonRegistration[];
+  profile: Profile;
+  myName: string;
+  busy: string | null;
+  onToggle: (l: Lesson, mine: LessonRegistration | undefined) => void;
+}) {
+  const lRegs = regs.filter((r) => r.lesson_id === l.id);
+  const approved = lRegs.filter((r) => r.status === "approved");
+  const mine = lRegs.find(
+    (r) =>
+      r.profile_id === profile.id ||
+      (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
+  );
+  const k = lessonKind(l.kind);
+
+  return (
+    <CardShell
+      edge="border-l-coach"
+      time={l.time}
+      filled={approved.length}
+      capacity={l.capacity}
+      names={approved.map((r) => r.player_name)}
+      badges={
+        <>
+          <Badge color="coach">
+            {k.icon} {k.label}
+          </Badge>
+          {l.theme && <span className="text-[11px] font-semibold text-body">« {l.theme} »</span>}
+          {l.status === "locked" && <Badge color="bad">🔒 Complète</Badge>}
+          {mine && <Badge color={STATUS_UI[mine.status].color}>{statusLabel(mine, lRegs)}</Badge>}
+        </>
+      }
+    >
+      <ActionRow
+        mine={mine}
+        locked={l.status === "locked"}
+        full={approved.length >= l.capacity}
+        busy={busy === l.id}
+        lockedText="Inscriptions clôturées par le coach."
+        joinText="🎓 Demander ma place"
+        onToggle={() => onToggle(l, mine)}
+      />
+    </CardShell>
+  );
+}
+
+function MatchCard({
+  m,
+  regs,
+  profile,
+  myName,
+  busy,
+  onToggle,
+}: {
+  m: MatchSlot;
+  regs: MatchSlotRegistration[];
+  profile: Profile;
+  myName: string;
+  busy: string | null;
+  onToggle: (m: MatchSlot, mine: MatchSlotRegistration | undefined) => void;
+}) {
+  const mRegs = regs.filter((r) => r.match_slot_id === m.id);
+  const approved = mRegs.filter((r) => r.status === "approved");
+  const mine = mRegs.find(
+    (r) =>
+      r.profile_id === profile.id ||
+      (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
+  );
+
+  return (
+    <CardShell
+      edge="border-l-match"
+      time={m.time}
+      filled={approved.length}
+      capacity={m.capacity}
+      names={approved.map((r) => r.player_name)}
+      badges={
+        <>
+          <Badge color="match">🤝 Match · {levelsLabel(m.levels)}</Badge>
+          {m.status === "locked" && <Badge color="bad">🔒 Complet</Badge>}
+          {mine && <Badge color={STATUS_UI[mine.status].color}>{statusLabel(mine, mRegs)}</Badge>}
+        </>
+      }
+    >
+      <ActionRow
+        mine={mine}
+        locked={m.status === "locked"}
+        full={approved.length >= m.capacity}
+        busy={busy === m.id}
+        lockedText="Inscriptions clôturées par l'organisateur."
+        joinText="🤝 Demander ma place"
+        onToggle={() => onToggle(m, mine)}
+      />
+    </CardShell>
+  );
+}
+
+// Agenda du joueur : frise 7 jours + liste chronologique des trois types.
+export default function PlayerAgenda() {
   const { profile } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[] | null>(null);
   const [regs, setRegs] = useState<Registration[]>([]);
@@ -69,6 +323,8 @@ export default function PlayerTournaments() {
   const [matchRegs, setMatchRegs] = useState<MatchSlotRegistration[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<AgendaKind | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -259,327 +515,80 @@ export default function PlayerTournaments() {
 
   if (tournaments === null || !profile) return <Loader />;
 
+  // Frise 7 jours + liste chronologique fusionnée : un joueur cherche d'abord
+  // « qu'est-ce que je peux jouer tel jour », pas « quels sont les tournois ».
+  const agenda = buildAgenda(upcoming, upcomingLessons, upcomingMatches);
+  const days = slidingDays(7);
+  const counts = countsByDay(agenda);
+  const byKind = {
+    tournament: agenda.filter((e) => e.kind === "tournament").length,
+    lesson: agenda.filter((e) => e.kind === "lesson").length,
+    match: agenda.filter((e) => e.kind === "match").length,
+  };
+  const visible = agenda
+    .filter((e) => !selectedDay || e.date === selectedDay)
+    .filter((e) => !kindFilter || e.kind === kindFilter);
+
   return (
-    <div className="fade-up space-y-5">
-      <div>
-        <SectionBanner
-          icon="🎾"
-          title="Tournois à venir"
-          subtitle="Matchs & points au classement V-Champs"
-          count={upcoming.length}
-          accent="gold"
-        />
+    <div className="fade-up space-y-4">
+      <WeekStrip days={days} counts={counts} selected={selectedDay} onSelect={setSelectedDay} />
+      <KindFilter value={kindFilter} counts={byKind} onChange={setKindFilter} />
 
-        {!upcoming.length ? (
-          <Card>
-            <EmptyState>Aucun tournoi à venir pour le moment.</EmptyState>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {upcoming.map((t) => {
-              const tRegs = regs.filter((r) => r.tournament_id === t.id);
-              const approved = tRegs.filter((r) => r.status === "approved");
-              const mine = tRegs.find(
-                (r) =>
-                  r.profile_id === profile.id ||
-                  (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
-              );
-              const gridNames = (t.teams || [])
-                .flatMap((tm) => tm.players)
-                .filter((p) => p?.trim());
-              const confirmedNames = [
-                ...new Set([...approved.map((r) => r.player_name), ...gridNames]),
-              ];
-              const full = confirmedNames.length >= t.capacity;
-              const locked = t.status === "locked";
-
-              return (
-                <Card key={t.id} className="overflow-hidden border-l-4 border-l-gold">
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-extrabold text-bright">
-                          {formatDateLong(t.date)}
-                          <span className="ml-2 text-gold">{t.time}</span>
-                        </div>
-                        <div className="mt-1 flex items-center gap-2">
-                          <Badge color="gold">Niveau {t.level}</Badge>
-                          <span
-                            className={`text-[11px] font-bold ${
-                              full ? "text-bad" : "text-ok"
-                            }`}
-                          >
-                            {confirmedNames.length}/{t.capacity} confirmés
-                          </span>
-                        </div>
-                      </div>
-                      {mine && (
-                        <Badge color={STATUS_UI[mine.status].color}>
-                          {statusLabel(mine, tRegs)}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {confirmedNames.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {confirmedNames.map((n) => (
-                          <span
-                            key={n}
-                            className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
-                          >
-                            {n}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="mt-4">
-                      {mine ? (
-                        mine.status !== "declined" && (
-                          <Btn
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy === t.id}
-                            onClick={() => toggleRegistration(t, mine)}
-                          >
-                            ✕ Annuler ma {mine.status === "approved" ? "participation" : "demande"}
-                          </Btn>
-                        )
-                      ) : locked ? (
-                        <p className="text-xs font-semibold text-mut">
-                          Inscriptions clôturées par l&apos;organisateur.
-                        </p>
-                      ) : (
-                        <Btn
-                          size="sm"
-                          disabled={busy === t.id}
-                          onClick={() => toggleRegistration(t, undefined)}
-                        >
-                          {full ? "Rejoindre la liste d'attente" : "🎾 Demander ma place"}
-                        </Btn>
-                      )}
-                    </div>
+      {!visible.length ? (
+        <Card>
+          <EmptyState>
+            {selectedDay
+              ? "Rien de prévu ce jour-là."
+              : kindFilter
+                ? "Rien de prévu dans cette catégorie."
+                : "Aucune séance à venir pour le moment."}
+          </EmptyState>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {visible.map((entry, i) => {
+            // Séparateur de date dès qu'on change de jour.
+            const newDay = i === 0 || visible[i - 1].date !== entry.date;
+            return (
+              <div key={`${entry.kind}-${entry.id}`}>
+                {newDay && (
+                  <div className="mb-2 mt-1 text-[11px] font-bold uppercase tracking-[2px] text-mut">
+                    {formatDateLong(entry.date)}
                   </div>
-                  <div className="h-1 bg-line">
-                    <div
-                      className={`h-full transition-all ${full ? "bg-ok" : "bg-gold"}`}
-                      style={{
-                        width: `${Math.min(100, Math.round((confirmedNames.length / t.capacity) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {upcomingLessons.length > 0 && (
-        <div>
-          <SectionBanner
-            icon="🎓"
-            title="Leçons à venir"
-            subtitle="Coaching — phases de jeu & panier (sans points)"
-            count={upcomingLessons.length}
-            accent="coach"
-          />
-          <div className="space-y-3">
-            {upcomingLessons.map((l) => {
-              const lRegs = lessonRegs.filter((r) => r.lesson_id === l.id);
-              const approved = lRegs.filter((r) => r.status === "approved");
-              const mine = lRegs.find(
-                (r) =>
-                  r.profile_id === profile.id ||
-                  (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
-              );
-              const full = approved.length >= l.capacity;
-              const locked = l.status === "locked";
-              const k = lessonKind(l.kind);
-
-              return (
-                <Card key={l.id} className="overflow-hidden border-l-4 border-l-coach">
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-extrabold text-bright">
-                          {formatDateLong(l.date)}
-                          <span className="ml-2 text-gold">{l.time}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <Badge color="coach">
-                            {k.icon} {k.label}
-                          </Badge>
-                          {l.theme && (
-                            <span className="text-[11px] font-semibold text-body">
-                              « {l.theme} »
-                            </span>
-                          )}
-                          {locked && <Badge color="bad">🔒 Complète</Badge>}
-                          <span className={`text-[11px] font-bold ${full ? "text-bad" : "text-ok"}`}>
-                            {approved.length}/{l.capacity} confirmés
-                          </span>
-                        </div>
-                      </div>
-                      {mine && (
-                        <Badge color={STATUS_UI[mine.status].color}>
-                          {statusLabel(mine, lRegs)}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {approved.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {approved.map((r) => (
-                          <span
-                            key={r.id}
-                            className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
-                          >
-                            {r.player_name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="mt-4">
-                      {mine ? (
-                        mine.status !== "declined" && (
-                          <Btn
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy === l.id}
-                            onClick={() => toggleLessonRegistration(l, mine)}
-                          >
-                            ✕ Annuler ma {mine.status === "approved" ? "participation" : "demande"}
-                          </Btn>
-                        )
-                      ) : locked ? (
-                        <p className="text-xs font-semibold text-mut">
-                          Inscriptions clôturées par le coach.
-                        </p>
-                      ) : (
-                        <Btn
-                          size="sm"
-                          disabled={busy === l.id}
-                          onClick={() => toggleLessonRegistration(l, undefined)}
-                        >
-                          {full ? "Rejoindre la liste d'attente" : "🎓 Demander ma place"}
-                        </Btn>
-                      )}
-                    </div>
-                  </div>
-                  <div className="h-1 bg-line">
-                    <div
-                      className={`h-full transition-all ${full ? "bg-ok" : "bg-gold"}`}
-                      style={{
-                        width: `${Math.min(100, Math.round((approved.length / l.capacity) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {upcomingMatches.length > 0 && (
-        <div>
-          <SectionBanner
-            icon="🤝"
-            title="Matchs à venir"
-            subtitle="Créneaux libres — sans points au classement"
-            count={upcomingMatches.length}
-            accent="match"
-          />
-          <div className="space-y-3">
-            {upcomingMatches.map((m) => {
-              const mRegs = matchRegs.filter((r) => r.match_slot_id === m.id);
-              const approved = mRegs.filter((r) => r.status === "approved");
-              const mine = mRegs.find(
-                (r) =>
-                  r.profile_id === profile.id ||
-                  (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
-              );
-              const full = approved.length >= m.capacity;
-              const locked = m.status === "locked";
-
-              return (
-                <Card key={m.id} className="overflow-hidden border-l-4 border-l-match">
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-extrabold text-bright">
-                          {formatDateLong(m.date)}
-                          <span className="ml-2 text-gold">{m.time}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <Badge color="match">🤝 {levelsLabel(m.levels)}</Badge>
-                          {locked && <Badge color="bad">🔒 Complet</Badge>}
-                          <span className={`text-[11px] font-bold ${full ? "text-bad" : "text-ok"}`}>
-                            {approved.length}/{m.capacity} confirmés
-                          </span>
-                        </div>
-                      </div>
-                      {mine && (
-                        <Badge color={STATUS_UI[mine.status].color}>
-                          {statusLabel(mine, mRegs)}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {approved.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {approved.map((r) => (
-                          <span
-                            key={r.id}
-                            className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
-                          >
-                            {r.player_name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="mt-4">
-                      {mine ? (
-                        mine.status !== "declined" && (
-                          <Btn
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy === m.id}
-                            onClick={() => toggleMatchRegistration(m, mine)}
-                          >
-                            ✕ Annuler ma {mine.status === "approved" ? "participation" : "demande"}
-                          </Btn>
-                        )
-                      ) : locked ? (
-                        <p className="text-xs font-semibold text-mut">
-                          Inscriptions clôturées par l&apos;organisateur.
-                        </p>
-                      ) : (
-                        <Btn
-                          size="sm"
-                          disabled={busy === m.id}
-                          onClick={() => toggleMatchRegistration(m, undefined)}
-                        >
-                          {full ? "Rejoindre la liste d'attente" : "🤝 Demander ma place"}
-                        </Btn>
-                      )}
-                    </div>
-                  </div>
-                  <div className="h-1 bg-line">
-                    <div
-                      className={`h-full transition-all ${full ? "bg-ok" : "bg-gold"}`}
-                      style={{
-                        width: `${Math.min(100, Math.round((approved.length / m.capacity) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                )}
+                {entry.kind === "tournament" && (
+                  <TournamentCard
+                    t={entry.item}
+                    regs={regs}
+                    profile={profile}
+                    myName={myName}
+                    busy={busy}
+                    onToggle={toggleRegistration}
+                  />
+                )}
+                {entry.kind === "lesson" && (
+                  <LessonCard
+                    l={entry.item}
+                    regs={lessonRegs}
+                    profile={profile}
+                    myName={myName}
+                    busy={busy}
+                    onToggle={toggleLessonRegistration}
+                  />
+                )}
+                {entry.kind === "match" && (
+                  <MatchCard
+                    m={entry.item}
+                    regs={matchRegs}
+                    profile={profile}
+                    myName={myName}
+                    busy={busy}
+                    onToggle={toggleMatchRegistration}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

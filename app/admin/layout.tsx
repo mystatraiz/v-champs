@@ -24,9 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
 
   // Compteurs des pastilles (demandes d'inscription + comptes à valider).
-  const [pendingRegs, setPendingRegs] = useState(0);
-  const [pendingLessons, setPendingLessons] = useState(0);
-  const [pendingMatches, setPendingMatches] = useState(0);
+  const [pendingAgenda, setPendingAgenda] = useState(0);
   const [pendingAccounts, setPendingAccounts] = useState(0);
 
   const isReady = !loading && !!profile && (profile.role === "admin" || profile.role === "organisateur");
@@ -41,9 +39,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         countPendingMatchSlotRegistrations(),
         canModerate ? countPendingProfiles() : Promise.resolve(0),
       ]);
-      setPendingRegs(regs);
-      setPendingLessons(lessons);
-      setPendingMatches(matches);
+      // Une seule pastille : l'agenda regroupe tournois, leçons et matchs.
+      setPendingAgenda(regs + lessons + matches);
       setPendingAccounts(accs);
       // Badge sur l'icône de l'app (si installée)
       updateAppBadge(regs + lessons + matches + accs);
@@ -77,9 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isAdmin = profile.role === "admin";
   const tabs: { href: string; label: string; icon: string; badge?: number }[] = [
-    { href: "/admin", label: "Tournois", icon: "🎾", badge: pendingRegs },
-    { href: "/admin/lecons", label: "Leçons", icon: "🎓", badge: pendingLessons },
-    { href: "/admin/matchs", label: "Matchs", icon: "🤝", badge: pendingMatches },
+    { href: "/admin", label: "Agenda", icon: "📅", badge: pendingAgenda },
     { href: "/admin/classement", label: "Classement", icon: "🏆" },
     { href: "/admin/reglement", label: "Règlement", icon: "📖" },
     ...(isAdmin

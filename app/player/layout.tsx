@@ -69,7 +69,7 @@ function LinkNotice({ onOpenChange }: { onOpenChange: (open: boolean) => void })
 }
 
 const TABS = [
-  { href: "/player", label: "Tournois", icon: "🎾" },
+  { href: "/player", label: "Agenda", icon: "📅" },
   { href: "/player/classement", label: "Classement", icon: "🏆" },
   { href: "/player/profil", label: "Profil", icon: "👤" },
   { href: "/player/reglement", label: "Règlement", icon: "📖" },
