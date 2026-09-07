@@ -187,16 +187,25 @@ export async function POST(req: Request) {
 
   // ── Broadcast admin par défaut : nouvelle demande / nouveau compte ──
   const type = body.type === "account" ? "account" : "registration";
+  // Même règle que les pastilles de l'app : seules les demandes sur des créneaux
+  // à venir sont comptées, sinon le compteur ne redescend jamais.
+  const today = new Date().toISOString().slice(0, 10);
   const [regsRes, lessonRegsRes, matchRegsRes, accsRes] = await Promise.all([
-    db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    db
+      .from("registrations")
+      .select("id, tournaments!inner(date)", { count: "exact", head: true })
+      .eq("status", "pending")
+      .gte("tournaments.date", today),
     db
       .from("lesson_registrations")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "pending"),
+      .select("id, lessons!inner(date)", { count: "exact", head: true })
+      .eq("status", "pending")
+      .gte("lessons.date", today),
     db
       .from("match_slot_registrations")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "pending"),
+      .select("id, match_slots!inner(date)", { count: "exact", head: true })
+      .eq("status", "pending")
+      .gte("match_slots.date", today),
     db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
   ]);
   const total =

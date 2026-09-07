@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import { computeSessionScores } from "./scoring";
 import { recomputeTeamStats } from "./session";
 import { isTestMode, nsKey } from "./test-mode";
+import { localDateStr } from "./format";
 import type {
   Lesson,
   LessonRegistration,
@@ -1090,41 +1091,62 @@ export async function addApprovedMatchSlotPlayer(
   if (error) throw error;
 }
 
+// Les pastilles ne comptent que les demandes sur des créneaux À VENIR : une
+// demande oubliée sur un créneau passé n'est plus actionnable (le créneau ne
+// s'affiche plus nulle part) et empêcherait la pastille de redescendre à zéro.
 export async function countPendingMatchSlotRegistrations(): Promise<number> {
+  const today = localDateStr(new Date());
   if (isTestMode()) {
-    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
-    return arr.filter((r) => r.status === "pending").length;
+    const [arr, slots] = await Promise.all([
+      readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG),
+      readJsonKey<MatchSlot>(TEST_MATCHES),
+    ]);
+    const upcoming = new Set(slots.filter((m) => m.date >= today).map((m) => m.id));
+    return arr.filter((r) => r.status === "pending" && upcoming.has(r.match_slot_id)).length;
   }
   const { count } = await supabase
     .from("match_slot_registrations")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "pending");
+    .select("id, match_slots!inner(date)", { count: "exact", head: true })
+    .eq("status", "pending")
+    .gte("match_slots.date", today);
   return count || 0;
 }
 
 // ─── Compteurs pour les pastilles de notification (admin) ───
 
 export async function countPendingLessonRegistrations(): Promise<number> {
+  const today = localDateStr(new Date());
   if (isTestMode()) {
-    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
-    return arr.filter((r) => r.status === "pending").length;
+    const [arr, slots] = await Promise.all([
+      readJsonKey<LessonRegistration>(TEST_LESSON_REG),
+      readJsonKey<Lesson>(TEST_LESSONS),
+    ]);
+    const upcoming = new Set(slots.filter((l) => l.date >= today).map((l) => l.id));
+    return arr.filter((r) => r.status === "pending" && upcoming.has(r.lesson_id)).length;
   }
   const { count } = await supabase
     .from("lesson_registrations")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "pending");
+    .select("id, lessons!inner(date)", { count: "exact", head: true })
+    .eq("status", "pending")
+    .gte("lessons.date", today);
   return count || 0;
 }
 
 export async function countPendingRegistrations(): Promise<number> {
+  const today = localDateStr(new Date());
   if (isTestMode()) {
-    const arr = await readJsonKey<Registration>(TEST_REG);
-    return arr.filter((r) => r.status === "pending").length;
+    const [arr, slots] = await Promise.all([
+      readJsonKey<Registration>(TEST_REG),
+      readJsonKey<Tournament>(TEST_TOURN),
+    ]);
+    const upcoming = new Set(slots.filter((t) => t.date >= today).map((t) => t.id));
+    return arr.filter((r) => r.status === "pending" && upcoming.has(r.tournament_id)).length;
   }
   const { count } = await supabase
     .from("registrations")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "pending");
+    .select("id, tournaments!inner(date)", { count: "exact", head: true })
+    .eq("status", "pending")
+    .gte("tournaments.date", today);
   return count || 0;
 }
 
