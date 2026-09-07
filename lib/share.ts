@@ -47,10 +47,11 @@ export function formatLessonText(lesson: Lesson, confirmedNames: string[]): stri
 
   const lines: (string | null)[] = [
     `🎓 *Leçon — ${k.label}*`,
+    lesson.theme ? `🎯 Thème : *${lesson.theme}*` : null,
     "",
     `📅 *${formatDateLong(lesson.date)}*`,
     `⏰ *${lesson.time}*`,
-    `🎯 ${lessonLevelsLabel(lesson.levels)}`,
+    `👥 ${lessonLevelsLabel(lesson.levels)}`,
     `🏟 ${lesson.courts} terrain${lesson.courts > 1 ? "s" : ""} · ${lesson.capacity} place${
       lesson.capacity > 1 ? "s" : ""
     }`,

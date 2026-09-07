@@ -721,7 +721,8 @@ export async function listLessons(): Promise<Lesson[]> {
 }
 
 export async function createLesson(
-  l: Pick<Lesson, "date" | "time" | "levels" | "kind" | "courts" | "capacity">
+  l: Pick<Lesson, "date" | "time" | "levels" | "kind" | "courts" | "capacity"> &
+    Partial<Pick<Lesson, "theme">>
 ): Promise<Lesson> {
   if (isTestMode()) {
     const arr = await readJsonKey<Lesson>(TEST_LESSONS);

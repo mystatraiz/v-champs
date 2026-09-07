@@ -126,6 +126,7 @@ export interface Lesson {
   time: string; // HH:MM
   levels: number[]; // niveaux de joueurs ciblés (1..10) ; vide = tous niveaux
   kind: LessonKind;
+  theme?: string | null; // thème libre saisi par le coach
   courts: number;
   capacity: number;
   status: LessonStatus;

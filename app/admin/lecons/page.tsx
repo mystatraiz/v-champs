@@ -41,6 +41,11 @@ function LessonDetail({
 }) {
   const [manual, setManual] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [theme, setTheme] = useState(lesson.theme ?? "");
+
+  // Le thème peut changer sous nos pieds (rechargement après enregistrement).
+  useEffect(() => setTheme(lesson.theme ?? ""), [lesson.theme]);
 
   const pending = regs.filter((r) => r.status === "pending");
   const approved = regs.filter((r) => r.status === "approved");
@@ -111,7 +116,146 @@ function LessonDetail({
         >
           📤 Partager
         </Btn>
+        <Btn size="sm" variant={editing ? "primary" : "secondary"} onClick={() => setEditing((v) => !v)}>
+          {editing ? "✓ Terminer" : "✏️ Modifier"}
+        </Btn>
       </div>
+
+      {editing && (
+        <div className="mb-3 space-y-3 rounded-lg border border-gold/40 bg-gold/5 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="min-w-0">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Date
+              </label>
+              <Input
+                type="date"
+                value={lesson.date}
+                onChange={(e) => act(() => updateLesson(lesson.id, { date: e.target.value }))}
+              />
+            </div>
+            <div className="min-w-0">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Heure
+              </label>
+              <Select
+                value={lesson.time}
+                onChange={(e) => act(() => updateLesson(lesson.id, { time: e.target.value }))}
+              >
+                {TIME_SLOTS.map((sl) => (
+                  <option key={sl} value={sl}>
+                    {sl}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Type de leçon
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {LESSON_KINDS.map((k) => (
+                <button
+                  key={k.value}
+                  disabled={busy}
+                  onClick={() => act(() => updateLesson(lesson.id, { kind: k.value }))}
+                  className={`cursor-pointer rounded-lg border py-2 text-xs font-bold transition-colors ${
+                    lesson.kind === k.value
+                      ? "border-gold bg-gold text-ink"
+                      : "border-line2 text-sub hover:text-body"
+                  }`}
+                >
+                  {k.icon} {k.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Thème personnalisé
+            </label>
+            <div className="flex items-start gap-2">
+              <Input
+                placeholder="ex : volée haute, sortie de vitre…"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+              />
+              {theme.trim() !== (lesson.theme ?? "").trim() && (
+                <Btn
+                  size="sm"
+                  variant="success"
+                  disabled={busy}
+                  onClick={() =>
+                    act(() => updateLesson(lesson.id, { theme: theme.trim() || null }))
+                  }
+                >
+                  ✓
+                </Btn>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Terrains
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {LESSON_COURTS.map((c) => (
+                <button
+                  key={c}
+                  disabled={busy}
+                  onClick={() => act(() => updateLesson(lesson.id, { courts: c }))}
+                  className={`cursor-pointer rounded-lg border py-2 text-xs font-bold transition-colors ${
+                    lesson.courts === c
+                      ? "border-gold bg-gold text-ink"
+                      : "border-line2 text-sub hover:text-body"
+                  }`}
+                >
+                  {c} terrain{c > 1 ? "s" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Niveaux concernés
+            </label>
+            <div className="grid grid-cols-5 gap-1.5">
+              {PLAYER_LEVELS.map((n) => {
+                const on = (lesson.levels || []).includes(n);
+                return (
+                  <button
+                    key={n}
+                    disabled={busy}
+                    onClick={() =>
+                      act(() =>
+                        updateLesson(lesson.id, {
+                          levels: on
+                            ? (lesson.levels || []).filter((x) => x !== n)
+                            : [...(lesson.levels || []), n].sort((a, b) => a - b),
+                        })
+                      )
+                    }
+                    className={`cursor-pointer rounded-lg border py-2 text-xs font-bold transition-colors ${
+                      on ? "border-gold bg-gold text-ink" : "border-line2 text-sub hover:text-body"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] text-mut">
+              Le nombre de places ne bouge pas tout seul : ajuste-le au-dessus si le changement de
+              type ou de terrains l&apos;impose.
+            </p>
+          </div>
+        </div>
+      )}
       {locked && (
         <p className="mb-3 rounded-lg bg-bad/10 px-3 py-2 text-[11px] font-semibold leading-4 text-bad">
           Inscriptions bloquées : les joueurs ne peuvent plus demander de place, ni rejoindre la
@@ -254,6 +398,7 @@ export default function AdminLessons() {
   const [fKind, setFKind] = useState<LessonKind>("phases");
   const [fCourts, setFCourts] = useState(1);
   const [fLevels, setFLevels] = useState<number[]>([]);
+  const [fTheme, setFTheme] = useState("");
   const [fCapacity, setFCapacity] = useState(lessonCapacity("phases", 1));
 
   // Le nombre de places suit le type et les terrains, puis reste ajustable
@@ -301,12 +446,14 @@ export default function AdminLessons() {
         time: fTime,
         levels: fLevels,
         kind: fKind,
+        theme: fTheme.trim() || null,
         courts: fCourts,
         capacity: fCapacity,
       });
       notifyNewLesson(fLevels, fKind, fDate, fTime); // prévient les joueurs ciblés
       setShowForm(false);
       setFLevels([]);
+      setFTheme("");
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -343,6 +490,7 @@ export default function AdminLessons() {
               <Badge color="gold">
                 {k.icon} {k.label}
               </Badge>
+              {l.theme && <span className="font-semibold text-body">« {l.theme} »</span>}
               <span>{lessonLevelsLabel(l.levels)}</span>·
               <span
                 className={`font-bold ${ready ? "text-ok" : confirmed > 0 ? "text-gold" : "text-mut"}`}
@@ -433,11 +581,21 @@ export default function AdminLessons() {
                     }`}
                   >
                     {k.icon} {k.label}
-                    <div className="text-[10px] font-semibold opacity-70">
-                      {k.perCourt} joueurs/terrain
-                    </div>
                   </button>
                 ))}
+              </div>
+              <div className="mt-2">
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                  Thème personnalisé
+                </label>
+                <Input
+                  placeholder="ex : volée haute, sortie de vitre, bandeja…"
+                  value={fTheme}
+                  onChange={(e) => setFTheme(e.target.value)}
+                />
+                <p className="mt-1 text-[11px] text-mut">
+                  Facultatif — affiché aux joueurs à côté du type de leçon.
+                </p>
               </div>
             </div>
 

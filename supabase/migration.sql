@@ -98,6 +98,9 @@ create table if not exists public.lesson_registrations (
   created_at  timestamptz not null default now()
 );
 
+-- Thème libre saisi par le coach (« Volée haute », « Sortie de vitre »…).
+alter table public.lessons add column if not exists theme text;
+
 -- Un même nom ne peut s'inscrire qu'une fois par leçon
 create unique index if not exists lesson_registrations_unique_name
   on public.lesson_registrations (lesson_id, lower(trim(player_name)));

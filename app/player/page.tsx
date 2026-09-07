@@ -343,6 +343,11 @@ export default function PlayerTournaments() {
                           <Badge color="coach">
                             {k.icon} {k.label}
                           </Badge>
+                          {l.theme && (
+                            <span className="text-[11px] font-semibold text-body">
+                              « {l.theme} »
+                            </span>
+                          )}
                           {locked && <Badge color="bad">🔒 Complète</Badge>}
                           <span className={`text-[11px] font-bold ${full ? "text-bad" : "text-ok"}`}>
                             {approved.length}/{l.capacity} confirmés
