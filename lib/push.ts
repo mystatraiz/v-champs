@@ -105,6 +105,10 @@ export const notifyNewLesson = (
   time: string
 ) => post({ type: "new-lesson", levels, kind, date, time });
 
+// Nouveau créneau de match → joueurs des niveaux visés (liste vide = tous).
+export const notifyNewMatchSlot = (levels: number[], date: string, time: string) =>
+  post({ type: "new-match", levels, date, time });
+
 // Place libérée → joueurs en liste d'attente du tournoi.
 export const notifySpotFreed = (tournamentId: string, date: string) =>
   post({ type: "spot-freed", tournamentId, date });

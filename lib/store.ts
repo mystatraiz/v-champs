@@ -6,6 +6,8 @@ import { isTestMode, nsKey } from "./test-mode";
 import type {
   Lesson,
   LessonRegistration,
+  MatchSlot,
+  MatchSlotRegistration,
   PlayerSessionScore,
   Profile,
   Registration,
@@ -887,6 +889,215 @@ export async function addApprovedLessonPlayer(lessonId: string, name: string): P
     is_guest: false,
   });
   if (error) throw error;
+}
+
+// ─── Créneaux de match ───
+const TEST_MATCHES = "test_match_slots";
+const TEST_MATCH_REG = "test_match_slot_registrations";
+
+export async function listMatchSlots(): Promise<MatchSlot[]> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlot>(TEST_MATCHES);
+    return arr.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  }
+  const { data, error } = await supabase
+    .from("match_slots")
+    .select("*")
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
+  if (error) throw error;
+  return (data as MatchSlot[]) || [];
+}
+
+export async function createMatchSlot(
+  m: Pick<MatchSlot, "date" | "time" | "levels" | "courts" | "capacity">
+): Promise<MatchSlot> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlot>(TEST_MATCHES);
+    const created: MatchSlot = {
+      id: newId(),
+      ...m,
+      status: "open",
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_MATCHES, [...arr, created]);
+    return created;
+  }
+  const { data, error } = await supabase
+    .from("match_slots")
+    .insert({ ...m, status: "open" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MatchSlot;
+}
+
+export async function updateMatchSlot(id: string, patch: Partial<MatchSlot>): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlot>(TEST_MATCHES);
+    await writeJsonKey(
+      TEST_MATCHES,
+      arr.map((m) => (m.id === id ? { ...m, ...patch } : m))
+    );
+    return;
+  }
+  const { error } = await supabase.from("match_slots").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteMatchSlot(id: string): Promise<void> {
+  if (isTestMode()) {
+    const [slots, regs] = await Promise.all([
+      readJsonKey<MatchSlot>(TEST_MATCHES),
+      readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG),
+    ]);
+    await writeJsonKey(
+      TEST_MATCHES,
+      slots.filter((m) => m.id !== id)
+    );
+    await writeJsonKey(
+      TEST_MATCH_REG,
+      regs.filter((r) => r.match_slot_id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("match_slots").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function listMatchSlotRegistrations(
+  matchSlotId?: string
+): Promise<MatchSlotRegistration[]> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    return (matchSlotId ? arr.filter((r) => r.match_slot_id === matchSlotId) : arr).sort((a, b) =>
+      (a.created_at || "").localeCompare(b.created_at || "")
+    );
+  }
+  let q = supabase
+    .from("match_slot_registrations")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (matchSlotId) q = q.eq("match_slot_id", matchSlotId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data as MatchSlotRegistration[]) || [];
+}
+
+export async function requestMatchSlotRegistration(
+  matchSlotId: string,
+  playerName: string,
+  profileId: string | null,
+  isGuest = false
+): Promise<MatchSlotRegistration> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    const created: MatchSlotRegistration = {
+      id: newId(),
+      match_slot_id: matchSlotId,
+      profile_id: profileId,
+      player_name: playerName,
+      status: "pending",
+      is_guest: isGuest,
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_MATCH_REG, [...arr, created]);
+    return created;
+  }
+  const { data, error } = await supabase
+    .from("match_slot_registrations")
+    .insert({
+      match_slot_id: matchSlotId,
+      profile_id: profileId,
+      player_name: playerName,
+      status: "pending",
+      is_guest: isGuest,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MatchSlotRegistration;
+}
+
+export async function setMatchSlotRegistrationStatus(
+  id: string,
+  status: RegistrationStatus
+): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    await writeJsonKey(
+      TEST_MATCH_REG,
+      arr.map((r) => (r.id === id ? { ...r, status } : r))
+    );
+    return;
+  }
+  const { error } = await supabase
+    .from("match_slot_registrations")
+    .update({ status })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteMatchSlotRegistration(id: string): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    await writeJsonKey(
+      TEST_MATCH_REG,
+      arr.filter((r) => r.id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("match_slot_registrations").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Ajout manuel par l'organisateur : inscription directement confirmée.
+export async function addApprovedMatchSlotPlayer(
+  matchSlotId: string,
+  name: string
+): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const existing = await listMatchSlotRegistrations(matchSlotId);
+  const dup = existing.find((r) => r.player_name.toLowerCase().trim() === trimmed.toLowerCase());
+  if (dup) {
+    if (dup.status !== "approved") await setMatchSlotRegistrationStatus(dup.id, "approved");
+    return;
+  }
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    arr.push({
+      id: newId(),
+      match_slot_id: matchSlotId,
+      profile_id: null,
+      player_name: trimmed,
+      status: "approved",
+      is_guest: false,
+      created_at: new Date().toISOString(),
+    });
+    await writeJsonKey(TEST_MATCH_REG, arr);
+    return;
+  }
+  const { error } = await supabase.from("match_slot_registrations").insert({
+    match_slot_id: matchSlotId,
+    profile_id: null,
+    player_name: trimmed,
+    status: "approved",
+    is_guest: false,
+  });
+  if (error) throw error;
+}
+
+export async function countPendingMatchSlotRegistrations(): Promise<number> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    return arr.filter((r) => r.status === "pending").length;
+  }
+  const { count } = await supabase
+    .from("match_slot_registrations")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
+  return count || 0;
 }
 
 // ─── Compteurs pour les pastilles de notification (admin) ───

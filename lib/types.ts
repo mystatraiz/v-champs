@@ -143,6 +143,29 @@ export interface LessonRegistration {
   created_at: string;
 }
 
+// ─── Créneaux de match ───────────────────────────────────────────────────────
+
+export interface MatchSlot {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  levels: number[]; // niveaux visés (1..10) ; vide = tous niveaux
+  courts: number;
+  capacity: number;
+  status: LessonStatus;
+  created_at?: string;
+}
+
+export interface MatchSlotRegistration {
+  id: string;
+  match_slot_id: string;
+  profile_id: string | null;
+  player_name: string;
+  status: RegistrationStatus;
+  is_guest: boolean;
+  created_at: string;
+}
+
 export interface AggPlayerStats {
   wins: number;
   losses: number;

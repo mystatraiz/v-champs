@@ -1,3 +1,4 @@
+import { levelsIncludePlayer, levelsLabel } from "./levels";
 import type { LessonKind } from "./types";
 
 // Types de leçon et nombre de joueurs par terrain.
@@ -21,17 +22,6 @@ export function lessonCapacity(kind: string, courts: number): number {
   return lessonKind(kind).perCourt * Math.max(1, courts);
 }
 
-// Un joueur voit une leçon si elle cible son niveau. Une leçon sans niveau
-// coché est ouverte à tous, et un joueur sans niveau attribué voit tout.
-export function lessonIncludesPlayer(levels: number[] | null, playerLevel: number | null): boolean {
-  if (!levels || levels.length === 0) return true;
-  if (playerLevel == null) return true;
-  return levels.includes(playerLevel);
-}
-
-// Libellé compact des niveaux ciblés : « Niveaux 5 · 6 · 7 » / « Tous niveaux ».
-export function lessonLevelsLabel(levels: number[] | null): string {
-  const l = [...(levels || [])].sort((a, b) => a - b);
-  if (!l.length) return "Tous niveaux";
-  return `Niveau${l.length > 1 ? "x" : ""} ${l.join(" · ")}`;
-}
+// Ciblage par niveaux : règles communes aux leçons et aux créneaux de match.
+export const lessonIncludesPlayer = levelsIncludePlayer;
+export const lessonLevelsLabel = levelsLabel;

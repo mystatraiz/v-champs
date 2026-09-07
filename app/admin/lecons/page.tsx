@@ -23,8 +23,13 @@ import { PLAYER_LEVELS } from "@/lib/levels";
 import { formatLessonText, openWhatsApp } from "@/lib/share";
 import { useAppData } from "@/lib/use-app-data";
 import { TIME_SLOTS, endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
-import type { Lesson, LessonKind, LessonRegistration } from "@/lib/types";
-import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
+import type {
+  Lesson,
+  LessonKind,
+  LessonRegistration,
+  RegistrationStatus,
+} from "@/lib/types";
+import { RegistrationManager } from "@/components/RegistrationManager";
 import { Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
 
 // Détail d'une leçon : demandes à valider + joueurs confirmés.
@@ -39,7 +44,6 @@ function LessonDetail({
   knownPlayers: string[];
   onChange: () => void;
 }) {
-  const [manual, setManual] = useState("");
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [theme, setTheme] = useState(lesson.theme ?? "");
@@ -47,10 +51,7 @@ function LessonDetail({
   // Le thème peut changer sous nos pieds (rechargement après enregistrement).
   useEffect(() => setTheme(lesson.theme ?? ""), [lesson.theme]);
 
-  const pending = regs.filter((r) => r.status === "pending");
   const approved = regs.filter((r) => r.status === "approved");
-  const waitlist = regs.filter((r) => r.status === "waitlist");
-  const full = approved.length >= lesson.capacity;
   const locked = lesson.status === "locked";
 
   async function act(fn: () => Promise<void>) {
@@ -72,15 +73,6 @@ function LessonDetail({
     const v = Math.max(1, Math.min(12, n));
     if (v === lesson.capacity) return;
     await act(() => updateLesson(lesson.id, { capacity: v }));
-  }
-
-  async function addManual(name = manual) {
-    const n = name.trim();
-    if (!n) return;
-    await act(async () => {
-      await addApprovedLessonPlayer(lesson.id, n);
-      setManual("");
-    });
   }
 
   return (
@@ -263,121 +255,17 @@ function LessonDetail({
         </p>
       )}
 
-      {pending.length > 0 && (
-        <div className="mb-3">
-          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-mut">
-            Demandes ({pending.length})
-          </div>
-          <div className="space-y-1.5">
-            {pending.map((r) => (
-              <div key={r.id} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm text-body">
-                  {r.player_name}
-                  {r.is_guest && <span className="ml-1.5 text-[10px] text-mut">invité</span>}
-                </span>
-                <Btn
-                  size="sm"
-                  variant="success"
-                  disabled={busy}
-                  onClick={() =>
-                    act(() => setLessonRegistrationStatus(r.id, full ? "waitlist" : "approved"))
-                  }
-                >
-                  {full ? "⏳ Attente" : "✓ Valider"}
-                </Btn>
-                <Btn
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => act(() => setLessonRegistrationStatus(r.id, "declined"))}
-                >
-                  ✕
-                </Btn>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="mb-3">
-        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-mut">
-          Confirmés ({approved.length}/{lesson.capacity})
-        </div>
-        {!approved.length ? (
-          <p className="text-xs text-mut">Personne pour le moment.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {approved.map((r) => (
-              <div key={r.id} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-body">
-                  ✓ {r.player_name}
-                </span>
-                <Btn
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => act(() => deleteLessonRegistration(r.id))}
-                >
-                  ✕
-                </Btn>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {waitlist.length > 0 && (
-        <div className="mb-3">
-          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-mut">
-            Liste d&apos;attente ({waitlist.length}) — par ordre d&apos;arrivée
-          </div>
-          <div className="space-y-1.5">
-            {waitlist.map((r, i) => (
-              <div key={r.id} className="flex items-center gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-card2 text-[11px] font-extrabold text-sub">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-sub">{r.player_name}</span>
-                <Btn
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => act(() => setLessonRegistrationStatus(r.id, "approved"))}
-                >
-                  ↑ Faire monter
-                </Btn>
-                <Btn
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => act(() => deleteLessonRegistration(r.id))}
-                >
-                  ✕
-                </Btn>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-start gap-2">
-        <PlayerAutocomplete
-          value={manual}
-          onChange={setManual}
-          onPick={(n) => addManual(n)}
-          options={knownPlayers}
-          exclude={regs.map((r) => r.player_name)}
-          placeholder="Ajouter un joueur…"
-        />
-        <Btn
-          size="sm"
-          variant="secondary"
-          disabled={busy || !manual.trim()}
-          onClick={() => addManual()}
-        >
-          + Ajouter
-        </Btn>
-      </div>
+      <RegistrationManager
+        regs={regs}
+        capacity={lesson.capacity}
+        knownPlayers={knownPlayers}
+        busy={busy}
+        onSetStatus={(id: string, status: RegistrationStatus) =>
+          act(() => setLessonRegistrationStatus(id, status))
+        }
+        onRemove={(id: string) => act(() => deleteLessonRegistration(id))}
+        onAdd={(name: string) => act(() => addApprovedLessonPlayer(lesson.id, name))}
+      />
     </div>
   );
 }

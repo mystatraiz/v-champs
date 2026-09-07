@@ -1,9 +1,11 @@
 import { rankTeamsInSession } from "./scoring";
 import { lessonKind, lessonLevelsLabel } from "./lessons";
+import { levelsLabel } from "./levels";
 import { formatDateLong, teamLabel } from "./format";
 import type {
   CombinedRankingRow,
   Lesson,
+  MatchSlot,
   Match,
   PlayerSessionScore,
   SessionHistoryEntry,
@@ -70,6 +72,44 @@ export function formatLessonText(lesson: Lesson, confirmedNames: string[]): stri
   // liste d'attente plutôt que de promettre une place.
   if (!locked && url) {
     if (free > 0) lines.push("", `👉 Réserve ta place sur V-Champs : ${url}`);
+    else
+      lines.push(
+        "",
+        "⏳ *Liste d'attente* — tu peux t'inscrire, mais aucune place n'est garantie : elle ne se libère que si un joueur se désiste.",
+        `👉 ${url}`
+      );
+  }
+  return lines.filter((l) => l !== null).join("\n");
+}
+
+// Message WhatsApp d'annonce d'un créneau de match.
+export function formatMatchSlotText(slot: MatchSlot, confirmedNames: string[]): string {
+  const free = Math.max(0, slot.capacity - confirmedNames.length);
+  const locked = slot.status === "locked";
+  const url = appUrl();
+
+  const lines: (string | null)[] = [
+    "🎾 *Match — créneau ouvert*",
+    "",
+    `📅 *${formatDateLong(slot.date)}*`,
+    `⏰ *${slot.time}*`,
+    `👥 ${levelsLabel(slot.levels)}`,
+    `🏟 ${slot.courts} terrain${slot.courts > 1 ? "s" : ""} · ${slot.capacity} joueur${
+      slot.capacity > 1 ? "s" : ""
+    }`,
+    "",
+    confirmedNames.length ? `✅ *Inscrits (${confirmedNames.length}/${slot.capacity}) :*` : null,
+    ...confirmedNames.map((p, i) => `${PLAYER_EMOJIS[i % PLAYER_EMOJIS.length]} ${p}`),
+    confirmedNames.length ? "" : null,
+    locked
+      ? "🔒 *Créneau fermé — inscriptions closes*"
+      : free === 0
+        ? "🔴 *Complet !*"
+        : `🟢 *${free} place${free > 1 ? "s" : ""} disponible${free > 1 ? "s" : ""}*`,
+  ];
+
+  if (!locked && url) {
+    if (free > 0) lines.push("", `👉 Prends ta place sur V-Champs : ${url}`);
     else
       lines.push(
         "",

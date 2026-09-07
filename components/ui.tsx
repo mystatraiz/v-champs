@@ -47,26 +47,24 @@ export function SectionBanner({
   title: string;
   subtitle?: string;
   count?: number;
-  accent?: "gold" | "coach";
+  accent?: "gold" | "coach" | "match";
 }) {
-  const gold = accent === "gold";
+  const tone = {
+    gold: { edge: "border-l-gold", text: "text-gold", chip: "bg-gold/15 text-gold" },
+    coach: { edge: "border-l-coach", text: "text-coach", chip: "bg-coach/15 text-coach" },
+    match: { edge: "border-l-match", text: "text-match", chip: "bg-match/15 text-match" },
+  }[accent];
   return (
     <div
-      className={`mb-2.5 flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 ${
-        gold ? "border-l-4 border-l-gold" : "border-l-4 border-l-coach"
-      }`}
+      className={`mb-2.5 flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 border-l-4 ${tone.edge}`}
     >
       <span className="text-2xl leading-none">{icon}</span>
       <div className="min-w-0 flex-1">
-        <div className={`text-sm font-extrabold ${gold ? "text-gold" : "text-coach"}`}>{title}</div>
+        <div className={`text-sm font-extrabold ${tone.text}`}>{title}</div>
         {subtitle && <div className="text-[11px] leading-4 text-mut">{subtitle}</div>}
       </div>
       {count != null && (
-        <span
-          className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${
-            gold ? "bg-gold/15 text-gold" : "bg-coach/15 text-coach"
-          }`}
-        >
+        <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${tone.chip}`}>
           {count}
         </span>
       )}
@@ -176,7 +174,7 @@ export function Badge({
   className = "",
 }: {
   children: ReactNode;
-  color?: "sub" | "gold" | "ok" | "bad" | "left" | "right" | "coach";
+  color?: "sub" | "gold" | "ok" | "bad" | "left" | "right" | "coach" | "match";
   className?: string;
 }) {
   const colors = {
@@ -187,6 +185,7 @@ export function Badge({
     left: "border-left/60 text-left",
     right: "border-right/60 text-right",
     coach: "border-coach/60 text-coach",
+    match: "border-match/60 text-match",
   };
   return (
     <span

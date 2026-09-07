@@ -16,6 +16,22 @@ export function labelIncludesPlayer(label: string, playerLevel: number | null): 
   return levelsOfLabel(label).includes(playerLevel);
 }
 
+// ─── Ciblage par liste de niveaux (leçons, créneaux de match) ───
+// Une liste vide vise tous les niveaux, et un joueur sans niveau attribué voit
+// tout — même règle que pour les tournois.
+export function levelsIncludePlayer(levels: number[] | null, playerLevel: number | null): boolean {
+  if (!levels || levels.length === 0) return true;
+  if (playerLevel == null) return true;
+  return levels.includes(playerLevel);
+}
+
+// Libellé compact : « Niveaux 5 · 6 · 7 » / « Tous niveaux ».
+export function levelsLabel(levels: number[] | null): string {
+  const l = [...(levels || [])].sort((a, b) => a - b);
+  if (!l.length) return "Tous niveaux";
+  return `Niveau${l.length > 1 ? "x" : ""} ${l.join(" · ")}`;
+}
+
 export const LEVEL_MULTIPLIER: Record<string, number> = {
   "3/4": 0.35,
   "4/5": 0.5,

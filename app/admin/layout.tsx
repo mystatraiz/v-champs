@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   countPendingLessonRegistrations,
+  countPendingMatchSlotRegistrations,
   countPendingProfiles,
   countPendingRegistrations,
 } from "@/lib/store";
@@ -25,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Compteurs des pastilles (demandes d'inscription + comptes à valider).
   const [pendingRegs, setPendingRegs] = useState(0);
   const [pendingLessons, setPendingLessons] = useState(0);
+  const [pendingMatches, setPendingMatches] = useState(0);
   const [pendingAccounts, setPendingAccounts] = useState(0);
 
   const isReady = !loading && !!profile && (profile.role === "admin" || profile.role === "organisateur");
@@ -33,15 +35,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const refreshBadges = useCallback(async () => {
     if (!isReady) return;
     try {
-      const [regs, lessons, accs] = await Promise.all([
+      const [regs, lessons, matches, accs] = await Promise.all([
         countPendingRegistrations(),
         countPendingLessonRegistrations(),
+        countPendingMatchSlotRegistrations(),
         canModerate ? countPendingProfiles() : Promise.resolve(0),
       ]);
       setPendingRegs(regs);
       setPendingLessons(lessons);
+      setPendingMatches(matches);
       setPendingAccounts(accs);
-      updateAppBadge(regs + lessons + accs); // badge sur l'icône de l'app (si installée)
+      // Badge sur l'icône de l'app (si installée)
+      updateAppBadge(regs + lessons + matches + accs);
     } catch {
       /* silencieux : les pastilles ne doivent jamais casser la navigation */
     }
@@ -74,6 +79,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const tabs: { href: string; label: string; icon: string; badge?: number }[] = [
     { href: "/admin", label: "Tournois", icon: "🎾", badge: pendingRegs },
     { href: "/admin/lecons", label: "Leçons", icon: "🎓", badge: pendingLessons },
+    { href: "/admin/matchs", label: "Matchs", icon: "🤝", badge: pendingMatches },
     { href: "/admin/classement", label: "Classement", icon: "🏆" },
     { href: "/admin/reglement", label: "Règlement", icon: "📖" },
     ...(isAdmin

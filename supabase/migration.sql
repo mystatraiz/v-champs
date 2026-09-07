@@ -128,7 +128,61 @@ drop policy if exists "lesson_regs_write" on public.lesson_registrations;
 create policy "lesson_regs_write" on public.lesson_registrations
   for all to authenticated using (true) with check (true);
 
--- ── 6. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
+-- ── 6. Créneaux de match (organisés par les coachs / admins) ───────────────
+-- Un créneau libre proposé aux joueurs des niveaux visés. Pas de composition
+-- d'équipes ni de score : les joueurs jouent entre eux, rien n'entre au
+-- classement V-Champs (ce rôle reste celui des tournois).
+create table if not exists public.match_slots (
+  id         uuid primary key default gen_random_uuid(),
+  date       date not null,
+  time       text not null default '18:30',
+  levels     int[] not null default '{}',
+  courts     int  not null default 1,
+  capacity   int  not null default 4,
+  status     text not null default 'open'
+             check (status in ('open','locked','done','cancelled')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.match_slot_registrations (
+  id            uuid primary key default gen_random_uuid(),
+  match_slot_id uuid not null references public.match_slots(id) on delete cascade,
+  profile_id    uuid references public.profiles(id) on delete set null,
+  player_name   text not null,
+  status        text not null default 'pending'
+                check (status in ('pending','approved','declined','waitlist')),
+  is_guest      boolean not null default false,
+  created_at    timestamptz not null default now()
+);
+
+-- Un même nom ne peut s'inscrire qu'une fois par créneau
+create unique index if not exists match_slot_registrations_unique_name
+  on public.match_slot_registrations (match_slot_id, lower(trim(player_name)));
+
+alter table public.match_slots              enable row level security;
+alter table public.match_slot_registrations enable row level security;
+
+drop policy if exists "match_slots_select" on public.match_slots;
+create policy "match_slots_select" on public.match_slots
+  for select using (true);
+
+drop policy if exists "match_slots_write" on public.match_slots;
+create policy "match_slots_write" on public.match_slots
+  for all to authenticated using (true) with check (true);
+
+drop policy if exists "match_regs_select" on public.match_slot_registrations;
+create policy "match_regs_select" on public.match_slot_registrations
+  for select using (true);
+
+drop policy if exists "match_regs_insert_guest" on public.match_slot_registrations;
+create policy "match_regs_insert_guest" on public.match_slot_registrations
+  for insert to anon with check (status = 'pending');
+
+drop policy if exists "match_regs_write" on public.match_slot_registrations;
+create policy "match_regs_write" on public.match_slot_registrations
+  for all to authenticated using (true) with check (true);
+
+-- ── 7. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
 insert into public.tournaments (date, time, level, courts, capacity, status, teams)
 select
   (elem->>'date')::date,

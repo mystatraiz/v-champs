@@ -7,14 +7,18 @@ import {
   deleteRegistration,
   listLessonRegistrations,
   listLessons,
+  listMatchSlotRegistrations,
+  listMatchSlots,
   listRegistrations,
   listTournaments,
   removeFromTournamentGrid,
   requestLessonRegistration,
+  requestMatchSlotRegistration,
   requestRegistration,
+  deleteMatchSlotRegistration,
 } from "@/lib/store";
 import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
-import { labelIncludesPlayer } from "@/lib/levels";
+import { labelIncludesPlayer, levelsIncludePlayer, levelsLabel } from "@/lib/levels";
 import { lessonIncludesPlayer, lessonKind } from "@/lib/lessons";
 import {
   endOfNextWeekStr,
@@ -23,7 +27,14 @@ import {
   playerIdentity,
   positionLabel,
 } from "@/lib/format";
-import type { Lesson, LessonRegistration, Registration, Tournament } from "@/lib/types";
+import type {
+  Lesson,
+  LessonRegistration,
+  MatchSlot,
+  MatchSlotRegistration,
+  Registration,
+  Tournament,
+} from "@/lib/types";
 import { Badge, Btn, Card, EmptyState, Loader, SectionBanner } from "@/components/ui";
 
 const STATUS_UI: Record<
@@ -54,6 +65,8 @@ export default function PlayerTournaments() {
   const [regs, setRegs] = useState<Registration[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [lessonRegs, setLessonRegs] = useState<LessonRegistration[]>([]);
+  const [matchSlots, setMatchSlots] = useState<MatchSlot[]>([]);
+  const [matchRegs, setMatchRegs] = useState<MatchSlotRegistration[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -75,6 +88,14 @@ export default function PlayerTournaments() {
       setLessonRegs(lrs);
     } catch {
       setLessons([]);
+    }
+    // Idem pour les créneaux de match : indépendants du reste.
+    try {
+      const [ms, mrs] = await Promise.all([listMatchSlots(), listMatchSlotRegistrations()]);
+      setMatchSlots(ms);
+      setMatchRegs(mrs);
+    } catch {
+      setMatchSlots([]);
     }
   }, []);
 
@@ -146,6 +167,52 @@ export default function PlayerTournaments() {
         return (inWindow && levelOk) || mine;
       });
   }, [lessons, profile, myLessonIds]);
+
+  // Créneaux où le joueur a déjà une inscription (par compte ou par nom).
+  const myMatchIds = useMemo(() => {
+    const key = myName.toLowerCase().trim();
+    return new Set(
+      matchRegs
+        .filter(
+          (r) =>
+            (profile && r.profile_id === profile.id) ||
+            (key && r.player_name.toLowerCase().trim() === key)
+        )
+        .map((r) => r.match_slot_id)
+    );
+  }, [matchRegs, profile, myName]);
+
+  const upcomingMatches = useMemo(() => {
+    const today = localDateStr(new Date());
+    const windowEnd = endOfNextWeekStr();
+    return matchSlots
+      .filter((m) => m.date >= today && (m.status === "open" || m.status === "locked"))
+      .filter((m) => {
+        const mine = myMatchIds.has(m.id);
+        // Verrouillé : masqué à tous sauf aux inscrits, qui gardent leur créneau.
+        if (m.status === "locked" && !mine) return false;
+        const inWindow = m.date <= windowEnd;
+        const levelOk = levelsIncludePlayer(m.levels, profile?.level ?? null);
+        return (inWindow && levelOk) || mine;
+      });
+  }, [matchSlots, profile, myMatchIds]);
+
+  async function toggleMatchRegistration(m: MatchSlot, mine: MatchSlotRegistration | undefined) {
+    if (!profile) return;
+    setBusy(m.id);
+    try {
+      if (mine) await deleteMatchSlotRegistration(mine.id);
+      else {
+        await requestMatchSlotRegistration(m.id, myName, profile.id);
+        notifyAdmins("registration", myName); // push aux admins (non bloquant)
+      }
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function toggleLessonRegistration(l: Lesson, mine: LessonRegistration | undefined) {
     if (!profile) return;
@@ -406,6 +473,106 @@ export default function PlayerTournaments() {
                       className={`h-full transition-all ${full ? "bg-ok" : "bg-gold"}`}
                       style={{
                         width: `${Math.min(100, Math.round((approved.length / l.capacity) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {upcomingMatches.length > 0 && (
+        <div>
+          <SectionBanner
+            icon="🤝"
+            title="Matchs à venir"
+            subtitle="Créneaux libres — sans points au classement"
+            count={upcomingMatches.length}
+            accent="match"
+          />
+          <div className="space-y-3">
+            {upcomingMatches.map((m) => {
+              const mRegs = matchRegs.filter((r) => r.match_slot_id === m.id);
+              const approved = mRegs.filter((r) => r.status === "approved");
+              const mine = mRegs.find(
+                (r) =>
+                  r.profile_id === profile.id ||
+                  (myName && r.player_name.toLowerCase().trim() === myName.toLowerCase().trim())
+              );
+              const full = approved.length >= m.capacity;
+              const locked = m.status === "locked";
+
+              return (
+                <Card key={m.id} className="overflow-hidden border-l-4 border-l-match">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-extrabold text-bright">
+                          {formatDateLong(m.date)}
+                          <span className="ml-2 text-gold">{m.time}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <Badge color="match">🤝 {levelsLabel(m.levels)}</Badge>
+                          {locked && <Badge color="bad">🔒 Complet</Badge>}
+                          <span className={`text-[11px] font-bold ${full ? "text-bad" : "text-ok"}`}>
+                            {approved.length}/{m.capacity} confirmés
+                          </span>
+                        </div>
+                      </div>
+                      {mine && (
+                        <Badge color={STATUS_UI[mine.status].color}>
+                          {statusLabel(mine, mRegs)}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {approved.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {approved.map((r) => (
+                          <span
+                            key={r.id}
+                            className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
+                          >
+                            {r.player_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-4">
+                      {mine ? (
+                        mine.status !== "declined" && (
+                          <Btn
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy === m.id}
+                            onClick={() => toggleMatchRegistration(m, mine)}
+                          >
+                            ✕ Annuler ma {mine.status === "approved" ? "participation" : "demande"}
+                          </Btn>
+                        )
+                      ) : locked ? (
+                        <p className="text-xs font-semibold text-mut">
+                          Inscriptions clôturées par l&apos;organisateur.
+                        </p>
+                      ) : (
+                        <Btn
+                          size="sm"
+                          disabled={busy === m.id}
+                          onClick={() => toggleMatchRegistration(m, undefined)}
+                        >
+                          {full ? "Rejoindre la liste d'attente" : "🤝 Demander ma place"}
+                        </Btn>
+                      )}
+                    </div>
+                  </div>
+                  <div className="h-1 bg-line">
+                    <div
+                      className={`h-full transition-all ${full ? "bg-ok" : "bg-gold"}`}
+                      style={{
+                        width: `${Math.min(100, Math.round((approved.length / m.capacity) * 100))}%`,
                       }}
                     />
                   </div>

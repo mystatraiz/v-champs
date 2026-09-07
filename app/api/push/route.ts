@@ -93,6 +93,29 @@ export async function POST(req: Request) {
     );
   }
 
+  // ── Nouveau créneau de match → joueurs des niveaux visés ──
+  if (body.type === "new-match") {
+    const lvls = Array.isArray(body.levels) ? body.levels : [];
+    const { data: profs } = await db.from("profiles").select("id,level,role").neq("role", "pending");
+    const eligible = new Set(
+      (profs || [])
+        .filter((p) => {
+          if (!lvls.length) return true; // créneau ouvert à tous les niveaux
+          if (p.level == null) return p.role === "player";
+          return lvls.includes(p.level as number);
+        })
+        .map((p) => p.id as string)
+    );
+    const targets = subs.filter((s) => s.profileId && eligible.has(s.profileId));
+    return j(
+      await sendToSubs(db, subs, targets, {
+        title: "Nouveau créneau de match 🎾",
+        body: `${frDate(body.date)}${body.time ? ` à ${body.time}` : ""} — prends ta place !`,
+        url: "/player",
+      })
+    );
+  }
+
   // ── Une place s'est libérée → joueurs en liste d'attente ──
   if (body.type === "spot-freed") {
     const tid = String(body.tournamentId || "");
@@ -164,15 +187,20 @@ export async function POST(req: Request) {
 
   // ── Broadcast admin par défaut : nouvelle demande / nouveau compte ──
   const type = body.type === "account" ? "account" : "registration";
-  const [regsRes, lessonRegsRes, accsRes] = await Promise.all([
+  const [regsRes, lessonRegsRes, matchRegsRes, accsRes] = await Promise.all([
     db.from("registrations").select("*", { count: "exact", head: true }).eq("status", "pending"),
     db
       .from("lesson_registrations")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending"),
+    db
+      .from("match_slot_registrations")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
     db.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
   ]);
-  const total = (regsRes.count || 0) + (lessonRegsRes.count || 0) + (accsRes.count || 0);
+  const total =
+    (regsRes.count || 0) + (lessonRegsRes.count || 0) + (matchRegsRes.count || 0) + (accsRes.count || 0);
   const sent = await sendToSubs(db, subs, admins, {
     title: type === "account" ? "Nouveau compte à valider" : "Nouvelle demande d'inscription",
     body: body.name

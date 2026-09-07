@@ -1,0 +1,501 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  addApprovedMatchSlotPlayer,
+  createMatchSlot,
+  deleteMatchSlot,
+  deleteMatchSlotRegistration,
+  listMatchSlotRegistrations,
+  listMatchSlots,
+  setMatchSlotRegistrationStatus,
+  updateMatchSlot,
+} from "@/lib/store";
+import { notifyNewMatchSlot } from "@/lib/push";
+import { MATCH_COURTS, matchCapacity } from "@/lib/matches";
+import { PLAYER_LEVELS, levelsLabel } from "@/lib/levels";
+import { formatMatchSlotText, openWhatsApp } from "@/lib/share";
+import { useAppData } from "@/lib/use-app-data";
+import { TIME_SLOTS, endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
+import type { MatchSlot, MatchSlotRegistration, RegistrationStatus } from "@/lib/types";
+import { RegistrationManager } from "@/components/RegistrationManager";
+import { Badge, Btn, Card, EmptyState, Input, Loader, SectionTitle, Select } from "@/components/ui";
+
+// Grille de sélection des niveaux visés (1 à 10).
+function LevelPicker({
+  selected,
+  disabled,
+  onToggle,
+}: {
+  selected: number[];
+  disabled?: boolean;
+  onToggle: (n: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-5 gap-1.5">
+      {PLAYER_LEVELS.map((n) => (
+        <button
+          key={n}
+          disabled={disabled}
+          onClick={() => onToggle(n)}
+          className={`cursor-pointer rounded-lg border py-2 text-xs font-bold transition-colors ${
+            selected.includes(n)
+              ? "border-gold bg-gold text-ink"
+              : "border-line2 text-sub hover:text-body"
+          }`}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Détail d'un créneau : réglages, partage, et gestion des inscriptions.
+function SlotDetail({
+  slot,
+  regs,
+  knownPlayers,
+  onChange,
+}: {
+  slot: MatchSlot;
+  regs: MatchSlotRegistration[];
+  knownPlayers: string[];
+  onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  const approved = regs.filter((r) => r.status === "approved");
+  const locked = slot.status === "locked";
+
+  async function act(fn: () => Promise<void>) {
+    setBusy(true);
+    try {
+      await fn();
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const patch = (p: Partial<MatchSlot>) => act(() => updateMatchSlot(slot.id, p));
+
+  async function setCapacity(n: number) {
+    const v = Math.max(1, Math.min(16, n));
+    if (v === slot.capacity) return;
+    await patch({ capacity: v });
+  }
+
+  return (
+    <div className="border-t border-line px-3.5 py-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface p-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-mut">Joueurs</span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCapacity(slot.capacity - 1)}
+            disabled={busy || slot.capacity <= 1}
+            className="h-7 w-7 cursor-pointer rounded-lg border border-line2 font-bold text-sub disabled:opacity-40 hover:text-body"
+          >
+            −
+          </button>
+          <span className="w-8 text-center text-sm font-extrabold text-bright">{slot.capacity}</span>
+          <button
+            onClick={() => setCapacity(slot.capacity + 1)}
+            disabled={busy || slot.capacity >= 16}
+            className="h-7 w-7 cursor-pointer rounded-lg border border-line2 font-bold text-sub disabled:opacity-40 hover:text-body"
+          >
+            +
+          </button>
+        </div>
+        <Btn
+          size="sm"
+          variant={locked ? "danger" : "secondary"}
+          disabled={busy}
+          onClick={() => patch({ status: locked ? "open" : "locked" })}
+        >
+          {locked ? "🔒 Verrouillé — rouvrir" : "🔓 Verrouiller"}
+        </Btn>
+        <Btn
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            openWhatsApp(formatMatchSlotText(slot, approved.map((r) => r.player_name)))
+          }
+        >
+          📤 Partager
+        </Btn>
+        <Btn
+          size="sm"
+          variant={editing ? "primary" : "secondary"}
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? "✓ Terminer" : "✏️ Modifier"}
+        </Btn>
+      </div>
+
+      {locked && (
+        <p className="mb-3 rounded-lg bg-bad/10 px-3 py-2 text-[11px] font-semibold leading-4 text-bad">
+          Inscriptions bloquées : les joueurs ne peuvent plus demander de place, ni rejoindre la
+          liste d&apos;attente.
+        </p>
+      )}
+
+      {editing && (
+        <div className="mb-3 space-y-3 rounded-lg border border-gold/40 bg-gold/5 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="min-w-0">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Date
+              </label>
+              <Input
+                type="date"
+                value={slot.date}
+                onChange={(e) => patch({ date: e.target.value })}
+              />
+            </div>
+            <div className="min-w-0">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Heure
+              </label>
+              <Select value={slot.time} onChange={(e) => patch({ time: e.target.value })}>
+                {TIME_SLOTS.map((sl) => (
+                  <option key={sl} value={sl}>
+                    {sl}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Terrains
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MATCH_COURTS.map((c) => (
+                <button
+                  key={c}
+                  disabled={busy}
+                  onClick={() => patch({ courts: c })}
+                  className={`cursor-pointer rounded-lg border py-2 text-xs font-bold transition-colors ${
+                    slot.courts === c
+                      ? "border-gold bg-gold text-ink"
+                      : "border-line2 text-sub hover:text-body"
+                  }`}
+                >
+                  {c} terrain{c > 1 ? "s" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Niveaux visés
+            </label>
+            <LevelPicker
+              selected={slot.levels || []}
+              disabled={busy}
+              onToggle={(n) =>
+                patch({
+                  levels: (slot.levels || []).includes(n)
+                    ? (slot.levels || []).filter((x) => x !== n)
+                    : [...(slot.levels || []), n].sort((a, b) => a - b),
+                })
+              }
+            />
+            <p className="mt-1.5 text-[11px] text-mut">
+              Le nombre de joueurs ne bouge pas tout seul : ajuste-le au-dessus si le changement de
+              terrains l&apos;impose.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <RegistrationManager
+        regs={regs}
+        capacity={slot.capacity}
+        knownPlayers={knownPlayers}
+        busy={busy}
+        onSetStatus={(id: string, status: RegistrationStatus) =>
+          act(() => setMatchSlotRegistrationStatus(id, status))
+        }
+        onRemove={(id: string) => act(() => deleteMatchSlotRegistration(id))}
+        onAdd={(name: string) => act(() => addApprovedMatchSlotPlayer(slot.id, name))}
+      />
+    </div>
+  );
+}
+
+export default function AdminMatches() {
+  const { data: appData } = useAppData();
+  const [slots, setSlots] = useState<MatchSlot[] | null>(null);
+  const [regs, setRegs] = useState<MatchSlotRegistration[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [showFar, setShowFar] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const [fDate, setFDate] = useState(localDateStr(tomorrow));
+  const [fTime, setFTime] = useState("18:30");
+  const [fCourts, setFCourts] = useState(1);
+  const [fLevels, setFLevels] = useState<number[]>([]);
+  const [fCapacity, setFCapacity] = useState(matchCapacity(1));
+
+  // Le nombre de joueurs suit les terrains, puis reste ajustable à la main.
+  useEffect(() => {
+    setFCapacity(matchCapacity(fCourts));
+  }, [fCourts]);
+
+  const reload = useCallback(async () => {
+    try {
+      const [ss, rs] = await Promise.all([listMatchSlots(), listMatchSlotRegistrations()]);
+      setSlots(ss);
+      setRegs(rs);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setSlots([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const today = localDateStr(new Date());
+  const windowEnd = endOfNextWeekStr();
+  const active = useMemo(
+    () =>
+      (slots ?? [])
+        .filter((s) => s.date >= today && s.status !== "cancelled")
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
+    [slots, today]
+  );
+  const upcoming = useMemo(() => active.filter((s) => s.date <= windowEnd), [active, windowEnd]);
+  const far = useMemo(() => active.filter((s) => s.date > windowEnd), [active, windowEnd]);
+
+  function toggleLevel(n: number) {
+    setFLevels((prev) =>
+      prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort((a, b) => a - b)
+    );
+  }
+
+  async function handleCreate() {
+    try {
+      await createMatchSlot({
+        date: fDate,
+        time: fTime,
+        levels: fLevels,
+        courts: fCourts,
+        capacity: fCapacity,
+      });
+      notifyNewMatchSlot(fLevels, fDate, fTime); // prévient les joueurs visés
+      setShowForm(false);
+      setFLevels([]);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    }
+  }
+
+  if (slots === null) return <Loader />;
+
+  const renderCard = (s: MatchSlot) => {
+    const sRegs = regs.filter((r) => r.match_slot_id === s.id);
+    const pending = sRegs.filter((r) => r.status === "pending").length;
+    const confirmed = sRegs.filter((r) => r.status === "approved").length;
+    const ready = confirmed >= s.capacity;
+    const open = openId === s.id;
+
+    return (
+      <Card key={s.id} tone={ready ? "gold" : "default"} className="overflow-hidden">
+        <div className="flex items-center gap-3 p-3.5">
+          <button
+            onClick={() => setOpenId(open ? null : s.id)}
+            className="min-w-0 flex-1 cursor-pointer text-left"
+          >
+            <div className="flex flex-wrap items-center gap-2 font-bold text-bright">
+              {formatDateLong(s.date)} · <span className="text-gold">{s.time}</span>
+              {pending > 0 && (
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bad px-1 text-[10px] font-extrabold text-white">
+                  {pending}
+                </span>
+              )}
+              {s.status === "locked" && <Badge color="bad">🔒 Verrouillé</Badge>}
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-sub">
+              <span>{levelsLabel(s.levels)}</span>·
+              <span
+                className={`font-bold ${ready ? "text-ok" : confirmed > 0 ? "text-gold" : "text-mut"}`}
+              >
+                {confirmed}/{s.capacity} joueurs
+              </span>
+            </div>
+          </button>
+          <span className="text-xs text-mut">{open ? "▲" : "▼"}</span>
+          <button
+            onClick={async () => {
+              if (!confirm("Supprimer ce créneau de match ?")) return;
+              await deleteMatchSlot(s.id);
+              reload();
+            }}
+            className="cursor-pointer px-2 py-1 text-mut hover:text-bad"
+            title="Supprimer"
+          >
+            ✕
+          </button>
+        </div>
+
+        {open && (
+          <SlotDetail
+            slot={s}
+            regs={sRegs}
+            knownPlayers={appData?.knownPlayers ?? []}
+            onChange={reload}
+          />
+        )}
+
+        <div className="h-[3px] bg-line">
+          <div
+            className={`h-full ${ready ? "bg-ok" : "bg-gold"}`}
+            style={{ width: `${Math.min(100, Math.round((confirmed / s.capacity) * 100))}%` }}
+          />
+        </div>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="fade-up space-y-5">
+      <div>
+        <div className="mb-2.5 flex items-center justify-between">
+          <SectionTitle className="mb-0">Créneaux de match</SectionTitle>
+          <Btn size="sm" variant="secondary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? "✕ Fermer" : "+ Créer"}
+          </Btn>
+        </div>
+
+        {showForm && (
+          <Card className="mb-3 space-y-3 p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                  Date
+                </label>
+                <Input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} />
+              </div>
+              <div className="min-w-0">
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                  Heure
+                </label>
+                <Select value={fTime} onChange={(e) => setFTime(e.target.value)}>
+                  {TIME_SLOTS.map((sl) => (
+                    <option key={sl} value={sl}>
+                      {sl}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Terrains
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {MATCH_COURTS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setFCourts(c)}
+                    className={`cursor-pointer rounded-lg border py-2 text-xs font-bold transition-colors ${
+                      fCourts === c
+                        ? "border-gold bg-gold text-ink"
+                        : "border-line2 text-sub hover:text-body"
+                    }`}
+                  >
+                    {c} terrain{c > 1 ? "s" : ""}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Nombre de joueurs
+              </label>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setFCapacity((c) => Math.max(1, c - 1))}
+                  className="h-9 w-9 cursor-pointer rounded-lg border border-line2 font-bold text-sub hover:text-body"
+                >
+                  −
+                </button>
+                <span className="w-10 text-center text-lg font-extrabold text-bright">
+                  {fCapacity}
+                </span>
+                <button
+                  onClick={() => setFCapacity((c) => Math.min(16, c + 1))}
+                  className="h-9 w-9 cursor-pointer rounded-lg border border-line2 font-bold text-sub hover:text-body"
+                >
+                  +
+                </button>
+              </div>
+              <p className="mt-1.5 text-[11px] text-mut">
+                {fCapacity === matchCapacity(fCourts)
+                  ? "Calculé d'après les terrains (4 par terrain) — ajustable."
+                  : `Personnalisé (${matchCapacity(fCourts)} par défaut).`}
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+                Niveaux visés
+              </label>
+              <LevelPicker selected={fLevels} onToggle={toggleLevel} />
+              <p className="mt-1.5 text-[11px] text-mut">
+                {fLevels.length
+                  ? `Visible par les joueurs de niveau ${fLevels.join(", ")}.`
+                  : "Aucun niveau coché : le créneau sera visible par tous les joueurs."}
+              </p>
+            </div>
+
+            <Btn size="lg" onClick={handleCreate}>
+              Créer le créneau ({fCapacity} joueur{fCapacity > 1 ? "s" : ""})
+            </Btn>
+          </Card>
+        )}
+
+        {!upcoming.length ? (
+          <Card>
+            <EmptyState>Aucun créneau cette semaine ni la semaine prochaine.</EmptyState>
+          </Card>
+        ) : (
+          <div className="space-y-2.5">{upcoming.map(renderCard)}</div>
+        )}
+
+        {far.length > 0 && (
+          <div className="mt-3">
+            <button
+              onClick={() => setShowFar((v) => !v)}
+              className="cursor-pointer text-[11px] font-bold uppercase tracking-[2px] text-mut hover:text-sub"
+            >
+              {showFar ? "▲" : "▼"} Créneaux plus lointains ({far.length})
+            </button>
+            {showFar && <div className="mt-2.5 space-y-2.5">{far.map(renderCard)}</div>}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <Card tone="danger" className="p-3 text-xs text-bad">
+          {error} — si les tables des créneaux de match n&apos;existent pas encore, exécutez{" "}
+          <code>supabase/migration.sql</code> (voir README).
+        </Card>
+      )}
+    </div>
+  );
+}
