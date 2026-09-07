@@ -473,34 +473,37 @@ export default function AdminJoueurs() {
               <b className="text-body">tous les tournois, leçons et matchs</b>, quel que soit son
               vrai niveau. Attribue-le ici pour qu&apos;il ne reçoive que ce qui le concerne.
             </p>
-            <div className="space-y-2">
+            {/* Nom et sélecteur sur deux lignes : le sélecteur occupe toute la
+                largeur et ne peut plus recouvrir le nom. */}
+            <div className="space-y-2.5">
               {noLevel.map((p) => (
-                <div key={p.id} className="flex items-center gap-2.5">
-                  <Avatar name={`${p.first_name} ${p.last_name}`} size={34} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-bold text-bright">
-                      {p.first_name} {p.last_name.toUpperCase()}
+                <Card key={p.id} tone="flat" className="p-3">
+                  <div className="mb-2 flex items-center gap-2.5">
+                    <Avatar name={`${p.first_name} ${p.last_name}`} size={34} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-bright">
+                        {p.first_name} {p.last_name.toUpperCase()}
+                      </div>
+                      <div className="text-[11px] text-mut">{ROLE_LABEL[p.role]}</div>
                     </div>
-                    <div className="text-[11px] text-mut">{ROLE_LABEL[p.role]}</div>
+                    {savedId === p.id && (
+                      <span className="shrink-0 text-[11px] font-bold text-ok">✓ Enregistré</span>
+                    )}
                   </div>
-                  {savedId === p.id && (
-                    <span className="text-[11px] font-bold text-ok">✓</span>
-                  )}
                   <Select
                     value=""
-                    className="w-32 text-xs"
                     onChange={(e) =>
                       e.target.value && patch(p, { level: Number(e.target.value) })
                     }
                   >
-                    <option value="">Niveau —</option>
+                    <option value="">Attribuer un niveau…</option>
                     {PLAYER_LEVELS.map((l) => (
                       <option key={l} value={l}>
                         Niveau {l}
                       </option>
                     ))}
                   </Select>
-                </div>
+                </Card>
               ))}
             </div>
           </>
