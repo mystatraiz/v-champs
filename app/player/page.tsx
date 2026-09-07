@@ -117,6 +117,10 @@ function CardShell({
   children: React.ReactNode;
 }) {
   const full = filled >= capacity;
+  // Les noms des inscrits sont repliés : le compteur suffit au premier coup
+  // d'œil, la liste ne s'ouvre que si on la demande.
+  const [showNames, setShowNames] = useState(false);
+
   return (
     <Card className={`overflow-hidden border-l-4 ${edge}`}>
       <div className="p-4">
@@ -129,15 +133,25 @@ function CardShell({
         </div>
 
         {names.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {names.map((n) => (
-              <span
-                key={n}
-                className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
-              >
-                {n}
-              </span>
-            ))}
+          <div className="mt-2">
+            <button
+              onClick={() => setShowNames((v) => !v)}
+              className="cursor-pointer text-[11px] font-bold text-mut hover:text-sub"
+            >
+              {showNames ? "▲" : "▼"} {names.length} inscrit{names.length > 1 ? "s" : ""}
+            </button>
+            {showNames && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {names.map((n) => (
+                  <span
+                    key={n}
+                    className="rounded-full bg-card2 px-2.5 py-1 text-[11px] font-semibold text-sub"
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
