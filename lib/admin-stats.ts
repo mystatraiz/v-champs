@@ -118,6 +118,110 @@ export function bestTimeSlots(slots: SlotLike[], filled: number[], min = 2): Slo
     .sort((a, b) => b.rate - a.rate);
 }
 
+// ─── Vitesse de remplissage ───
+// Combien de temps s'écoule entre l'ouverture d'un créneau et le moment où la
+// dernière place part. Sert à repérer les créneaux qui partent tout seuls et
+// ceux qu'il faut relancer.
+
+export interface SlotFill {
+  key: string; // « Mardi 12:30 »
+  hoursToFill: number | null; // null = jamais rempli
+  lastMinute: boolean; // complété dans les 24 h précédant la séance
+  everFull: boolean;
+}
+
+// Horodatage du début de la séance à partir de « 2026-09-08 » + « 12:30 ».
+function slotStart(date: string, time: string): number {
+  return new Date(`${date}T${(time || "00:00").padEnd(5, "0")}:00`).getTime();
+}
+
+export function slotFillTimes<
+  T extends { id: string; date: string; time: string; capacity: number; created_at?: string },
+  R extends { status: string; created_at: string },
+>(slots: T[], regs: R[], slotIdOf: (r: R) => string): SlotFill[] {
+  const approvedBySlot = new Map<string, number[]>();
+  regs.forEach((r) => {
+    if (r.status !== "approved" || !r.created_at) return;
+    const id = slotIdOf(r);
+    const arr = approvedBySlot.get(id) ?? [];
+    arr.push(new Date(r.created_at).getTime());
+    approvedBySlot.set(id, arr);
+  });
+
+  return slots.map((s) => {
+    const d = new Date(s.date + "T00:00:00");
+    const key = `${WEEKDAYS[d.getDay()]} ${s.time}`;
+    const times = (approvedBySlot.get(s.id) ?? []).sort((a, b) => a - b);
+    const opened = s.created_at ? new Date(s.created_at).getTime() : null;
+
+    // La place qui complète le créneau est la capacité-ième inscription.
+    const fullAt = times.length >= s.capacity ? times[s.capacity - 1] : null;
+    const hoursToFill =
+      fullAt != null && opened != null && fullAt >= opened
+        ? Math.round(((fullAt - opened) / 3_600_000) * 10) / 10
+        : null;
+
+    return {
+      key,
+      hoursToFill,
+      everFull: fullAt != null,
+      lastMinute: fullAt != null && slotStart(s.date, s.time) - fullAt <= 24 * 3_600_000,
+    };
+  });
+}
+
+export function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const v = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(v.length / 2);
+  const m = v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+  return Math.round(m * 10) / 10;
+}
+
+export interface FillSpeedRow {
+  key: string;
+  slots: number;
+  filled: number;
+  medianHours: number | null;
+  lastMinute: number;
+}
+
+// Agrège la vitesse de remplissage par créneau horaire récurrent.
+export function fillSpeedByTimeSlot(fills: SlotFill[], min = 2): FillSpeedRow[] {
+  const agg = new Map<string, { slots: number; filled: number; hours: number[]; late: number }>();
+  fills.forEach((f) => {
+    const a = agg.get(f.key) ?? { slots: 0, filled: 0, hours: [], late: 0 };
+    a.slots++;
+    if (f.everFull) a.filled++;
+    if (f.hoursToFill != null) a.hours.push(f.hoursToFill);
+    if (f.lastMinute) a.late++;
+    agg.set(f.key, a);
+  });
+  return [...agg.entries()]
+    .filter(([, a]) => a.slots >= min)
+    .map(([key, a]) => ({
+      key,
+      slots: a.slots,
+      filled: a.filled,
+      medianHours: median(a.hours),
+      lastMinute: a.late,
+    }))
+    .sort((a, b) => {
+      // Les plus rapides d'abord ; les jamais remplis en dernier.
+      if (a.medianHours == null) return 1;
+      if (b.medianHours == null) return -1;
+      return a.medianHours - b.medianHours;
+    });
+}
+
+// Libellé lisible d'un délai en heures.
+export function formatDelay(hours: number | null): string {
+  if (hours == null) return "—";
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`;
+  if (hours < 48) return `${Math.round(hours)} h`;
+  return `${Math.round(hours / 24)} j`;
+}
+
 // ─── Joueurs : les plus actifs, et ceux qui ont décroché ───
 
 export interface PlayerActivity {

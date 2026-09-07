@@ -18,10 +18,14 @@ import {
   activityStats,
   bestTimeSlots,
   confirmedCounts,
+  fillSpeedByTimeSlot,
   fillStats,
+  formatDelay,
+  median,
   organiserActivity,
   pendingCounts,
   playerActivity,
+  slotFillTimes,
   underfilled,
 } from "@/lib/admin-stats";
 import { formatDateShort, localDateStr } from "@/lib/format";
@@ -148,6 +152,17 @@ export default function AdminStats() {
     const allPast = [...pt.slots, ...pl.slots, ...pm.slots];
     const allPastFilled = [...pt.filled, ...pl.filled, ...pm.filled];
 
+    // Vitesse de remplissage : uniquement sur les créneaux passés, dont on
+    // connaît le sort final.
+    const speeds = [
+      ...slotFillTimes(pt.slots, regs, (r) => r.tournament_id),
+      ...slotFillTimes(pl.slots, lessonRegs, (r) => r.lesson_id),
+      ...slotFillTimes(pm.slots, matchRegs, (r) => r.match_slot_id),
+    ];
+    const filledDelays = speeds
+      .map((f) => f.hoursToFill)
+      .filter((h): h is number => h != null);
+
     return {
       act30: activityStats(history, 30),
       act90: activityStats(history, 90),
@@ -155,6 +170,11 @@ export default function AdminStats() {
       fillL: fillStats(pl.slots, pl.filled),
       fillM: fillStats(pm.slots, pm.filled),
       best: bestTimeSlots(allPast, allPastFilled, 2).slice(0, 5),
+      speed: fillSpeedByTimeSlot(speeds, 2),
+      medianDelay: median(filledDelays),
+      lastMinute: speeds.filter((f) => f.lastMinute).length,
+      neverFull: speeds.filter((f) => !f.everFull).length,
+      pastSlots: speeds.length,
       players: playerActivity(history),
       accounts: accountStats(profiles),
       todo: pendingCounts(regs, lessonRegs, matchRegs),
@@ -289,6 +309,74 @@ export default function AdminStats() {
               </div>
             ))}
           </Card>
+        </div>
+      )}
+
+      {/* ── Vitesse de remplissage ── */}
+      {stats.pastSlots > 0 && (
+        <div>
+          <SectionTitle>Vitesse de remplissage</SectionTitle>
+          <div className="mb-2 grid grid-cols-3 gap-2">
+            <Stat
+              value={formatDelay(stats.medianDelay)}
+              label="Délai médian"
+              hint="ouverture → complet"
+              tone="gold"
+            />
+            <Stat
+              value={stats.lastMinute}
+              label="Dernière minute"
+              hint="complétés < 24 h avant"
+              tone={stats.lastMinute ? "bad" : "body"}
+            />
+            <Stat
+              value={stats.neverFull}
+              label="Jamais complets"
+              hint={`sur ${stats.pastSlots} créneaux`}
+              tone={stats.neverFull ? "bad" : "ok"}
+            />
+          </div>
+
+          {stats.speed.length > 0 && (
+            <Card className="overflow-hidden">
+              {stats.speed.map((r, i) => (
+                <div
+                  key={r.key}
+                  className={`px-3.5 py-2.5 ${
+                    i < stats.speed.length - 1 ? "border-b border-line/60" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-body">
+                      {r.key}
+                    </span>
+                    <span
+                      className={`text-sm font-extrabold ${
+                        r.medianHours == null
+                          ? "text-mut"
+                          : r.medianHours <= 24
+                            ? "text-ok"
+                            : r.medianHours <= 96
+                              ? "text-gold"
+                              : "text-bad"
+                      }`}
+                    >
+                      {formatDelay(r.medianHours)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-mut">
+                    {r.filled}/{r.slots} complets
+                    {r.lastMinute > 0 && ` · ${r.lastMinute} à la dernière minute`}
+                    {r.filled === 0 && " · jamais rempli"}
+                  </div>
+                </div>
+              ))}
+              <div className="border-t border-line px-3.5 py-2 text-[10px] leading-4 text-mut">
+                Délai médian entre l&apos;ouverture du créneau et la prise de la dernière place.
+                Les plus rapides en premier : ceux du bas sont à ouvrir plus tôt, ou à relancer.
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
