@@ -6,9 +6,7 @@ import {
   adminResetPassword,
   listProfiles,
   markUserNotificationRead,
-  renamePlayer,
   replacePlayerInSession,
-  resetAllScores,
   updateProfile,
 } from "@/lib/store";
 import { useAppData } from "@/lib/use-app-data";
@@ -18,9 +16,6 @@ import { formatDateShort, playerIdentity, uniquePlayerIdentity } from "@/lib/for
 import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
-import { isTestMode, setTestMode } from "@/lib/test-mode";
-import { isOwner } from "@/lib/owner";
-import { ChangePassword } from "@/components/ChangePassword";
 import type { Profile, Role } from "@/lib/types";
 import {
   Avatar,
@@ -35,37 +30,6 @@ import {
   SectionTitle,
   Select,
 } from "@/components/ui";
-
-// Encart : mode test (bac à sable) — réservé au propriétaire.
-function TestModeCard() {
-  const [on, setOn] = useState(false);
-  useEffect(() => setOn(isTestMode()), []);
-
-  function toggle() {
-    setTestMode(!on);
-    // Rechargement : toutes les données rebasculent sur le bon espace.
-    window.location.reload();
-  }
-
-  return (
-    <Card tone={on ? "gold" : "default"} className="p-4">
-      <p className="mb-3 text-xs leading-5 text-sub">
-        Le mode test est un <b className="text-body">bac à sable</b> : tu peux créer et lancer des
-        tournois pour t&apos;entraîner, <b className="text-body">sans toucher aux vraies données</b>
-        {" "}(classement, historique). Les joueurs ne voient rien et aucune notification n&apos;est
-        envoyée. Actif uniquement sur cet appareil.
-      </p>
-      {on && (
-        <p className="mb-3 rounded-lg bg-gold/10 px-3 py-2 text-xs font-bold text-gold">
-          🧪 Mode test ACTIVÉ — tu manipules des données de test.
-        </p>
-      )}
-      <Btn variant={on ? "danger" : "primary"} size="lg" onClick={toggle}>
-        {on ? "Revenir aux vraies données" : "🧪 Activer le mode test"}
-      </Btn>
-    </Card>
-  );
-}
 
 // Encart : notifications push + badge sur l'icône de l'écran d'accueil.
 function BadgeSettings({ role }: { role: string }) {
@@ -150,95 +114,6 @@ function collectPlayerNames(data: AppData): { name: string; count: number }[] {
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-}
-
-// Gestionnaire : liste tous les noms et permet de les renommer un par un.
-function NamesManager({ data, onDone }: { data: AppData; onDone: () => void }) {
-  const names = useMemo(() => collectPlayerNames(data), [data]);
-  const [filter, setFilter] = useState("");
-  const [editing, setEditing] = useState<string | null>(null);
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const filtered = names.filter((n) => n.name.toLowerCase().includes(filter.toLowerCase()));
-
-  async function save(oldName: string) {
-    const nv = value.trim();
-    if (!nv || nv === oldName) {
-      setEditing(null);
-      return;
-    }
-    const exists = names.some((n) => n.name.toLowerCase().trim() === nv.toLowerCase().trim());
-    if (
-      !confirm(
-        exists
-          ? `« ${nv} » existe déjà : « ${oldName} » sera fusionné avec « ${nv} » partout. Continuer ?`
-          : `Renommer « ${oldName} » en « ${nv} » partout (historique, points, palmarès, compte lié) ?`
-      )
-    )
-      return;
-    setBusy(true);
-    try {
-      await renamePlayer(oldName, nv);
-      setEditing(null);
-      onDone();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Erreur pendant le renommage.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card className="p-3">
-      <Input
-        placeholder="Rechercher un nom…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="mb-3"
-      />
-      {!filtered.length ? (
-        <EmptyState>Aucun nom.</EmptyState>
-      ) : (
-        <div className="max-h-96 divide-y divide-line overflow-y-auto">
-          {filtered.map((n) =>
-            editing === n.name ? (
-              <div key={n.name} className="flex items-center gap-2 py-2">
-                <Input
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && save(n.name)}
-                  autoFocus
-                />
-                <Btn size="sm" variant="success" disabled={busy} onClick={() => save(n.name)}>
-                  ✓
-                </Btn>
-                <Btn size="sm" variant="ghost" onClick={() => setEditing(null)}>
-                  ✕
-                </Btn>
-              </div>
-            ) : (
-              <div key={n.name} className="flex items-center gap-2 py-2">
-                <span className="flex-1 truncate text-sm text-body">
-                  {n.name} <span className="text-xs text-mut">({n.count})</span>
-                </span>
-                <Btn
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setEditing(n.name);
-                    setValue(n.name);
-                  }}
-                >
-                  ✏️ Renommer
-                </Btn>
-              </div>
-            )
-          )}
-        </div>
-      )}
-    </Card>
-  );
 }
 
 // Outil admin : corriger un joueur sur UNE session (erreur d'homonyme le jour J).
@@ -369,97 +244,6 @@ function SessionFixTool({ data, onDone }: { data: AppData; onDone: () => void })
   );
 }
 
-// Outil admin : fusionner un nom mal saisi vers le bon.
-function MergeTool({ data, onDone }: { data: AppData; onDone: () => void }) {
-  const names = useMemo(() => collectPlayerNames(data), [data]);
-  const [oldName, setOldName] = useState("");
-  const [newName, setNewName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  async function doMerge() {
-    if (!oldName || !newName.trim()) return;
-    if (oldName.toLowerCase().trim() === newName.toLowerCase().trim()) {
-      setMsg("Les deux noms sont identiques.");
-      return;
-    }
-    if (
-      !confirm(
-        `Fusionner « ${oldName} » → « ${newName.trim()} » ?\n\nToutes les sessions, points, palmarès et comptes liés au nom « ${oldName} » seront réattribués à « ${newName.trim()} ». Action définitive.`
-      )
-    )
-      return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      const r = await renamePlayer(oldName, newName.trim());
-      setMsg(
-        `✓ Fusionné. ${r.historyTouched ? "Historique mis à jour." : ""} ${
-          r.scoresTouched ? `${r.scoresTouched} score(s) réattribué(s).` : ""
-        }`.trim() || "✓ Fusionné."
-      );
-      setOldName("");
-      setNewName("");
-      onDone();
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Erreur pendant la fusion.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card className="p-4">
-      <p className="mb-3 text-xs leading-5 text-sub">
-        Corrige un nom mal saisi (ex. « fredv ») en le fusionnant vers le bon (ex. « Fred V »).
-        La correction s&apos;applique partout : historique, points V-Champs, palmarès et comptes liés.
-      </p>
-      <div className="space-y-2">
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
-            Nom à corriger
-          </label>
-          <Select value={oldName} onChange={(e) => setOldName(e.target.value)}>
-            <option value="">— Choisir le nom erroné —</option>
-            {names.map((n) => (
-              <option key={n.name} value={n.name}>
-                {n.name} ({n.count})
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
-            Vers le bon nom
-          </label>
-          <Input
-            list="known-names-list"
-            placeholder="Bon nom (ex. Fred V)"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <datalist id="known-names-list">
-            {names.map((n) => (
-              <option key={n.name} value={n.name} />
-            ))}
-          </datalist>
-        </div>
-      </div>
-      {msg && (
-        <p className={`mt-2 text-xs font-semibold ${msg.startsWith("✓") ? "text-ok" : "text-bad"}`}>{msg}</p>
-      )}
-      <Btn
-        className="mt-3"
-        size="lg"
-        disabled={busy || !oldName || !newName.trim()}
-        onClick={doMerge}
-      >
-        {busy ? "Fusion en cours…" : "Fusionner les noms"}
-      </Btn>
-    </Card>
-  );
-}
-
 const ROLE_LABEL: Record<Role, string> = {
   pending: "En attente",
   player: "🎾 Joueur",
@@ -573,7 +357,7 @@ function PendingCard({
 }
 
 export default function AdminJoueurs() {
-  const { profile: me, user } = useAuth();
+  const { profile: me } = useAuth();
   const { data, reload: reloadData } = useAppData();
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -760,71 +544,22 @@ export default function AdminJoueurs() {
         )}
       </CollapsibleCard>
 
-      <CollapsibleCard icon="✏️" title="Noms des joueurs" subtitle="Corriger, renommer, fusionner">
-        <div className="space-y-4">
-          <div>
-            <SectionTitle>Corriger / renommer</SectionTitle>
-            <NamesManager
-              data={data}
-              onDone={() => {
-                reloadData();
-                reload();
-              }}
-            />
-          </div>
-          <div>
-            <SectionTitle>Erreur de joueur sur une session</SectionTitle>
-            <SessionFixTool
-              data={data}
-              onDone={() => {
-                reloadData();
-                reload();
-              }}
-            />
-          </div>
-          <div>
-            <SectionTitle>Fusion rapide de deux noms</SectionTitle>
-            <MergeTool
-              data={data}
-              onDone={() => {
-                reloadData();
-                reload();
-              }}
-            />
-          </div>
-        </div>
+      <CollapsibleCard
+        icon="✏️"
+        title="Erreur de joueur sur une session"
+        subtitle="Remplacer un homonyme inscrit par erreur"
+      >
+        <SessionFixTool
+          data={data}
+          onDone={() => {
+            reloadData();
+            reload();
+          }}
+        />
       </CollapsibleCard>
 
       <CollapsibleCard icon="🔔" title="Notifications" subtitle="Alertes & pastille sur l'icône">
         <BadgeSettings role={me?.role || "admin"} />
-      </CollapsibleCard>
-
-      <CollapsibleCard icon="🔒" title="Mon mot de passe" subtitle="Changer mon mot de passe">
-        <ChangePassword />
-      </CollapsibleCard>
-
-      {isOwner(user?.email) && (
-        <CollapsibleCard icon="🧪" title="Mode test" subtitle="Bac à sable (propriétaire)">
-          <TestModeCard />
-        </CollapsibleCard>
-      )}
-
-      <CollapsibleCard icon="⚠️" title="Zone dangereuse" subtitle="Réinitialiser le classement" tone="danger">
-        <p className="mb-3 text-xs leading-5 text-sub">
-          Remet le classement V-Champs à zéro (les scores antérieurs sont ignorés, l&apos;historique
-          des sessions est conservé). Irréversible.
-        </p>
-        <Btn
-          variant="danger"
-          onClick={async () => {
-            if (!confirm("Remettre le classement V-Champs à zéro ? Cette action est irréversible.")) return;
-            if (!confirm("Confirmez une seconde fois : réinitialiser TOUS les scores ?")) return;
-            await resetAllScores();
-            alert("✓ Classement réinitialisé.");
-          }}
-        >
-          🗑 Remettre le classement à zéro
-        </Btn>
       </CollapsibleCard>
 
       <Modal open={!!resetInfo} onClose={() => setResetInfo(null)}>
