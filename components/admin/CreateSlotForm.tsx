@@ -102,6 +102,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
     setCourts(kind === "tournament" ? 2 : 1);
   }, [kind]);
 
+  // Le club a deux terrains : même choix pour les trois types.
   const courtOptions = kind === "lesson" ? LESSON_COURTS : MATCH_COURTS;
 
   function toggleLevel(n: number) {
@@ -158,21 +159,21 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="min-w-0">
-          {label("Date")}
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div className="min-w-0">
-          {label("Heure")}
-          <Select value={time} onChange={(e) => setTime(e.target.value)}>
-            {TIME_SLOTS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </Select>
-        </div>
+      {/* Une ligne chacun : sur Safari iOS le champ date natif refuse de se
+          comprimer et déborde sur son voisin dans une grille à deux colonnes. */}
+      <div>
+        {label("Date")}
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+      <div>
+        {label("Heure")}
+        <Select value={time} onChange={(e) => setTime(e.target.value)}>
+          {TIME_SLOTS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {kind === "lesson" && (
@@ -203,10 +204,9 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
       <div>
         {label("Terrains")}
         <Choice
-          options={kind === "tournament" ? [1, 2, 3] : courtOptions}
+          options={courtOptions}
           value={courts}
           onChange={setCourts}
-          cols={3}
           render={(c) => `${c} terrain${c > 1 ? "s" : ""}`}
         />
       </div>

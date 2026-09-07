@@ -137,36 +137,36 @@ export function MatchSlotDetail({
 
       {editing && (
         <div className="mb-3 space-y-3 rounded-lg border border-gold/40 bg-gold/5 p-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="min-w-0">
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
-                Date
-              </label>
-              <Input
-                type="date"
-                value={slot.date}
-                onChange={(e) => patch({ date: e.target.value })}
-              />
-            </div>
-            <div className="min-w-0">
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
-                Heure
-              </label>
-              <Select value={slot.time} onChange={(e) => patch({ time: e.target.value })}>
-                {TIME_SLOTS.map((sl) => (
-                  <option key={sl} value={sl}>
-                    {sl}
-                  </option>
-                ))}
-              </Select>
-            </div>
+          {/* Une ligne chacun : sur Safari iOS le champ date natif refuse de se
+              comprimer et déborde sur son voisin dans une grille à deux colonnes. */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Date
+            </label>
+            <Input
+              type="date"
+              value={slot.date}
+              onChange={(e) => patch({ date: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
+              Heure
+            </label>
+            <Select value={slot.time} onChange={(e) => patch({ time: e.target.value })}>
+              {TIME_SLOTS.map((sl) => (
+                <option key={sl} value={sl}>
+                  {sl}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div>
             <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-mut">
               Terrains
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {MATCH_COURTS.map((c) => (
                 <button
                   key={c}
