@@ -6,6 +6,16 @@ import { Input } from "./ui";
 // Champ de saisie d'un nom de joueur avec suggestions filtrées et tappables.
 // Volontairement pas de <datalist> : sur iOS les suggestions natives sont
 // masquées par le clavier, une liste rendue sous le champ est bien plus lisible.
+// Comparaison tolérante : casse et accents ignorés, espaces normalisés.
+// « Puech » se retrouve en tapant « puech », « Frédéric » en tapant « frederic ».
+function norm(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export function PlayerAutocomplete({
   value,
   onChange,
@@ -26,22 +36,31 @@ export function PlayerAutocomplete({
   const [focused, setFocused] = useState(false);
 
   const suggestions = useMemo(() => {
-    const taken = new Set(exclude.map((n) => n.toLowerCase().trim()).filter(Boolean));
-    const q = value.trim().toLowerCase();
-    const pool = [...new Set(options.map((n) => n.trim()).filter(Boolean))]
-      .filter((n) => !taken.has(n.toLowerCase()))
-      .filter((n) => !q || n.toLowerCase().includes(q));
-    // Les noms qui commencent par la saisie d'abord, puis l'ordre alphabétique.
+    const taken = new Set(exclude.map((n) => norm(n)).filter(Boolean));
+    const q = norm(value);
+    const pool = [...new Set(options.map((n) => n.trim()).filter(Boolean))].filter(
+      (n) => !taken.has(norm(n))
+    );
+    if (!q) return pool.sort((a, b) => norm(a).localeCompare(norm(b))).slice(0, max);
+
+    // Rang de pertinence : début du nom, puis début d'un mot (« Tom » dans
+    // « Alex Tom. »), puis n'importe où dans la chaîne.
+    const rank = (n: string): number => {
+      const v = norm(n);
+      if (v.startsWith(q)) return 0;
+      if (v.split(/[\s'-]+/).some((w) => w.startsWith(q))) return 1;
+      return v.includes(q) ? 2 : 3;
+    };
+
     return pool
-      .sort((a, b) => {
-        const as = a.toLowerCase().startsWith(q) ? 0 : 1;
-        const bs = b.toLowerCase().startsWith(q) ? 0 : 1;
-        return as !== bs ? as - bs : a.toLowerCase().localeCompare(b.toLowerCase());
-      })
+      .map((n) => ({ n, r: rank(n) }))
+      .filter((x) => x.r < 3)
+      .sort((a, b) => (a.r !== b.r ? a.r - b.r : norm(a.n).localeCompare(norm(b.n))))
+      .map((x) => x.n)
       .slice(0, max);
   }, [options, exclude, value, max]);
 
-  const exact = suggestions.some((n) => n.toLowerCase() === value.trim().toLowerCase());
+  const exact = suggestions.some((n) => norm(n) === norm(value));
   const show = focused && suggestions.length > 0 && !exact;
 
   return (
@@ -55,6 +74,9 @@ export function PlayerAutocomplete({
         onBlur={() => setTimeout(() => setFocused(false), 150)}
         onKeyDown={(e) => e.key === "Enter" && onPick(value)}
         autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="words"
+        spellCheck={false}
       />
       {/* Liste en flux normal (et non en survol absolu) : les cartes parentes
           utilisent overflow-hidden, qui découperait un menu positionné. */}

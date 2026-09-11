@@ -33,7 +33,7 @@ import {
 import { levelsLabel } from "@/lib/levels";
 import { nextOccurrences } from "@/lib/recurrence";
 import { lessonKind } from "@/lib/lessons";
-import { endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
+import { endOfNextWeekStr, formatDateLong, localDateStr, playerIdentity } from "@/lib/format";
 import type {
   Lesson,
   Profile,
@@ -215,12 +215,13 @@ export default function AdminAgenda() {
     reload();
   }, [reload]);
 
+  // Les profils servent à l'étiquette d'auteur (admins) et à l'autocomplétion
+  // des joueurs (tous les organisateurs) : on les charge dans les deux cas.
   useEffect(() => {
-    if (!isAdmin) return;
     listProfiles()
       .then(setProfiles)
       .catch(() => setProfiles([]));
-  }, [isAdmin]);
+  }, []);
 
   const today = localDateStr(new Date());
   const windowEnd = endOfNextWeekStr();
@@ -260,7 +261,17 @@ export default function AdminAgenda() {
   if (tournaments === null) return <Loader />;
 
   const sessionActive = session?.sessionStarted && !session.sessionFinished;
-  const knownPlayers = appData?.knownPlayers ?? [];
+  // known_players ne contient que les joueurs ayant déjà joué une session. Les
+  // comptes inscrits mais jamais alignés doivent aussi être proposés.
+  const knownPlayers = [
+    ...new Set([
+      ...(appData?.knownPlayers ?? []),
+      ...profiles
+        .filter((p) => p.role !== "pending")
+        .map((p) => p.linked_player_name || playerIdentity(p.first_name, p.last_name))
+        .filter(Boolean),
+    ]),
+  ];
 
   // Étiquette « créé par » — visible des seuls admins. Un créneau sans auteur
   // vient de la génération automatique des récurrences.
