@@ -169,6 +169,26 @@ export interface MatchSlotRegistration {
   created_at: string;
 }
 
+// ─── Règles de récurrence ────────────────────────────────────────────────────
+
+export interface RecurrenceRule {
+  id: string;
+  kind: "tournament" | "lesson" | "match";
+  start_date: string; // première occurrence : donne le jour et la phase
+  time: string;
+  interval_weeks: number;
+  keep_ahead: number;
+  level?: string | null; // tournois
+  levels: number[]; // leçons et matchs
+  lesson_kind?: LessonKind | null;
+  theme?: string | null;
+  courts: number;
+  capacity: number;
+  active: boolean;
+  created_by?: string | null;
+  created_at?: string;
+}
+
 export interface AggPlayerStats {
   wins: number;
   losses: number;

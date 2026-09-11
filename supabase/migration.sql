@@ -192,7 +192,54 @@ alter table public.lessons     add column if not exists created_by uuid
 alter table public.match_slots add column if not exists created_by uuid
   references public.profiles(id) on delete set null;
 
--- ── 8. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
+-- ── 8. Règles de récurrence ────────────────────────────────────────────────
+-- Un créneau qui se répète. start_date porte la première occurrence : elle fixe
+-- le jour de la semaine et la phase (pour « une semaine sur deux »).
+create table if not exists public.recurrence_rules (
+  id             uuid primary key default gen_random_uuid(),
+  kind           text not null check (kind in ('tournament','lesson','match')),
+  start_date     date not null,
+  time           text not null,
+  interval_weeks int  not null default 1 check (interval_weeks between 1 and 4),
+  keep_ahead     int  not null default 4 check (keep_ahead between 1 and 12),
+  -- Gabarit du créneau à créer
+  level          text,                        -- tournois
+  levels         int[] not null default '{}', -- leçons et matchs
+  lesson_kind    text,                        -- leçons
+  theme          text,                        -- leçons
+  courts         int  not null default 2,
+  capacity       int  not null default 8,
+  active         boolean not null default true,
+  created_by     uuid references public.profiles(id) on delete set null,
+  created_at     timestamptz not null default now()
+);
+
+alter table public.recurrence_rules enable row level security;
+
+drop policy if exists "recurrence_select" on public.recurrence_rules;
+create policy "recurrence_select" on public.recurrence_rules
+  for select using (true);
+
+drop policy if exists "recurrence_write" on public.recurrence_rules;
+create policy "recurrence_write" on public.recurrence_rules
+  for all to authenticated using (true) with check (true);
+
+-- Reprise des deux récurrences historiques (lundi/mardi 6/7, jeudi 5/6), qui
+-- étaient codées en dur. Ancrées sur le prochain jour correspondant.
+insert into public.recurrence_rules (kind, start_date, time, interval_weeks, keep_ahead, level, courts, capacity)
+select v.kind, v.start_date, v.time, 1, 4, v.level, 2, 8
+from (values
+  ('tournament', (current_date + ((1 - extract(isodow from current_date)::int + 7) % 7))::date, '12:30', '6/7'),
+  ('tournament', (current_date + ((2 - extract(isodow from current_date)::int + 7) % 7))::date, '12:30', '6/7'),
+  ('tournament', (current_date + ((4 - extract(isodow from current_date)::int + 7) % 7))::date, '12:30', '5/6')
+) as v(kind, start_date, time, level)
+where not exists (
+  select 1 from public.recurrence_rules r
+  where r.kind = v.kind and r.time = v.time
+    and extract(isodow from r.start_date) = extract(isodow from v.start_date)
+);
+
+-- ── 9. Reprise des tournois planifiés existants de la v1 (à venir) ─────────
 insert into public.tournaments (date, time, level, courts, capacity, status, teams)
 select
   (elem->>'date')::date,

@@ -11,6 +11,7 @@ import type {
   MatchSlotRegistration,
   PlayerSessionScore,
   Profile,
+  RecurrenceRule,
   Registration,
   RegistrationStatus,
   SessionHistoryEntry,
@@ -1110,6 +1111,58 @@ export async function countPendingMatchSlotRegistrations(): Promise<number> {
     .eq("status", "pending")
     .gte("match_slots.date", today);
   return count || 0;
+}
+
+// ─── Règles de récurrence ───
+const TEST_RULES = "test_recurrence_rules";
+
+export async function listRecurrenceRules(): Promise<RecurrenceRule[]> {
+  if (isTestMode()) return readJsonKey<RecurrenceRule>(TEST_RULES);
+  const { data, error } = await supabase
+    .from("recurrence_rules")
+    .select("*")
+    .eq("active", true)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as RecurrenceRule[]) || [];
+}
+
+export async function createRecurrenceRule(
+  r: Omit<RecurrenceRule, "id" | "active" | "created_at">
+): Promise<RecurrenceRule> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<RecurrenceRule>(TEST_RULES);
+    const created: RecurrenceRule = {
+      id: newId(),
+      ...r,
+      active: true,
+      created_at: new Date().toISOString(),
+    };
+    await writeJsonKey(TEST_RULES, [...arr, created]);
+    return created;
+  }
+  const { data, error } = await supabase
+    .from("recurrence_rules")
+    .insert({ ...r, active: true })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as RecurrenceRule;
+}
+
+// Arrêter une récurrence n'efface pas les créneaux déjà créés : ils restent
+// visibles et annulables un par un.
+export async function deleteRecurrenceRule(id: string): Promise<void> {
+  if (isTestMode()) {
+    const arr = await readJsonKey<RecurrenceRule>(TEST_RULES);
+    await writeJsonKey(
+      TEST_RULES,
+      arr.filter((r) => r.id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("recurrence_rules").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ─── Compteurs pour les pastilles de notification (admin) ───

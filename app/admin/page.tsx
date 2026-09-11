@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   cancelTournament,
+  createLesson,
+  createMatchSlot,
   createTournament,
+  deleteRecurrenceRule,
   deleteLesson,
   deleteMatchSlot,
   listLessonRegistrations,
@@ -14,11 +17,12 @@ import {
   listMatchSlotRegistrations,
   listMatchSlots,
   listProfiles,
+  listRecurrenceRules,
   listRegistrations,
   listTournaments,
   loadAppData,
 } from "@/lib/store";
-import { notifyNewTournament } from "@/lib/push";
+import { notifyNewLesson, notifyNewMatchSlot, notifyNewTournament } from "@/lib/push";
 import { useAppData } from "@/lib/use-app-data";
 import {
   AGENDA_KINDS,
@@ -28,11 +32,13 @@ import {
   type AgendaKind,
 } from "@/lib/agenda";
 import { levelsLabel } from "@/lib/levels";
+import { nextOccurrences, recurrenceLabel } from "@/lib/recurrence";
 import { lessonKind } from "@/lib/lessons";
 import { endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type {
   Lesson,
   Profile,
+  RecurrenceRule,
   LessonRegistration,
   MatchSlot,
   MatchSlotRegistration,
@@ -44,69 +50,90 @@ import { KindFilter, WeekStrip } from "@/components/WeekStrip";
 import { CreateSlotForm } from "@/components/admin/CreateSlotForm";
 import { LessonDetail } from "@/components/admin/LessonDetail";
 import { MatchSlotDetail } from "@/components/admin/MatchSlotDetail";
-import { Badge, Btn, Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
+import {
+  Badge,
+  Btn,
+  Card,
+  CollapsibleCard,
+  EmptyState,
+  Loader,
+  SectionTitle,
+} from "@/components/ui";
 
-// Règles de tournois récurrents (jour(s) de la semaine 0=dim..6=sam).
-const RECURRENCES: {
-  days: number[];
-  time: string;
-  level: string;
-  courts: number;
-  count: number;
-}[] = [
-  { days: [1, 2], time: "12:30", level: "6/7", courts: 2, count: 4 }, // lundi/mardi
-  { days: [4], time: "12:30", level: "5/6", courts: 2, count: 4 }, // jeudi
+// Récurrences de secours, utilisées uniquement si la table des règles n'est pas
+// encore disponible (migration non exécutée). Elles reprennent les créneaux
+// historiques du club.
+const FALLBACK_RULES: Omit<RecurrenceRule, "id" | "active" | "created_at">[] = [
+  { kind: "tournament", start_date: "", time: "12:30", interval_weeks: 1, keep_ahead: 4, level: "6/7", levels: [], courts: 2, capacity: 8 },
+  { kind: "tournament", start_date: "", time: "12:30", interval_weeks: 1, keep_ahead: 4, level: "6/7", levels: [], courts: 2, capacity: 8 },
+  { kind: "tournament", start_date: "", time: "12:30", interval_weeks: 1, keep_ahead: 4, level: "5/6", levels: [], courts: 2, capacity: 8 },
 ];
+// Jours ISO correspondants (lundi, mardi, jeudi) pour ancrer les règles de secours.
+const FALLBACK_DAYS = [1, 2, 4];
 
-// Maintient les prochains tournois récurrents (crée ceux qui manquent).
-async function ensureRecurring(tournaments: Tournament[]): Promise<boolean> {
-  const today = localDateStr(new Date());
+function nextDateForIsoDay(isoDay: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const cur = d.getDay() === 0 ? 7 : d.getDay();
+  d.setDate(d.getDate() + ((isoDay - cur + 7) % 7));
+  return localDateStr(d);
+}
+
+// Maintient les prochaines occurrences de chaque règle active, pour les trois
+// types de créneaux. Un créneau déjà présent (même type, même date, même heure)
+// n'est jamais recréé : annuler une occurrence ne la fait donc pas revenir.
+async function ensureRecurring(
+  rules: RecurrenceRule[],
+  existing: { tournament: Tournament[]; lesson: Lesson[]; match: MatchSlot[] }
+): Promise<boolean> {
   const windowEnd = endOfNextWeekStr();
+  const occupied = {
+    tournament: new Set(existing.tournament.map((t) => `${t.date}|${t.time}`)),
+    lesson: new Set(existing.lesson.map((l) => `${l.date}|${l.time}`)),
+    match: new Set(existing.match.map((m) => `${m.date}|${m.time}`)),
+  };
   let created = false;
 
-  // Créneaux (date + heure) déjà pris, TOUS niveaux et TOUS statuts confondus.
-  // On ne crée jamais un tournoi récurrent sur un créneau déjà occupé : changer
-  // le niveau d'un tournoi ne crée donc pas de doublon le même jour, et un
-  // tournoi annulé par l'organisateur n'est pas ressuscité aussitôt.
-  const occupied = new Set(tournaments.map((t) => `${t.date}|${t.time}`));
+  for (const rule of rules) {
+    if (!rule.start_date) continue;
+    for (const date of nextOccurrences(rule.start_date, rule.interval_weeks, rule.keep_ahead)) {
+      const slot = `${date}|${rule.time}`;
+      if (occupied[rule.kind].has(slot)) continue;
+      occupied[rule.kind].add(slot);
 
-  for (const rule of RECURRENCES) {
-    const upcoming = tournaments.filter((t) => {
-      const d = new Date(t.date + "T00:00:00");
-      return (
-        t.date >= today &&
-        t.time === rule.time &&
-        t.level === rule.level &&
-        rule.days.includes(d.getDay()) &&
-        t.status !== "cancelled"
-      );
-    });
-    let need = rule.count - upcoming.length;
-    if (need <= 0) continue;
-
-    const cursor = new Date();
-    cursor.setDate(cursor.getDate() + 1);
-    let safety = 0;
-    while (need > 0 && safety < 120) {
-      safety++;
-      const dateStr = localDateStr(cursor);
-      const slot = `${dateStr}|${rule.time}`;
-      if (rule.days.includes(cursor.getDay()) && !occupied.has(slot)) {
+      if (rule.kind === "tournament") {
         await createTournament({
-          date: dateStr,
+          date,
           time: rule.time,
-          level: rule.level,
+          level: rule.level || "6/7",
           courts: rule.courts,
-          capacity: rule.courts * 4,
+          capacity: rule.capacity,
         });
-        // Notification uniquement pour les tournois déjà visibles côté joueur :
-        // la récurrence en crée aussi de plus lointains, masqués chez eux.
-        if (dateStr <= windowEnd) notifyNewTournament(rule.level, dateStr, rule.time);
-        occupied.add(slot);
-        need--;
-        created = true;
+        // On ne notifie que pour les créneaux déjà visibles côté joueur.
+        if (date <= windowEnd) notifyNewTournament(rule.level || "6/7", date, rule.time);
+      } else if (rule.kind === "lesson") {
+        await createLesson({
+          date,
+          time: rule.time,
+          levels: rule.levels || [],
+          kind: rule.lesson_kind || "phases",
+          theme: rule.theme ?? null,
+          courts: rule.courts,
+          capacity: rule.capacity,
+        });
+        if (date <= windowEnd)
+          notifyNewLesson(rule.levels || [], rule.lesson_kind || "phases", date, rule.time);
+      } else {
+        await createMatchSlot({
+          date,
+          time: rule.time,
+          levels: rule.levels || [],
+          courts: rule.courts,
+          capacity: rule.capacity,
+        });
+        if (date <= windowEnd) notifyNewMatchSlot(rule.levels || [], date, rule.time);
       }
-      cursor.setDate(cursor.getDate() + 1);
+      created = true;
     }
   }
   return created;
@@ -127,6 +154,7 @@ export default function AdminAgenda() {
   const [matchSlots, setMatchSlots] = useState<MatchSlot[]>([]);
   const [matchRegs, setMatchRegs] = useState<MatchSlotRegistration[]>([]);
   const [session, setSession] = useState<SessionState | null>(null);
+  const [recurrences, setRecurrences] = useState<RecurrenceRule[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -136,34 +164,63 @@ export default function AdminAgenda() {
   const [openId, setOpenId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
+    const safe = async <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await p;
+      } catch {
+        return fallback;
+      }
+    };
+
+    let ts: Tournament[] = [];
     try {
-      let ts = await listTournaments();
-      if (await ensureRecurring(ts)) ts = await listTournaments();
-      const [rs, app] = await Promise.all([listRegistrations(), loadAppData()]);
-      setTournaments(ts);
-      setRegs(rs);
-      setSession(app.currentSession);
+      ts = await listTournaments();
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
       setTournaments([]);
+      return;
     }
-    // Leçons et matchs sont indépendants : si leurs tables manquent encore,
-    // les tournois doivent rester affichés.
-    try {
-      const [ls, lrs] = await Promise.all([listLessons(), listLessonRegistrations()]);
-      setLessons(ls);
-      setLessonRegs(lrs);
-    } catch {
-      setLessons([]);
+    // Leçons, matchs et règles sont indépendants : si leurs tables manquent
+    // encore, les tournois doivent rester affichés.
+    let ls = await safe(listLessons(), [] as Lesson[]);
+    let ms = await safe(listMatchSlots(), [] as MatchSlot[]);
+
+    // Sans table de règles (migration non exécutée), on retombe sur les
+    // récurrences historiques pour ne pas interrompre les tournois du club.
+    let rules = await safe(listRecurrenceRules(), null);
+    if (rules === null) {
+      rules = FALLBACK_RULES.map((r, i) => ({
+        ...r,
+        id: `fallback-${i}`,
+        active: true,
+        start_date: nextDateForIsoDay(FALLBACK_DAYS[i]),
+      }));
     }
-    try {
-      const [ms, mrs] = await Promise.all([listMatchSlots(), listMatchSlotRegistrations()]);
-      setMatchSlots(ms);
-      setMatchRegs(mrs);
-    } catch {
-      setMatchSlots([]);
+    setRecurrences(rules.filter((r) => !r.id.startsWith("fallback-")));
+
+    if (await ensureRecurring(rules, { tournament: ts, lesson: ls, match: ms })) {
+      [ts, ls, ms] = await Promise.all([
+        listTournaments(),
+        safe(listLessons(), ls),
+        safe(listMatchSlots(), ms),
+      ]);
     }
+
+    const [rs, lrs, mrs, app] = await Promise.all([
+      safe(listRegistrations(), [] as Registration[]),
+      safe(listLessonRegistrations(), [] as LessonRegistration[]),
+      safe(listMatchSlotRegistrations(), [] as MatchSlotRegistration[]),
+      loadAppData(),
+    ]);
+
+    setTournaments(ts);
+    setLessons(ls);
+    setMatchSlots(ms);
+    setRegs(rs);
+    setLessonRegs(lrs);
+    setMatchRegs(mrs);
+    setSession(app.currentSession);
   }, []);
 
   useEffect(() => {
@@ -314,6 +371,57 @@ export default function AdminAgenda() {
             reload();
           }}
         />
+      )}
+
+      {recurrences.length > 0 && (
+        <CollapsibleCard
+          icon="🔁"
+          title="Récurrences actives"
+          subtitle={`${recurrences.length} créneau${recurrences.length > 1 ? "x" : ""} se répète${recurrences.length > 1 ? "nt" : ""} automatiquement`}
+        >
+          <div className="space-y-2">
+            {recurrences.map((r) => {
+              const meta = AGENDA_KINDS.find((k) => k.key === r.kind)!;
+              return (
+                <div
+                  key={r.id}
+                  className={`flex items-center gap-2.5 rounded-lg border border-line bg-surface p-2.5 border-l-4 ${meta.edge}`}
+                >
+                  <span className="text-base leading-none">{meta.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold text-bright">
+                      {recurrenceLabel(r.start_date, r.time, r.interval_weeks)}
+                    </div>
+                    <div className="text-[11px] text-mut">
+                      {meta.short}
+                      {r.kind === "tournament"
+                        ? ` · niveau ${r.level}`
+                        : ` · ${levelsLabel(r.levels)}`}
+                      {" · "}
+                      {r.capacity} joueurs
+                    </div>
+                  </div>
+                  <Btn
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          `Arrêter cette récurrence ?\n\n${recurrenceLabel(r.start_date, r.time, r.interval_weeks)}\n\nPlus aucune occurrence ne sera créée. Les créneaux déjà planifiés restent en place — annule-les un par un si besoin.`
+                        )
+                      )
+                        return;
+                      await deleteRecurrenceRule(r.id);
+                      reload();
+                    }}
+                  >
+                    ⏹ Arrêter
+                  </Btn>
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleCard>
       )}
 
       <WeekStrip

@@ -19,7 +19,8 @@ deux applications. Vous pouvez donc utiliser la v1 et la v2 en parallèle et cho
 
 ### Espace admin / organisateur
 - Planification des tournois (date, créneau 1h30, **niveau**, nombre de terrains)
-- Créneaux récurrents automatiques (lundi/mardi 12:30 niveau 6/7)
+- **Récurrences** : une case à cocher à la création répète le créneau chaque semaine
+  ou une semaine sur deux (tournois, leçons et matchs) ; arrêt à tout moment
 - Validation des **demandes d'inscription** (badge de notifications)
 - Composition des équipes tactile (joueur → emplacement Gauche/Droite), noms d'équipes mémorisés par paire
 - Partage WhatsApp avec lien d'inscription public (`/join/<id>`)
@@ -47,6 +48,7 @@ Le script est **idempotent** et **ne touche à aucune donnée v1**. Il :
 - crée les tables `lessons` et `lesson_registrations` (leçons de coaching),
 - crée les tables `match_slots` et `match_slot_registrations` (créneaux de match),
 - ajoute `created_by` aux créneaux (qui a créé quoi),
+- crée la table `recurrence_rules` et y reprend les récurrences historiques,
 - importe les tournois planifiés à venir de la v1.
 
 ### 2. Déploiement sur Vercel

@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { createLesson, createMatchSlot, createTournament } from "@/lib/store";
+import {
+  createLesson,
+  createMatchSlot,
+  createRecurrenceRule,
+  createTournament,
+} from "@/lib/store";
 import { notifyNewLesson, notifyNewMatchSlot, notifyNewTournament } from "@/lib/push";
 import { AGENDA_KINDS, type AgendaKind } from "@/lib/agenda";
+import { RECURRENCE_INTERVALS, recurrenceLabel } from "@/lib/recurrence";
 import { LESSON_COURTS, LESSON_KINDS, lessonCapacity } from "@/lib/lessons";
 import { MATCH_COURTS, matchCapacity } from "@/lib/matches";
 import { LEVEL_LABELS } from "@/lib/levels";
@@ -84,6 +90,8 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
   const [level, setLevel] = useState("6/7"); // tournois uniquement
   const [lessonType, setLessonType] = useState<LessonKind>("phases");
   const [theme, setTheme] = useState("");
+  const [repeat, setRepeat] = useState(false);
+  const [intervalWeeks, setIntervalWeeks] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,8 +144,27 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
         await createMatchSlot({ date, time, levels, courts, capacity, created_by: profile?.id });
         notifyNewMatchSlot(levels, date, time);
       }
+      // Récurrence : la règle porte le gabarit, la maintenance créera les
+      // occurrences suivantes à chaque ouverture de l'agenda.
+      if (repeat) {
+        await createRecurrenceRule({
+          kind,
+          start_date: date,
+          time,
+          interval_weeks: intervalWeeks,
+          keep_ahead: 4,
+          level: kind === "tournament" ? level : null,
+          levels: kind === "tournament" ? [] : levels,
+          lesson_kind: kind === "lesson" ? lessonType : null,
+          theme: kind === "lesson" ? theme.trim() || null : null,
+          courts,
+          capacity,
+          created_by: profile?.id,
+        });
+      }
       setLevels([]);
       setTheme("");
+      setRepeat(false);
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur pendant la création.");
@@ -243,6 +270,33 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
                 : "Aucun niveau coché : visible par tous les joueurs."}
             </p>
           </>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-line2 bg-surface p-3">
+        <label className="flex cursor-pointer items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={repeat}
+            onChange={(e) => setRepeat(e.target.checked)}
+            className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-gold)]"
+          />
+          <span className="text-sm font-bold text-body">🔁 Répéter ce créneau</span>
+        </label>
+        {repeat && (
+          <div className="mt-3">
+            <Choice
+              options={RECURRENCE_INTERVALS.map((r) => r.weeks)}
+              value={intervalWeeks}
+              onChange={setIntervalWeeks}
+              render={(w) => RECURRENCE_INTERVALS.find((r) => r.weeks === w)!.label}
+            />
+            <p className="mt-2 text-[11px] leading-4 text-mut">
+              {recurrenceLabel(date, time, intervalWeeks)} — les 4 prochaines occurrences sont
+              maintenues automatiquement. Tu pourras arrêter la récurrence à tout moment depuis
+              l&apos;agenda.
+            </p>
+          </div>
         )}
       </div>
 
