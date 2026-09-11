@@ -14,6 +14,7 @@ import type { AppData } from "@/lib/store";
 import { PLAYER_LEVELS } from "@/lib/levels";
 import { formatDateShort, playerIdentity, uniquePlayerIdentity } from "@/lib/format";
 import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
+import { RecurrenceManager } from "@/components/admin/RecurrenceManager";
 import { StatsPanel } from "@/components/admin/StatsPanel";
 import { notificationPermission, updateAppBadge } from "@/lib/badge";
 import { notifyPlayer, pushSupported, subscribeAdminPush } from "@/lib/push";
@@ -598,6 +599,14 @@ export default function AdminJoueurs() {
             ))}
           </div>
         )}
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        icon="🔁"
+        title="Récurrences actives"
+        subtitle="Créneaux qui se répètent automatiquement"
+      >
+        <RecurrenceManager />
       </CollapsibleCard>
 
       <CollapsibleCard

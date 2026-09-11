@@ -9,7 +9,6 @@ import {
   createLesson,
   createMatchSlot,
   createTournament,
-  deleteRecurrenceRule,
   deleteLesson,
   deleteMatchSlot,
   listLessonRegistrations,
@@ -32,7 +31,7 @@ import {
   type AgendaKind,
 } from "@/lib/agenda";
 import { levelsLabel } from "@/lib/levels";
-import { nextOccurrences, recurrenceLabel } from "@/lib/recurrence";
+import { nextOccurrences } from "@/lib/recurrence";
 import { lessonKind } from "@/lib/lessons";
 import { endOfNextWeekStr, formatDateLong, localDateStr } from "@/lib/format";
 import type {
@@ -50,15 +49,7 @@ import { KindFilter, WeekStrip } from "@/components/WeekStrip";
 import { CreateSlotForm } from "@/components/admin/CreateSlotForm";
 import { LessonDetail } from "@/components/admin/LessonDetail";
 import { MatchSlotDetail } from "@/components/admin/MatchSlotDetail";
-import {
-  Badge,
-  Btn,
-  Card,
-  CollapsibleCard,
-  EmptyState,
-  Loader,
-  SectionTitle,
-} from "@/components/ui";
+import { Badge, Btn, Card, EmptyState, Loader, SectionTitle } from "@/components/ui";
 
 // Récurrences de secours, utilisées uniquement si la table des règles n'est pas
 // encore disponible (migration non exécutée). Elles reprennent les créneaux
@@ -154,7 +145,6 @@ export default function AdminAgenda() {
   const [matchSlots, setMatchSlots] = useState<MatchSlot[]>([]);
   const [matchRegs, setMatchRegs] = useState<MatchSlotRegistration[]>([]);
   const [session, setSession] = useState<SessionState | null>(null);
-  const [recurrences, setRecurrences] = useState<RecurrenceRule[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -197,8 +187,6 @@ export default function AdminAgenda() {
         start_date: nextDateForIsoDay(FALLBACK_DAYS[i]),
       }));
     }
-    setRecurrences(rules.filter((r) => !r.id.startsWith("fallback-")));
-
     if (await ensureRecurring(rules, { tournament: ts, lesson: ls, match: ms })) {
       [ts, ls, ms] = await Promise.all([
         listTournaments(),
@@ -371,57 +359,6 @@ export default function AdminAgenda() {
             reload();
           }}
         />
-      )}
-
-      {recurrences.length > 0 && (
-        <CollapsibleCard
-          icon="🔁"
-          title="Récurrences actives"
-          subtitle={`${recurrences.length} créneau${recurrences.length > 1 ? "x" : ""} se répète${recurrences.length > 1 ? "nt" : ""} automatiquement`}
-        >
-          <div className="space-y-2">
-            {recurrences.map((r) => {
-              const meta = AGENDA_KINDS.find((k) => k.key === r.kind)!;
-              return (
-                <div
-                  key={r.id}
-                  className={`flex items-center gap-2.5 rounded-lg border border-line bg-surface p-2.5 border-l-4 ${meta.edge}`}
-                >
-                  <span className="text-base leading-none">{meta.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-bold text-bright">
-                      {recurrenceLabel(r.start_date, r.time, r.interval_weeks)}
-                    </div>
-                    <div className="text-[11px] text-mut">
-                      {meta.short}
-                      {r.kind === "tournament"
-                        ? ` · niveau ${r.level}`
-                        : ` · ${levelsLabel(r.levels)}`}
-                      {" · "}
-                      {r.capacity} joueurs
-                    </div>
-                  </div>
-                  <Btn
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => {
-                      if (
-                        !confirm(
-                          `Arrêter cette récurrence ?\n\n${recurrenceLabel(r.start_date, r.time, r.interval_weeks)}\n\nPlus aucune occurrence ne sera créée. Les créneaux déjà planifiés restent en place — annule-les un par un si besoin.`
-                        )
-                      )
-                        return;
-                      await deleteRecurrenceRule(r.id);
-                      reload();
-                    }}
-                  >
-                    ⏹ Arrêter
-                  </Btn>
-                </div>
-              );
-            })}
-          </div>
-        </CollapsibleCard>
       )}
 
       <WeekStrip
