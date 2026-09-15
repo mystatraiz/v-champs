@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
+  cancelLesson,
+  cancelMatchSlot,
   cancelTournament,
   createLesson,
   createMatchSlot,
   createTournament,
-  deleteLesson,
-  deleteMatchSlot,
   listLessonRegistrations,
   listLessons,
   listMatchSlotRegistrations,
@@ -462,8 +462,13 @@ export default function AdminAgenda() {
                     l.capacity,
                     toggle,
                     async () => {
-                      if (!confirm("Supprimer cette leçon ?")) return;
-                      await deleteLesson(l.id);
+                      if (
+                        !confirm(
+                          "Annuler cette leçon ?\n\nElle disparaîtra pour les joueurs et ne sera pas recréée par la récurrence. Les demandes en cours seront effacées."
+                        )
+                      )
+                        return;
+                      await cancelLesson(l.id);
                       reload();
                     },
                     authorTag(l.created_by)
@@ -500,8 +505,13 @@ export default function AdminAgenda() {
                     m.capacity,
                     toggle,
                     async () => {
-                      if (!confirm("Supprimer ce créneau de match ?")) return;
-                      await deleteMatchSlot(m.id);
+                      if (
+                        !confirm(
+                          "Annuler ce créneau de match ?\n\nIl disparaîtra pour les joueurs et ne sera pas recréé par la récurrence. Les demandes en cours seront effacées."
+                        )
+                      )
+                        return;
+                      await cancelMatchSlot(m.id);
                       reload();
                     },
                     authorTag(m.created_by)

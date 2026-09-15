@@ -762,6 +762,23 @@ export async function updateLesson(id: string, patch: Partial<Lesson>): Promise<
   if (error) throw error;
 }
 
+// Annule une leçon. Comme pour les tournois, on ne la supprime pas : le créneau
+// reste enregistré, donc la maintenance des récurrences ne le recrée pas
+// aussitôt. Les demandes liées sont effacées pour ne pas fausser les pastilles.
+export async function cancelLesson(id: string): Promise<void> {
+  await updateLesson(id, { status: "cancelled" });
+  if (isTestMode()) {
+    const arr = await readJsonKey<LessonRegistration>(TEST_LESSON_REG);
+    await writeJsonKey(
+      TEST_LESSON_REG,
+      arr.filter((r) => r.lesson_id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase.from("lesson_registrations").delete().eq("lesson_id", id);
+  if (error) throw error;
+}
+
 export async function deleteLesson(id: string): Promise<void> {
   if (isTestMode()) {
     const [lessons, regs] = await Promise.all([
@@ -946,6 +963,24 @@ export async function updateMatchSlot(id: string, patch: Partial<MatchSlot>): Pr
     return;
   }
   const { error } = await supabase.from("match_slots").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+// Annule un créneau de match — même principe que les leçons et les tournois.
+export async function cancelMatchSlot(id: string): Promise<void> {
+  await updateMatchSlot(id, { status: "cancelled" });
+  if (isTestMode()) {
+    const arr = await readJsonKey<MatchSlotRegistration>(TEST_MATCH_REG);
+    await writeJsonKey(
+      TEST_MATCH_REG,
+      arr.filter((r) => r.match_slot_id !== id)
+    );
+    return;
+  }
+  const { error } = await supabase
+    .from("match_slot_registrations")
+    .delete()
+    .eq("match_slot_id", id);
   if (error) throw error;
 }
 
