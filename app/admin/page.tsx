@@ -576,7 +576,9 @@ export default function AdminAgenda() {
                     )}
                     <span className="shrink-0 text-[11px] text-mut">{meta.short}</span>
                     {/* Annulable ici aussi : une récurrence créée par erreur se
-                        corrige sans attendre que ses occurrences se rapprochent. */}
+                        corrige sans attendre que ses occurrences se rapprochent.
+                        Bouton bordé et non une simple croix grise, qui passait
+                        inaperçue au bord de la ligne. */}
                     <button
                       onClick={async () => {
                         if (
@@ -590,8 +592,8 @@ export default function AdminAgenda() {
                         else await cancelMatchSlot(e.id);
                         reload();
                       }}
-                      className="shrink-0 cursor-pointer px-1.5 text-mut hover:text-bad"
-                      title="Annuler"
+                      className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line2 text-sm font-bold text-sub hover:border-bad hover:text-bad"
+                      title="Annuler ce créneau"
                     >
                       ✕
                     </button>
