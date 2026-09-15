@@ -555,21 +555,47 @@ export default function AdminAgenda() {
             <div className="mt-2.5 space-y-1.5">
               {far.map((e) => {
                 const meta = AGENDA_KINDS.find((k) => k.key === e.kind)!;
-                const inner = (
-                  <Card className={`flex items-center gap-2 border-l-4 p-3 ${meta.edge}`}>
+                const label = `${formatDateLong(e.date)} à ${e.time}`;
+                return (
+                  <Card
+                    key={`${e.kind}-${e.id}`}
+                    className={`flex items-center gap-2 border-l-4 p-3 ${meta.edge}`}
+                  >
                     <span className="text-sm">{meta.icon}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-body">
-                      {formatDateLong(e.date)} · <span className="text-gold">{e.time}</span>
-                    </span>
-                    <span className="text-[11px] text-mut">{meta.short}</span>
+                    {e.kind === "tournament" ? (
+                      <Link
+                        href={`/admin/tournoi/${e.id}`}
+                        className="min-w-0 flex-1 truncate text-sm text-body"
+                      >
+                        {formatDateLong(e.date)} · <span className="text-gold">{e.time}</span>
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-sm text-body">
+                        {formatDateLong(e.date)} · <span className="text-gold">{e.time}</span>
+                      </span>
+                    )}
+                    <span className="shrink-0 text-[11px] text-mut">{meta.short}</span>
+                    {/* Annulable ici aussi : une récurrence créée par erreur se
+                        corrige sans attendre que ses occurrences se rapprochent. */}
+                    <button
+                      onClick={async () => {
+                        if (
+                          !confirm(
+                            `Annuler ce créneau ?\n\n${meta.short} — ${label}\n\nIl disparaîtra pour les joueurs et ne sera pas recréé par la récurrence.`
+                          )
+                        )
+                          return;
+                        if (e.kind === "tournament") await cancelTournament(e.id);
+                        else if (e.kind === "lesson") await cancelLesson(e.id);
+                        else await cancelMatchSlot(e.id);
+                        reload();
+                      }}
+                      className="shrink-0 cursor-pointer px-1.5 text-mut hover:text-bad"
+                      title="Annuler"
+                    >
+                      ✕
+                    </button>
                   </Card>
-                );
-                return e.kind === "tournament" ? (
-                  <Link key={`${e.kind}-${e.id}`} href={`/admin/tournoi/${e.id}`} className="block">
-                    {inner}
-                  </Link>
-                ) : (
-                  <div key={`${e.kind}-${e.id}`}>{inner}</div>
                 );
               })}
             </div>
