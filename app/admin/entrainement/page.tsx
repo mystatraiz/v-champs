@@ -329,7 +329,12 @@ export default function TrainingTool() {
             return (
               <Card key={team} className="space-y-2.5 p-3.5">
                 <div className="flex items-center justify-between">
-                  <SectionTitle className="mb-0">Équipe {team}</SectionTitle>
+                  <SectionTitle className="mb-0">
+                    Équipe {team}{" "}
+                    <span className="font-semibold normal-case tracking-normal text-mut">
+                      · {team === 1 ? "en face de toi" : "de ton côté"}
+                    </span>
+                  </SectionTitle>
                   <button
                     onClick={() => swapSides(team)}
                     className="cursor-pointer rounded-lg border border-line2 px-2.5 py-1 text-xs font-bold text-sub"
@@ -362,7 +367,8 @@ export default function TrainingTool() {
           <p className="px-1 text-[11px] leading-5 text-mut">
             Pendant le match : un tap sur la case d&apos;un joueur = une balle touchée (hors
             service). Rouge = faute directe, vert = point gagnant : ils comptent aussi comme une balle
-            touchée. Au changement de côté, le bouton 🔄 Côtés fait pivoter les places : le joueur en haut à
+            touchée. L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
+            affichée en miroir (son joueur de gauche à droite). Au changement de côté, le bouton 🔄 Côtés fait pivoter les places : le joueur en haut à
             gauche passe en bas à droite. L&apos;écran reste allumé et le match en cours est conservé
             si l&apos;appli se ferme.
           </p>

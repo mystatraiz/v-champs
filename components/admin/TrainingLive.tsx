@@ -66,10 +66,12 @@ export function LiveTracker({
   const last = live.events[live.events.length - 1];
   const elapsed = Math.max(0, (now - new Date(live.startedAt).getTime()) / 1000);
 
-  // Les trois blocs suivent la même disposition : équipe 1 en haut, équipe 2
-  // en bas, gauche à gauche, droite à droite. Après un changement de côté,
-  // tout pivote de 180° : l'ordre d'affichage est inversé.
-  const order = live.flipped ? [3, 2, 1, 0] : [0, 1, 2, 3];
+  // Vue de l'observateur, derrière le terrain : l'équipe du bas lui tourne le
+  // dos (sa gauche est à gauche), l'équipe du haut lui fait face (sa gauche
+  // est à droite). Les trois blocs suivent cette disposition. Au changement
+  // de côté, tout pivote de 180° : l'équipe 2 passe en haut, en miroir.
+  // Index joueurs : 0 = éq. 1 gauche, 1 = éq. 1 droite, 2 = éq. 2 gauche, 3 = éq. 2 droite.
+  const order = live.flipped ? [3, 2, 0, 1] : [1, 0, 2, 3];
   const grid = (render: (i: number) => React.ReactNode) => (
     <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5">
       {order.map((i) => (
