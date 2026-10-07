@@ -242,10 +242,11 @@ where not exists (
 -- ── 9. Formule des tournois ────────────────────────────────────────────────
 -- « equipes » : 4 paires fixes qui se rencontrent toutes (formule historique).
 -- « mexicano » : paires recomposées à chaque round selon le classement du jour.
+-- « bo4 » : Best Of 4, 4 joueurs sur 1 terrain, chacun avec chacun des deux côtés.
 alter table public.tournaments add column if not exists format text not null default 'equipes';
 alter table public.tournaments drop constraint if exists tournaments_format_check;
 alter table public.tournaments add constraint tournaments_format_check
-  check (format in ('equipes','mexicano'));
+  check (format in ('equipes','mexicano','bo4'));
 alter table public.recurrence_rules add column if not exists format text;
 
 -- ── 10. Reprise des tournois planifiés existants de la v1 (à venir) ────────

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { formatTag } from "@/lib/formats";
 import { getTournament, listRegistrations, requestRegistration } from "@/lib/store";
 import { notifyAdmins } from "@/lib/push";
 import { formatDateLong, uniquePlayerIdentity } from "@/lib/format";
@@ -124,7 +125,9 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
               <div className="mt-0.5 text-lg font-bold text-gold">{tournament.time}</div>
               <div className="mt-2 flex justify-center gap-2">
                 <Badge color="gold">Niveau {tournament.level}</Badge>
-                {tournament.format === "mexicano" && <Badge color="match">🔀 Mexicano</Badge>}
+                {formatTag(tournament.format) && (
+                  <Badge color="match">{formatTag(tournament.format)}</Badge>
+                )}
                 <Badge color={free > 0 ? "ok" : "bad"}>
                   {free > 0 ? `🎟️ ${free} place${free > 1 ? "s" : ""} dispo` : "Complet"}
                 </Badge>

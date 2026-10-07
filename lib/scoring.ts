@@ -118,6 +118,8 @@ export function computeSessionScores(
   sessionId: string,
   existingScores: PlayerSessionScore[]
 ): PlayerSessionScore[] {
+  // Best Of 4 : classement à part, aucun point V-Champs.
+  if (session.format === "bo4") return [];
   if (session.format === "mexicano") {
     return computeMexicanoScores(
       { ...session, matches: session.matches || [] },

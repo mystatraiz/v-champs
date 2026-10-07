@@ -5,7 +5,8 @@ import { rankTeamsInSession } from "@/lib/scoring";
 import { formatDateLong, teamLabel } from "@/lib/format";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { updateSessionMatchScore } from "@/lib/store";
-import { computeFinalStandings, finalStageOf } from "@/lib/mexicano";
+import { computeFinalStandings, computeIndividualStandings, finalStageOf } from "@/lib/mexicano";
+import { formatTag } from "@/lib/formats";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
 import { Badge, Btn, Modal, SectionTitle } from "./ui";
 
@@ -110,13 +111,15 @@ export function SessionSheet({
 
   const ranked = useMemo(() => (entry ? rankTeamsInSession(entry.teams || []) : []), [entry]);
   const mex = entry?.format === "mexicano";
-  const standings = useMemo(
-    () =>
-      entry && entry.format === "mexicano"
-        ? computeFinalStandings(entry.teams || [], entry.matches || [], entry.seedOrder || [])
-        : [],
-    [entry]
-  );
+  const individual = mex || entry?.format === "bo4";
+  const standings = useMemo(() => {
+    if (!entry) return [];
+    const args = [entry.teams || [], entry.matches || [], entry.seedOrder || []] as const;
+    if (entry.format === "mexicano") return computeFinalStandings(...args);
+    if (entry.format === "bo4")
+      return computeIndividualStandings(...args).map((r) => ({ ...r, stage: null, wonFinal: null }));
+    return [];
+  }, [entry]);
   const points = useMemo(() => {
     if (!entry) return [];
     return scores
@@ -134,7 +137,7 @@ export function SessionSheet({
           <h3 className="text-lg font-extrabold text-bright">{formatDateLong(entry.date)}</h3>
           <div className="flex flex-wrap gap-1.5">
             <Badge color="gold">Niveau {entry.label || "6/7"}</Badge>
-            {mex && <Badge color="match">🔀 Mexicano</Badge>}
+            {formatTag(entry.format) && <Badge color="match">{formatTag(entry.format)}</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -157,7 +160,7 @@ export function SessionSheet({
       </div>
 
       <SectionTitle>Classement final</SectionTitle>
-      {mex ? (
+      {individual ? (
         <div className="mb-5 overflow-hidden rounded-xl border border-line">
           <table className="w-full text-sm">
             <thead>
@@ -308,7 +311,9 @@ export function SessionSheet({
                     ? m.court === 1
                       ? "Finale"
                       : "P. finale"
-                    : `T${m.court} R${m.roundNum}`}
+                    : entry.format === "bo4"
+                      ? `Match ${m.roundNum}`
+                      : `T${m.court} R${m.roundNum}`}
                 </span>
                 <span className={`flex-1 truncate text-right ${w1 ? "font-bold text-gold" : "text-sub"}`}>
                   {(t1?.players || []).filter(Boolean).join(" / ") || "?"}

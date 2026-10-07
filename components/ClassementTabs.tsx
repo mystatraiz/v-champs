@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildTeamStats } from "@/lib/stats";
-import { formatDateShort, teamLabel } from "@/lib/format";
+import { buildTeamStats, sessionWinnerLabel } from "@/lib/stats";
+import { formatDateShort } from "@/lib/format";
+import { formatMeta } from "@/lib/formats";
 import type { AppData } from "@/lib/store";
 import type { SessionHistoryEntry } from "@/lib/types";
 import { RankingBoard } from "./RankingBoard";
+import { Bo4Board } from "./Bo4Board";
 import { SessionSheet } from "./SessionSheet";
 import { Card, EmptyState, SectionTitle } from "./ui";
 
-// Classement à onglets (V-Champs / Équipes / Sessions), partagé admin & joueur.
+// Classement à onglets (V-Champs / Équipes / Best Of 4 / Sessions), partagé admin & joueur.
 export function ClassementTabs({
   data,
   highlightPlayer,
@@ -23,7 +25,7 @@ export function ClassementTabs({
   canEdit?: boolean;
   onEdited?: () => void;
 }) {
-  const [tab, setTab] = useState<"vchamps" | "equipes" | "sessions">("vchamps");
+  const [tab, setTab] = useState<"vchamps" | "equipes" | "bo4" | "sessions">("vchamps");
   const [openSession, setOpenSession] = useState<SessionHistoryEntry | null>(null);
 
   const teamStats = useMemo(() => buildTeamStats(data.history, data.currentSession), [data]);
@@ -31,18 +33,19 @@ export function ClassementTabs({
 
   return (
     <div>
-      <div className="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-surface p-1">
+      <div className="mb-4 grid grid-cols-4 gap-1 rounded-lg bg-surface p-1">
         {(
           [
             ["vchamps", "V-Champs"],
             ["equipes", "Équipes"],
+            ["bo4", "Best Of 4"],
             ["sessions", "Sessions"],
           ] as const
         ).map(([k, label]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`cursor-pointer rounded-md py-2 text-sm font-bold transition-colors ${
+            className={`cursor-pointer rounded-md px-1 py-2 text-[13px] font-bold leading-tight transition-colors ${
               tab === k ? "bg-gold text-ink" : "text-sub hover:text-body"
             }`}
           >
@@ -54,6 +57,8 @@ export function ClassementTabs({
       {tab === "vchamps" && (
         <RankingBoard data={data} highlightPlayer={highlightPlayer} canShare={canShare} />
       )}
+
+      {tab === "bo4" && <Bo4Board data={data} highlightPlayer={highlightPlayer} />}
 
       {tab === "equipes" && (
         <div>
@@ -125,11 +130,8 @@ export function ClassementTabs({
           ) : (
             <Card className="overflow-hidden">
               {[...data.history].reverse().map((s, i, arr) => {
-                const winner = [...s.teams].sort(
-                  (a, b) =>
-                    b.wins * 3 + (b.draws || 0) - (a.wins * 3 + (a.draws || 0)) ||
-                    b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst)
-                )[0];
+                const winner = sessionWinnerLabel(s);
+                const special = s.format && s.format !== "equipes" ? formatMeta(s.format) : null;
                 const played =
                   meKey &&
                   (s.teams || []).some((t) =>
@@ -147,11 +149,14 @@ export function ClassementTabs({
                     <span className="shrink-0 rounded bg-card2 px-1.5 py-0.5 text-[10px] font-bold text-sub">
                       {s.label || "6/7"}
                     </span>
+                    {special && (
+                      <span className="shrink-0 text-xs" title={special.label}>
+                        {special.icon}
+                      </span>
+                    )}
                     <span className="flex-1 truncate">
                       🏆{" "}
-                      <span className="font-bold text-gold">
-                        {winner ? teamLabel(winner.name, winner.players) : ""}
-                      </span>
+                      <span className="font-bold text-gold">{winner}</span>
                       {played && (
                         <span className="ml-1 text-[10px] font-bold uppercase text-gold">· tu y étais</span>
                       )}

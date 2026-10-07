@@ -29,10 +29,13 @@ import {
   MEXICANO_FINAL_ROUND,
   appendRoundTeams,
   computeFinalStandings,
+  computeIndividualStandings,
   finalStageOf,
   mexicanoMatchups,
   nextRoundOrder,
+  type FinalStanding,
 } from "@/lib/mexicano";
+import { BO4_MATCH_DURATION, BO4_POINTS_BY_POS, BO4_ROUNDS, bo4Matchups } from "@/lib/bestof4";
 import { notifySessionResults } from "@/lib/push";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { playBell, unlockAudio } from "@/lib/audio";
@@ -42,11 +45,15 @@ import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
 
 // ─── Règles propres à chaque formule ───
 const isMexicano = (s: SessionState | null | undefined) => s?.format === "mexicano";
-const roundsOf = (s: SessionState) => (isMexicano(s) ? MEXICANO_ROUNDS : MAX_ROUNDS);
-const durationOf = (s: SessionState) => (isMexicano(s) ? MEXICANO_MATCH_DURATION : MATCH_DURATION);
-// Affiches du prochain round : en Mexicano, les 4 dernières paires ajoutées.
+const isBo4 = (s: SessionState | null | undefined) => s?.format === "bo4";
+const roundsOf = (s: SessionState) =>
+  isMexicano(s) ? MEXICANO_ROUNDS : isBo4(s) ? BO4_ROUNDS : MAX_ROUNDS;
+const durationOf = (s: SessionState) =>
+  isMexicano(s) ? MEXICANO_MATCH_DURATION : isBo4(s) ? BO4_MATCH_DURATION : MATCH_DURATION;
+// Affiches du prochain round : en Mexicano, les 4 dernières paires ajoutées ;
+// en Best Of 4, le match suivant du programme fixe.
 const matchupsOf = (s: SessionState): Matchup[] =>
-  isMexicano(s) ? mexicanoMatchups(s) : proposeBestMatchups(s);
+  isMexicano(s) ? mexicanoMatchups(s) : isBo4(s) ? bo4Matchups(s) : proposeBestMatchups(s);
 
 // ─── Carte de match avec saisie du score ───
 function MatchCard({
@@ -337,7 +344,7 @@ export default function SessionLive() {
       const withPairs = appendRoundTeams(s, nextRoundOrder(s));
       persist(launchRound(withPairs, mexicanoMatchups(withPairs)));
     } else {
-      persist(launchRound(s, proposeBestMatchups(s)));
+      persist(launchRound(s, matchupsOf(s)));
     }
   }
 
@@ -361,9 +368,19 @@ export default function SessionLive() {
 
   const sorted = getSortedTeams(state);
   const mex = isMexicano(state);
-  const standings = mex
+  const bo4 = isBo4(state);
+  // Classement individuel : Mexicano (avec finales) et Best Of 4.
+  const individual = mex || bo4;
+  const standings: FinalStanding[] = mex
     ? computeFinalStandings(state.teams, state.matches, state.seedOrder || [])
-    : [];
+    : bo4
+      ? computeIndividualStandings(state.teams, state.matches, state.seedOrder || []).map((r) => ({
+          ...r,
+          stage: null,
+          wonFinal: null,
+          bonus: 0,
+        }))
+      : [];
   // Rounds de classement terminés ou en cours : la ligne entre le 4e et le 5e
   // sépare les futurs finalistes du reste.
   const finalsPlayed = mex && state.roundNum >= MEXICANO_FINAL_ROUND;
@@ -383,7 +400,7 @@ export default function SessionLive() {
         <tbody>
           {standings.map((r, i) => {
             const diff = r.gamesFor - r.gamesAgainst;
-            const cut = i === 3 && !finalsPlayed;
+            const cut = mex && i === 3 && !finalsPlayed;
             return (
               <tr
                 key={r.name}
@@ -413,7 +430,9 @@ export default function SessionLive() {
         </tbody>
       </table>
       <p className="border-t border-line px-3.5 py-2 text-[10px] leading-4 text-mut">
-        {finalsPlayed
+        {bo4
+          ? `Classement aux jeux gagnés (chacun joue 6 matchs : 3 à gauche, 3 à droite). Classement Best Of 4 : ${BO4_POINTS_BY_POS[1]} · ${BO4_POINTS_BY_POS[2]} · ${BO4_POINTS_BY_POS[3]} · ${BO4_POINTS_BY_POS[4]} pts — pas de points V-Champs.`
+          : finalsPlayed
           ? `Finale sur le terrain 1 (4 premiers), petite finale sur le terrain 2. Vainqueurs de la finale 1-2, perdants 3-4, vainqueurs de la petite finale 5-6, perdants 7-8. Bonus V-Champs : +${MEXICANO_FINAL_BONUS.finale} finale, +${MEXICANO_FINAL_BONUS.petite} petite finale.`
           : `Classement aux jeux gagnés. Rounds 1 à ${MEXICANO_FINAL_ROUND - 1} : 1+4 contre 2+3 sur le terrain 1, 5+8 contre 6+7 sur le terrain 2 (sans rejouer avec le même partenaire si possible). Au round ${MEXICANO_FINAL_ROUND}, les 4 premiers (au-dessus de la ligne) jouent la finale, les 4 autres la petite finale.`}
       </p>
@@ -481,7 +500,7 @@ export default function SessionLive() {
         </div>
         <div>
           <SectionTitle>Classement final</SectionTitle>
-          {mex ? playerRankTable : teamRankTable}
+          {individual ? playerRankTable : teamRankTable}
         </div>
         {sessionScores.length > 0 && (
           <div>
@@ -544,7 +563,9 @@ export default function SessionLive() {
     return (
       <div className="fade-up space-y-4">
         <div className="text-center">
-          <h1 className="text-lg font-extrabold text-bright">Affiches du round 1</h1>
+          <h1 className="text-lg font-extrabold text-bright">
+            {isBo4(state) ? "Match 1 / 6" : "Affiches du round 1"}
+          </h1>
           <p className="text-xs text-mut">Tirage du service effectué 🎲</p>
         </div>
         {(pendingMatchups ?? []).map((m) => {
@@ -628,6 +649,10 @@ export default function SessionLive() {
           <h1 className="text-lg font-extrabold text-bright">
             {mex && state.roundNum >= MEXICANO_FINAL_ROUND ? (
               "🏆 Finales"
+            ) : bo4 ? (
+              <>
+                Match {state.roundNum} <span className="text-mut">/ {BO4_ROUNDS}</span>
+              </>
             ) : (
               <>
                 Round {state.roundNum}{" "}
@@ -639,7 +664,8 @@ export default function SessionLive() {
           </h1>
           <div className="flex flex-wrap gap-1.5">
             <Badge color="gold">Niveau {state.label || "6/7"}</Badge>
-            {isMexicano(state) && <Badge color="match">🔀 Mexicano</Badge>}
+            {mex && <Badge color="match">🔀 Mexicano</Badge>}
+            {bo4 && <Badge color="match">🔄 Best Of 4</Badge>}
           </div>
         </div>
         <Btn variant="ghost" size="sm" onClick={cancelSession}>✕ Annuler</Btn>
@@ -664,13 +690,15 @@ export default function SessionLive() {
             ? "✓ Terminer la session"
             : mex && state.roundNum === MEXICANO_FINAL_ROUND - 1
               ? "✓ Valider les scores → finales 🏆"
+              : bo4
+              ? "✓ Valider le score → match suivant"
               : "✓ Valider les scores → round suivant"
           : "Saisissez tous les scores pour valider"}
       </Btn>
 
       <div>
         <SectionTitle>Classement de la session</SectionTitle>
-        {mex ? playerRankTable : teamRankTable}
+        {individual ? playerRankTable : teamRankTable}
       </div>
 
       {finishedMatches.length > 0 && (
@@ -698,6 +726,8 @@ export default function SessionLive() {
                       ? m.court === 1
                         ? "Finale"
                         : "P. finale"
+                      : bo4
+                      ? `Match ${m.roundNum}`
                       : `T${m.court} R${m.roundNum}`}
                   </span>
                   <span className={`flex-1 truncate text-right ${w1 ? "font-bold text-gold" : "text-sub"}`}>

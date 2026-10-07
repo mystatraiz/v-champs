@@ -170,8 +170,8 @@ export async function archiveSession(
     label: (state.label as string) || "6/7",
     // Champs absents pour la formule historique : l'historique reste lisible
     // à l'identique par la v1, qui ne connaît que les paires fixes.
-    ...(state.format === "mexicano"
-      ? { format: "mexicano" as const, seedOrder: state.seedOrder || [] }
+    ...(state.format && state.format !== "equipes"
+      ? { format: state.format, seedOrder: state.seedOrder || [] }
       : {}),
   };
   const newHistory = [...history, entry];

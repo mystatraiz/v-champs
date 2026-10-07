@@ -66,7 +66,7 @@ export interface SessionState {
   plannedTournamentId?: string | null;
   pairNameMap: Record<string, string>;
   format?: TournamentFormat; // absent = « equipes »
-  seedOrder?: string[]; // Mexicano : ordre de tête de série (classement V-Champs)
+  seedOrder?: string[]; // Mexicano / Best Of 4 : ordre de tête de série (classement V-Champs)
   playerSides?: Record<string, "left" | "right" | "any">; // Mexicano : côté préféré
 }
 
@@ -98,7 +98,9 @@ export type TournamentStatus = "open" | "locked" | "started" | "done" | "cancell
 
 // « equipes » : 4 paires fixes qui se rencontrent toutes (formule historique).
 // « mexicano » : paires recomposées à chaque round selon le classement du jour.
-export type TournamentFormat = "equipes" | "mexicano";
+// « bo4 » : Best Of 4 — 4 joueurs sur 1 terrain, chacun avec chacun des deux
+// côtés, classement séparé (pas de points V-Champs).
+export type TournamentFormat = "equipes" | "mexicano" | "bo4";
 
 export interface Tournament {
   id: string;

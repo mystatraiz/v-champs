@@ -1,5 +1,11 @@
 import { rankTeamsInSession } from "./scoring";
-import { FINAL_STAGE_LABEL, computeFinalStandings, finalStageOf } from "./mexicano";
+import {
+  FINAL_STAGE_LABEL,
+  computeFinalStandings,
+  computeIndividualStandings,
+  finalStageOf,
+} from "./mexicano";
+import { formatTag } from "./formats";
 import { lessonKind, lessonLevelsLabel } from "./lessons";
 import { levelsLabel } from "./levels";
 import { formatDateLong, teamLabel } from "./format";
@@ -144,21 +150,25 @@ export function formatSessionText(
   scores: PlayerSessionScore[]
 ): string {
   const mex = entry.format === "mexicano";
+  const bo4 = entry.format === "bo4";
+  const tag = formatTag(entry.format);
   const lines = [
     `🎾 *Résultats — ${formatDateLong(entry.date)}*`,
-    `Niveau ${entry.label || "6/7"}${mex ? " · 🔀 Mexicano" : ""}`,
+    `Niveau ${entry.label || "6/7"}${tag ? ` · ${tag}` : ""}`,
     "",
     "🏆 *Classement*",
   ];
-  if (mex) {
-    computeFinalStandings(entry.teams || [], entry.matches || [], entry.seedOrder || []).forEach(
-      (r, i) => {
-        const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
-        const diff = r.gamesFor - r.gamesAgainst;
-        const tag = r.wonFinal ? (r.stage === "finale" ? " 🏆" : " 🥉") : "";
-        lines.push(`${rank} ${r.name}${tag} — ${r.gamesFor} jeux (${diff >= 0 ? "+" : ""}${diff})`);
-      }
-    );
+  if (mex || bo4) {
+    const args = [entry.teams || [], entry.matches || [], entry.seedOrder || []] as const;
+    const rows = mex
+      ? computeFinalStandings(...args)
+      : computeIndividualStandings(...args).map((r) => ({ ...r, stage: null, wonFinal: null }));
+    rows.forEach((r, i) => {
+      const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
+      const diff = r.gamesFor - r.gamesAgainst;
+      const medal = r.wonFinal ? (r.stage === "finale" ? " 🏆" : " 🥉") : "";
+      lines.push(`${rank} ${r.name}${medal} — ${r.gamesFor} jeux (${diff >= 0 ? "+" : ""}${diff})`);
+    });
   } else {
     rankTeamsInSession(entry.teams || []).forEach((t, i) => {
       const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
@@ -180,7 +190,8 @@ export function formatSessionText(
         const n1 = (t1?.players || []).filter(Boolean).join("/") || "?";
         const n2 = (t2?.players || []).filter(Boolean).join("/") || "?";
         const stage = mex ? finalStageOf(m) : null;
-        lines.push(`${stage ? FINAL_STAGE_LABEL[stage] : `R${m.roundNum}`} · ${n1} ${matchScoreStr(m)} ${n2}`);
+        const tagM = stage ? FINAL_STAGE_LABEL[stage] : bo4 ? `M${m.roundNum}` : `R${m.roundNum}`;
+        lines.push(`${tagM} · ${n1} ${matchScoreStr(m)} ${n2}`);
       });
   }
 

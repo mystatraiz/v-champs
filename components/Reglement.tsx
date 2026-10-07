@@ -109,6 +109,28 @@ export function Reglement() {
       </div>
 
       <div>
+        <SectionTitle>🔄 Formule Best Of 4</SectionTitle>
+        <Card className="p-4 text-sm leading-7 text-sub">
+          <b className="text-body">4 joueurs sur 1 terrain</b>. Chaque joueur joue avec chacun des 3
+          autres <b className="text-body">une fois à gauche et une fois à droite</b> :{" "}
+          <b className="text-body">6 matchs de 13 minutes</b> (après 6 min d&apos;échauffement), soit 3
+          matchs à gauche et 3 à droite pour tout le monde. Le programme est fixe et évite de
+          rejouer deux fois de suite la même affiche ou de rester plus de deux matchs d&apos;affilée
+          du même côté. Score en jeux, comme les autres formules.
+          <br />
+          <br />
+          Classement de la session <b className="text-body">individuel</b> : jeux gagnés, puis
+          différence de jeux, puis victoires.
+          <br />
+          <br />
+          <b className="text-body">Classement à part</b> : le Best Of 4 ne rapporte pas de points
+          V-Champs et ne compte pas dans les statistiques V-Champs. Il alimente son propre classement
+          (onglet « Best Of 4 ») : <b className="text-body">10 · 6 · 3 · 1 pts</b> du 1ᵉʳ au 4ᵉ de
+          chaque session, puis départage au nombre de victoires de session et au +/-.
+        </Card>
+      </div>
+
+      <div>
         <SectionTitle>⭐ Points V-Champs — barème par niveau</SectionTitle>
         <Card className="overflow-hidden">
           <table className="w-full text-sm">

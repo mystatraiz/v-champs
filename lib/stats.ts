@@ -6,19 +6,21 @@ import type {
   Team,
 } from "./types";
 import { isGenericTeamName, teamLabel } from "./format";
-import { computeFinalStandings } from "./mexicano";
+import { computeFinalStandings, computeIndividualStandings } from "./mexicano";
 
 interface SessionLike {
   teams: Team[];
   matches: Match[];
 }
 
+// Le Best Of 4 a son propre classement : ses matchs ne comptent pas dans les
+// statistiques V-Champs (victoires, côtés, équipes).
 function collectSessions(
   history: SessionHistoryEntry[],
   current: SessionState | null
 ): SessionLike[] {
-  const sessions: SessionLike[] = [...history];
-  if (current && current.sessionStarted && !current.sessionFinished) {
+  const sessions: SessionLike[] = history.filter((s) => s.format !== "bo4");
+  if (current && current.sessionStarted && !current.sessionFinished && current.format !== "bo4") {
     sessions.push({
       teams: current.teams,
       matches: current.matches.filter((m) => m.status === "finished"),
@@ -194,8 +196,9 @@ export function buildPlayerPalmares(
   const entries: PalmaresEntry[] = [];
   history.forEach((session) => {
     // Mexicano : les paires changent à chaque round, le rang est individuel.
-    if (session.format === "mexicano") {
-      const standings = computeFinalStandings(
+    if (session.format === "mexicano" || session.format === "bo4") {
+      const rank = session.format === "mexicano" ? computeFinalStandings : computeIndividualStandings;
+      const standings = rank(
         session.teams || [],
         session.matches || [],
         session.seedOrder || []
@@ -206,7 +209,7 @@ export function buildPlayerPalmares(
           date: session.date,
           label: session.label || "6/7",
           position: idx + 1,
-          teamName: "Mexicano",
+          teamName: session.format === "mexicano" ? "Mexicano" : "Best Of 4",
           partner: null,
         });
       }
@@ -236,4 +239,19 @@ export function buildPlayerPalmares(
     });
   });
   return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+// Vainqueur d'une session archivée, quelle que soit la formule : la paire en
+// tête (équipes fixes) ou le joueur en tête (Mexicano, Best Of 4).
+export function sessionWinnerLabel(s: SessionHistoryEntry): string {
+  if (s.format === "mexicano" || s.format === "bo4") {
+    const rank = s.format === "mexicano" ? computeFinalStandings : computeIndividualStandings;
+    return rank(s.teams || [], s.matches || [], s.seedOrder || [])[0]?.name || "";
+  }
+  const winner = [...(s.teams || [])].sort(
+    (a, b) =>
+      b.wins * 3 + (b.draws || 0) - (a.wins * 3 + (a.draws || 0)) ||
+      b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst)
+  )[0];
+  return winner ? teamLabel(winner.name, winner.players) : "";
 }

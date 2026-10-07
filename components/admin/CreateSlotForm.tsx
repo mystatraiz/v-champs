@@ -14,6 +14,7 @@ import { RECURRENCE_INTERVALS, recurrenceLabel } from "@/lib/recurrence";
 import { LESSON_COURTS, LESSON_KINDS, lessonCapacity } from "@/lib/lessons";
 import { MATCH_COURTS, matchCapacity } from "@/lib/matches";
 import { LEVEL_LABELS } from "@/lib/levels";
+import { FORMATS, formatMeta } from "@/lib/formats";
 import { TIME_SLOTS, localDateStr } from "@/lib/format";
 import type { LessonKind, TournamentFormat } from "@/lib/types";
 import { LevelPicker } from "./MatchSlotDetail";
@@ -110,11 +111,12 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
 
   // Les tournois tournent sur 2 terrains par défaut, les leçons sur 1.
   useEffect(() => {
-    setCourts(kind === "tournament" ? 2 : 1);
+    setCourts(kind === "tournament" ? (formatMeta(format).courts ?? 2) : 1);
   }, [kind]);
 
-  // Mexicano : 8 joueurs sur les 2 terrains.
-  const mex = kind === "tournament" && format === "mexicano" && courts === 2;
+  // Formule spéciale (Mexicano, Best Of 4) : son nombre de terrains est imposé.
+  const forcedCourts = kind === "tournament" ? formatMeta(format).courts : null;
+  const special = kind === "tournament" && format !== "equipes" ? format : null;
 
   // Le club a deux terrains : même choix pour les trois types.
   const courtOptions = kind === "lesson" ? LESSON_COURTS : MATCH_COURTS;
@@ -139,7 +141,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
           courts,
           capacity,
           created_by: profile?.id,
-          ...(mex ? { format: "mexicano" as const } : {}),
+          ...(special ? { format: special } : {}),
         });
         notifyNewTournament(level, date, time);
       } else if (kind === "lesson") {
@@ -174,7 +176,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
           courts,
           capacity,
           created_by: profile?.id,
-          ...(mex ? { format: "mexicano" as const } : {}),
+          ...(special ? { format: special } : {}),
         });
       }
       setLevels([]);
@@ -225,19 +227,16 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
         <div>
           {label("Formule")}
           <Choice
-            options={["equipes", "mexicano"] as TournamentFormat[]}
+            options={FORMATS.map((f) => f.value)}
             value={format}
             onChange={(f) => {
               setFormat(f);
-              if (f === "mexicano") setCourts(2);
+              setCourts(formatMeta(f).courts ?? 2);
             }}
-            render={(f) => (f === "mexicano" ? "🔀 Mexicano" : "👥 Équipes fixes")}
+            cols={3}
+            render={(f) => `${formatMeta(f).icon} ${formatMeta(f).short}`}
           />
-          <p className="mt-1.5 text-[11px] text-mut">
-            {format === "mexicano"
-              ? "Paires recomposées à chaque round selon le classement du jour — 8 joueurs, 2 terrains."
-              : "4 paires fixes qui se rencontrent toutes."}
-          </p>
+          <p className="mt-1.5 text-[11px] text-mut">{formatMeta(format).desc}</p>
         </div>
       )}
 
@@ -266,15 +265,17 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
         </>
       )}
 
-      <div>
-        {label("Terrains")}
-        <Choice
-          options={courtOptions}
-          value={courts}
-          onChange={setCourts}
-          render={(c) => `${c} terrain${c > 1 ? "s" : ""}`}
-        />
-      </div>
+      {forcedCourts == null && (
+        <div>
+          {label("Terrains")}
+          <Choice
+            options={courtOptions}
+            value={courts}
+            onChange={setCourts}
+            render={(c) => `${c} terrain${c > 1 ? "s" : ""}`}
+          />
+        </div>
+      )}
 
       <div>
         {label(kind === "tournament" ? "Nombre de joueurs" : "Nombre de places")}

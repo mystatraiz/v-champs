@@ -23,6 +23,8 @@ import { LEVEL_LABELS } from "@/lib/levels";
 import { autoPlace, emptyTeam, normalizeName, pairKey, rebalanceTeams } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
 import { MEXICANO_PLAYERS, appendRoundTeams } from "@/lib/mexicano";
+import { BO4_PLAYERS, buildBo4Teams } from "@/lib/bestof4";
+import { FORMATS } from "@/lib/formats";
 import type { AppData } from "@/lib/store";
 import type {
   Profile,
@@ -142,6 +144,10 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   ];
   // Mexicano : 8 joueurs sur 2 terrains uniquement.
   const mex = t.format === "mexicano" && t.courts === 2;
+  // Best Of 4 : 4 joueurs sur 1 terrain.
+  const bo4 = t.format === "bo4" && t.courts === 1;
+  const individual = mex || bo4;
+  const currentFormat: TournamentFormat = mex ? "mexicano" : bo4 ? "bo4" : "equipes";
 
   // ── Placement automatique d'un joueur (côté + équilibrage) ──
   async function placeByName(name: string, profileId: string | null): Promise<boolean> {
@@ -238,6 +244,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       `📅 *${formatDateLong(t.date)}*`,
       `⏰ *${t.time}*`,
       mex ? `🔀 *Formule Mexicano* : partenaires différents à chaque round, finale et petite finale au dernier round 🏆` : null,
+      bo4 ? `🔄 *Best Of 4* : chacun joue avec chacun, à gauche ET à droite (6 matchs)` : null,
       ``,
       confirmedNames.length ? `👥 *Joueurs inscrits (${confirmedNames.length}/${t.capacity}) :*` : null,
       ...confirmedNames.map((p, i) => `${emojis[i % emojis.length]} ${p}`),
@@ -258,6 +265,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   async function startSession() {
     if (!appData || busy) return;
     if (mex) return startMexicano();
+    if (bo4) return startBo4();
     setBusy(true);
     try {
       const cleanTeams = structuredClone(teams).map((tm, i) => ({
@@ -299,56 +307,106 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     }
   }
 
-  // Mexicano : les 8 joueurs sont classés par force V-Champs (le plus fort en
-  // tête) ; le round 1 oppose 1+4 / 2+3 sur le terrain 1 et 5+8 / 6+7 sur le 2.
-  async function startMexicano() {
+  // Joueurs placés dans la grille, classés par force V-Champs (le plus fort en tête).
+  function seededNames(): string[] {
+    const names = [
+      ...new Set(teams.flatMap((tm) => tm.players).map((p) => normalizeName(p || "")).filter(Boolean)),
+    ];
+    return names.sort((a, b) => strengthOf(b) - strengthOf(a));
+  }
+
+  function baseState(courts: number): SessionState {
+    return {
+      courts,
+      teams: [],
+      matches: [],
+      matchCounter: 0,
+      roundNum: 0,
+      activeMatches: [],
+      sessionStarted: true,
+      sessionFinished: false,
+      matchPhaseStarted: true,
+      sessionArchivedAt: null,
+      warmupStart: null,
+      label: t.level,
+      pairNameMap: { ...appData!.pairNames },
+      plannedTournamentId: t.id,
+    };
+  }
+
+  async function launch(state: SessionState) {
+    await addKnownPlayers(state.seedOrder || [], appData!.knownPlayers);
+    await saveSessionState(state);
+    await updateTournament(t.id, { status: "started" });
+    router.push("/admin/session");
+  }
+
+  // Best Of 4 : programme fixe de 6 matchs, le 1er oppose 1+4 à 2+3.
+  async function startBo4() {
     if (!appData) return;
+    const seedOrder = seededNames();
+    if (seedOrder.length !== BO4_PLAYERS) {
+      alert(`Il faut ${BO4_PLAYERS} joueurs différents pour lancer un Best Of 4.`);
+      return;
+    }
     setBusy(true);
     try {
-      const names = [
-        ...new Set(teams.flatMap((tm) => tm.players).map((p) => normalizeName(p || "")).filter(Boolean)),
-      ];
-      if (names.length !== MEXICANO_PLAYERS) {
-        alert(`Il faut ${MEXICANO_PLAYERS} joueurs différents pour lancer un Mexicano.`);
-        return;
-      }
-      const seedOrder = [...names].sort((a, b) => strengthOf(b) - strengthOf(a));
-      const playerSides: Record<string, Side> = {};
-      seedOrder.forEach((n) => {
-        const reg = regs.find((r) => r.player_name.toLowerCase().trim() === n.toLowerCase().trim());
-        playerSides[n] = sideOf(n, reg?.profile_id ?? null);
-      });
-      await addKnownPlayers(seedOrder, appData.knownPlayers);
-      const base: SessionState = {
-        courts: 2,
-        teams: [],
-        matches: [],
-        matchCounter: 0,
-        roundNum: 0,
-        activeMatches: [],
-        sessionStarted: true,
-        sessionFinished: false,
-        matchPhaseStarted: true,
-        sessionArchivedAt: null,
-        warmupStart: null,
-        label: t.level,
-        pairNameMap: { ...appData.pairNames },
-        plannedTournamentId: t.id,
-        format: "mexicano",
+      await launch({
+        ...baseState(1),
+        teams: buildBo4Teams(seedOrder),
+        format: "bo4",
         seedOrder,
-        playerSides,
-      };
-      const state = appendRoundTeams(base, seedOrder);
-      await saveSessionState(state);
-      await updateTournament(t.id, { status: "started" });
-      router.push("/admin/session");
+      });
     } finally {
       setBusy(false);
     }
   }
 
+  // Mexicano : les 8 joueurs sont classés par force V-Champs (le plus fort en
+  // tête) ; le round 1 oppose 1+4 / 2+3 sur le terrain 1 et 5+8 / 6+7 sur le 2.
+  async function startMexicano() {
+    if (!appData) return;
+    const seedOrder = seededNames();
+    if (seedOrder.length !== MEXICANO_PLAYERS) {
+      alert(`Il faut ${MEXICANO_PLAYERS} joueurs différents pour lancer un Mexicano.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const playerSides: Record<string, Side> = {};
+      seedOrder.forEach((n) => {
+        const reg = regs.find((r) => r.player_name.toLowerCase().trim() === n.toLowerCase().trim());
+        playerSides[n] = sideOf(n, reg?.profile_id ?? null);
+      });
+      await launch(
+        appendRoundTeams({ ...baseState(2), format: "mexicano", seedOrder, playerSides }, seedOrder)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Changer de formule peut imposer un nombre de terrains (Mexicano : 2,
+  // Best Of 4 : 1) : la grille est alors redimensionnée en gardant les joueurs.
   async function setFormat(format: TournamentFormat) {
-    await updateTournament(t.id, { format });
+    const courts = FORMATS.find((f) => f.value === format)?.courts ?? t.courts;
+    if (courts === t.courts) {
+      await updateTournament(t.id, { format });
+      return reload();
+    }
+    if (confirmedNames.length > courts * 4) {
+      alert(
+        `Cette formule se joue à ${courts * 4} joueurs : retire d'abord ${
+          confirmedNames.length - courts * 4
+        } joueur(s) de la grille.`
+      );
+      return;
+    }
+    const grid = Array.from({ length: courts * 2 }, (_, i) => emptyTeam(i));
+    confirmedNames.forEach((name, i) => {
+      grid[Math.floor(i / 2)].players[i % 2] = name;
+    });
+    await updateTournament(t.id, { format, courts, capacity: courts * 4, teams: grid });
     reload();
   }
 
@@ -398,14 +456,15 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
             <label className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-sub">Formule</span>
               <select
-                value={mex ? "mexicano" : "equipes"}
+                value={currentFormat}
                 onChange={(e) => setFormat(e.target.value as TournamentFormat)}
                 className="bg-transparent text-xs font-extrabold text-body outline-none"
               >
-                <option value="equipes" className="bg-surface text-body">Équipes fixes</option>
-                <option value="mexicano" disabled={t.courts !== 2} className="bg-surface text-body">
-                  🔀 Mexicano
-                </option>
+                {FORMATS.map((f) => (
+                  <option key={f.value} value={f.value} className="bg-surface text-body">
+                    {f.icon} {f.label}
+                  </option>
+                ))}
               </select>
             </label>
             <Badge>{t.courts} terrain{t.courts > 1 ? "s" : ""}</Badge>
@@ -495,9 +554,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       <div>
         <div className="mb-2.5 flex items-center justify-between">
           <SectionTitle className="mb-0">
-            {mex ? `Les ${MEXICANO_PLAYERS} joueurs` : "Composition des équipes"}
+            {mex
+              ? `Les ${MEXICANO_PLAYERS} joueurs`
+              : bo4
+                ? `Les ${BO4_PLAYERS} joueurs`
+                : "Composition des équipes"}
           </SectionTitle>
-          {!mex && (
+          {!individual && (
             <Btn size="sm" variant="secondary" disabled={filledCount < 2} onClick={rebalance}>
               ⚖️ Rééquilibrer
             </Btn>
@@ -509,6 +572,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
             paires changent à chaque round : 4 rounds de classement (le 1er selon le classement
             V-Champs, puis selon le classement du jour), puis les finales : les 4 premiers jouent
             la finale, les 4 autres la petite finale. Bonus de points pour les vainqueurs.
+          </p>
+        )}
+        {bo4 && (
+          <p className="mb-2.5 px-1 text-[11px] leading-relaxed text-mut">
+            🔄 Best Of 4 : placez simplement les {BO4_PLAYERS} joueurs, peu importe la case. Chacun
+            joue avec chacun des 3 autres, une fois à gauche et une fois à droite : 6 matchs de 13
+            min sur 1 terrain. Classement Best Of 4 à part, pas de points V-Champs.
           </p>
         )}
         <TeamComposer

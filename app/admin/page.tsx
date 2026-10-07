@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { formatTag } from "@/lib/formats";
 import {
   cancelLesson,
   cancelMatchSlot,
@@ -99,7 +100,7 @@ async function ensureRecurring(
           level: rule.level || "6/7",
           courts: rule.courts,
           capacity: rule.capacity,
-          ...(rule.format === "mexicano" ? { format: "mexicano" as const } : {}),
+          ...(rule.format && rule.format !== "equipes" ? { format: rule.format } : {}),
         });
         // On ne notifie que pour les créneaux déjà visibles côté joueur.
         if (date <= windowEnd) notifyNewTournament(rule.level || "6/7", date, rule.time);
@@ -415,7 +416,7 @@ export default function AdminAgenda() {
                     t.time,
                     <>
                       <Badge color="gold">🎾 Tournoi · {t.level}</Badge>
-                      {t.format === "mexicano" && <Badge color="match">🔀 Mexicano</Badge>}
+                      {formatTag(t.format) && <Badge color="match">{formatTag(t.format)}</Badge>}
                       {t.status === "locked" && <Badge>🔒</Badge>}
                     </>,
                     pending,

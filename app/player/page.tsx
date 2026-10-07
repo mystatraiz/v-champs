@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { formatTag } from "@/lib/formats";
 import {
   deleteLessonRegistration,
   deleteRegistration,
@@ -203,7 +204,7 @@ function TournamentCard({
       badges={
         <>
           <Badge color="gold">🎾 Tournoi · niveau {t.level}</Badge>
-          {t.format === "mexicano" && <Badge color="match">🔀 Mexicano</Badge>}
+          {formatTag(t.format) && <Badge color="match">{formatTag(t.format)}</Badge>}
           {mine && <Badge color={STATUS_UI[mine.status].color}>{statusLabel(mine, tRegs)}</Badge>}
         </>
       }
