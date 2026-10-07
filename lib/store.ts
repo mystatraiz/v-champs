@@ -168,6 +168,11 @@ export async function archiveSession(
     teams: JSON.parse(JSON.stringify(state.teams)),
     matches: state.matches.filter((m) => m.status === "finished"),
     label: (state.label as string) || "6/7",
+    // Champs absents pour la formule historique : l'historique reste lisible
+    // à l'identique par la v1, qui ne connaît que les paires fixes.
+    ...(state.format === "mexicano"
+      ? { format: "mexicano" as const, seedOrder: state.seedOrder || [] }
+      : {}),
   };
   const newHistory = [...history, entry];
   await saveHistory(newHistory);
@@ -423,6 +428,9 @@ export async function replacePlayerInSession(
           p && p.toLowerCase().trim() === oldKey ? newTrim : p
         ) as [string, string],
       })),
+      ...(s.seedOrder
+        ? { seedOrder: s.seedOrder.map((p) => (p.toLowerCase().trim() === oldKey ? newTrim : p)) }
+        : {}),
     };
   });
   if (!found) throw new Error("Session introuvable dans l'historique.");
@@ -493,7 +501,7 @@ export async function getTournament(id: string): Promise<Tournament | null> {
 
 export async function createTournament(
   t: Pick<Tournament, "date" | "time" | "level" | "courts" | "capacity"> &
-    Partial<Pick<Tournament, "created_by">>
+    Partial<Pick<Tournament, "created_by" | "format">>
 ): Promise<Tournament> {
   if (isTestMode()) {
     const arr = await readJsonKey<Tournament>(TEST_TOURN);

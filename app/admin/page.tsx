@@ -99,6 +99,7 @@ async function ensureRecurring(
           level: rule.level || "6/7",
           courts: rule.courts,
           capacity: rule.capacity,
+          ...(rule.format === "mexicano" ? { format: "mexicano" as const } : {}),
         });
         // On ne notifie que pour les créneaux déjà visibles côté joueur.
         if (date <= windowEnd) notifyNewTournament(rule.level || "6/7", date, rule.time);
@@ -414,6 +415,7 @@ export default function AdminAgenda() {
                     t.time,
                     <>
                       <Badge color="gold">🎾 Tournoi · {t.level}</Badge>
+                      {t.format === "mexicano" && <Badge color="match">🔀 Mexicano</Badge>}
                       {t.status === "locked" && <Badge>🔒</Badge>}
                     </>,
                     pending,

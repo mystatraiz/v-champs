@@ -6,6 +6,7 @@ import type {
   Team,
 } from "./types";
 import { isGenericTeamName, teamLabel } from "./format";
+import { computeIndividualStandings } from "./mexicano";
 
 interface SessionLike {
   teams: Team[];
@@ -192,6 +193,25 @@ export function buildPlayerPalmares(
   const key = playerName.toLowerCase().trim();
   const entries: PalmaresEntry[] = [];
   history.forEach((session) => {
+    // Mexicano : les paires changent à chaque round, le rang est individuel.
+    if (session.format === "mexicano") {
+      const standings = computeIndividualStandings(
+        session.teams || [],
+        session.matches || [],
+        session.seedOrder || []
+      ).filter((r) => r.played > 0);
+      const idx = standings.findIndex((r) => r.name.toLowerCase().trim() === key);
+      if (idx >= 0) {
+        entries.push({
+          date: session.date,
+          label: session.label || "6/7",
+          position: idx + 1,
+          teamName: "Mexicano",
+          partner: null,
+        });
+      }
+      return;
+    }
     const ranked = [...(session.teams || [])].sort((a, b) => {
       const pa = (a.wins || 0) * 3 + (a.draws || 0);
       const pb = (b.wins || 0) * 3 + (b.draws || 0);

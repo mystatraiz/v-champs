@@ -124,6 +124,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
               <div className="mt-0.5 text-lg font-bold text-gold">{tournament.time}</div>
               <div className="mt-2 flex justify-center gap-2">
                 <Badge color="gold">Niveau {tournament.level}</Badge>
+                {tournament.format === "mexicano" && <Badge color="match">🔀 Mexicano</Badge>}
                 <Badge color={free > 0 ? "ok" : "bad"}>
                   {free > 0 ? `🎟️ ${free} place${free > 1 ? "s" : ""} dispo` : "Complet"}
                 </Badge>

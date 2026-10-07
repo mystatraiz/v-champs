@@ -21,12 +21,28 @@ import {
   type Matchup,
 } from "@/lib/session";
 import { computeCombinedRanking } from "@/lib/scoring";
+import {
+  MEXICANO_MATCH_DURATION,
+  MEXICANO_ROUNDS,
+  appendRoundTeams,
+  computeIndividualStandings,
+  mexicanoMatchups,
+  nextRoundOrder,
+} from "@/lib/mexicano";
 import { notifySessionResults } from "@/lib/push";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { playBell, unlockAudio } from "@/lib/audio";
 import { formatClock, teamLabel } from "@/lib/format";
 import type { Match, PlayerSessionScore, SessionHistoryEntry, SessionState } from "@/lib/types";
 import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
+
+// ─── Règles propres à chaque formule ───
+const isMexicano = (s: SessionState | null | undefined) => s?.format === "mexicano";
+const roundsOf = (s: SessionState) => (isMexicano(s) ? MEXICANO_ROUNDS : MAX_ROUNDS);
+const durationOf = (s: SessionState) => (isMexicano(s) ? MEXICANO_MATCH_DURATION : MATCH_DURATION);
+// Affiches du prochain round : en Mexicano, les 4 dernières paires ajoutées.
+const matchupsOf = (s: SessionState): Matchup[] =>
+  isMexicano(s) ? mexicanoMatchups(s) : proposeBestMatchups(s);
 
 // ─── Carte de match avec saisie du score ───
 function MatchCard({
@@ -45,7 +61,7 @@ function MatchCard({
   const t1 = state.teams[match.team1Id];
   const t2 = state.teams[match.team2Id];
   const elapsed = match.startTime ? (now - match.startTime) / 1000 : 0;
-  const remaining = MATCH_DURATION - elapsed;
+  const remaining = durationOf(state) - elapsed;
   const overtime = remaining <= 0;
 
   const teamBlock = (team: typeof t1, serving: boolean) => (
@@ -200,7 +216,7 @@ export default function SessionLive() {
   // Aperçu : calcule les affiches du round 1 (tirage du service inclus)
   useEffect(() => {
     if (phase === "preview" && state && !pendingMatchups) {
-      setPendingMatchups(proposeBestMatchups(state));
+      setPendingMatchups(matchupsOf(state));
     }
   }, [phase, state, pendingMatchups]);
 
@@ -212,7 +228,7 @@ export default function SessionLive() {
     if (phase === "warmup" && state && warmupRemaining <= 0 && !bellRung.current.has("warmup")) {
       bellRung.current.add("warmup");
       playBell(2);
-      const matchups = pendingMatchups ?? proposeBestMatchups(state);
+      const matchups = pendingMatchups ?? matchupsOf(state);
       persist({ ...launchRound({ ...state, warmupStart: null }, matchups) });
       setPendingMatchups(null);
     }
@@ -223,13 +239,13 @@ export default function SessionLive() {
     if (phase !== "play") return;
     activeMatches.forEach((m) => {
       if (!m.startTime) return;
-      const remaining = MATCH_DURATION - (now - m.startTime) / 1000;
+      const remaining = durationOf(state!) - (now - m.startTime) / 1000;
       if (remaining <= 0 && !bellRung.current.has(m.id)) {
         bellRung.current.add(m.id);
         playBell(3);
       }
     });
-  }, [phase, activeMatches, now]);
+  }, [phase, activeMatches, now, state]);
 
   if (phase === "loading") return <Loader />;
   if (phase === "none" || !state) {
@@ -305,12 +321,17 @@ export default function SessionLive() {
     if (!state || !allActiveScored(state)) return;
     const s = structuredClone(state);
     s.matches.filter((m) => m.status === "active").forEach((m) => finishMatch(s, m.id));
-    if (s.roundNum >= MAX_ROUNDS) {
+    if (s.roundNum >= roundsOf(s)) {
       playBell(3);
       await finalizeSession(s);
+    } else if (isMexicano(s)) {
+      // Nouvelles paires tirées du classement du jour : 1+4 contre 2+3 sur le
+      // terrain 1, 5+8 contre 6+7 sur le terrain 2 (sans répéter un partenaire
+      // quand c'est possible).
+      const withPairs = appendRoundTeams(s, nextRoundOrder(s));
+      persist(launchRound(withPairs, mexicanoMatchups(withPairs)));
     } else {
-      const next = launchRound(s, proposeBestMatchups(s));
-      persist(next);
+      persist(launchRound(s, proposeBestMatchups(s)));
     }
   }
 
@@ -333,6 +354,48 @@ export default function SessionLive() {
   }
 
   const sorted = getSortedTeams(state);
+  const mex = isMexicano(state);
+  const standings = mex
+    ? computeIndividualStandings(state.teams, state.matches, state.seedOrder || [])
+    : [];
+
+  const playerRankTable = (
+    <Card className="overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+            <th className="px-3 py-2">#</th>
+            <th className="px-2 py-2">Joueur</th>
+            <th className="px-2 py-2">Jeux</th>
+            <th className="px-2 py-2">V</th>
+            <th className="px-2 py-2">+/-</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((r, i) => {
+            const diff = r.gamesFor - r.gamesAgainst;
+            return (
+              <tr key={r.name} className="border-b border-line/50 last:border-0">
+                <td className="px-3 py-2 font-extrabold text-gold">{i + 1}</td>
+                <td className="px-2 py-2 font-bold text-body">{r.name}</td>
+                <td className="px-2 py-2 font-extrabold">{r.gamesFor}</td>
+                <td className="px-2 py-2 text-ok">{r.wins}</td>
+                <td className={`px-2 py-2 font-bold ${diff > 0 ? "text-ok" : diff < 0 ? "text-bad" : "text-sub"}`}>
+                  {diff > 0 ? "+" : ""}
+                  {diff}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="border-t border-line px-3.5 py-2 text-[10px] leading-4 text-mut">
+        Classement aux jeux gagnés. Au prochain round : 1+4 contre 2+3 sur le terrain 1,
+        5+8 contre 6+7 sur le terrain 2 (découpage ajusté pour éviter de rejouer avec le même
+        partenaire).
+      </p>
+    </Card>
+  );
   const finishedMatches = [...state.matches.filter((m) => m.status === "finished")].reverse();
 
   const teamRankTable = (
@@ -395,7 +458,7 @@ export default function SessionLive() {
         </div>
         <div>
           <SectionTitle>Classement final</SectionTitle>
-          {teamRankTable}
+          {mex ? playerRankTable : teamRankTable}
         </div>
         {sessionScores.length > 0 && (
           <div>
@@ -430,6 +493,8 @@ export default function SessionLive() {
                   teams: state.teams,
                   matches: state.matches.filter((m) => m.status === "finished"),
                   label: (state.label as string) || "6/7",
+                  format: state.format,
+                  seedOrder: state.seedOrder,
                 },
                 scores
               )
@@ -517,7 +582,7 @@ export default function SessionLive() {
           onClick={() => {
             bellRung.current.add("warmup");
             playBell(1);
-            const matchups = pendingMatchups ?? proposeBestMatchups(state);
+            const matchups = pendingMatchups ?? matchupsOf(state);
             persist({ ...launchRound({ ...state, warmupStart: null }, matchups) });
             setPendingMatchups(null);
           }}
@@ -531,16 +596,19 @@ export default function SessionLive() {
 
   // ─── PHASE : matchs en cours ───
   const canValidate = allActiveScored(state);
-  const isLastRound = state.roundNum >= MAX_ROUNDS;
+  const isLastRound = state.roundNum >= roundsOf(state);
 
   return (
     <div className="fade-up space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-extrabold text-bright">
-            Round {state.roundNum} <span className="text-mut">/ {MAX_ROUNDS}</span>
+            Round {state.roundNum} <span className="text-mut">/ {roundsOf(state)}</span>
           </h1>
-          <Badge color="gold">Niveau {state.label || "6/7"}</Badge>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge color="gold">Niveau {state.label || "6/7"}</Badge>
+            {isMexicano(state) && <Badge color="match">🔀 Mexicano</Badge>}
+          </div>
         </div>
         <Btn variant="ghost" size="sm" onClick={cancelSession}>✕ Annuler</Btn>
       </div>
@@ -568,7 +636,7 @@ export default function SessionLive() {
 
       <div>
         <SectionTitle>Classement de la session</SectionTitle>
-        {teamRankTable}
+        {mex ? playerRankTable : teamRankTable}
       </div>
 
       {finishedMatches.length > 0 && (

@@ -1,4 +1,5 @@
 import { rankTeamsInSession } from "./scoring";
+import { computeIndividualStandings } from "./mexicano";
 import { lessonKind, lessonLevelsLabel } from "./lessons";
 import { levelsLabel } from "./levels";
 import { formatDateLong, teamLabel } from "./format";
@@ -142,19 +143,29 @@ export function formatSessionText(
   entry: SessionHistoryEntry,
   scores: PlayerSessionScore[]
 ): string {
-  const ranked = rankTeamsInSession(entry.teams || []);
+  const mex = entry.format === "mexicano";
   const lines = [
     `🎾 *Résultats — ${formatDateLong(entry.date)}*`,
-    `Niveau ${entry.label || "6/7"}`,
+    `Niveau ${entry.label || "6/7"}${mex ? " · 🔀 Mexicano" : ""}`,
     "",
     "🏆 *Classement*",
   ];
-  ranked.forEach((t, i) => {
-    const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
-    const pts = (t.wins || 0) * 3 + (t.draws || 0);
-    const diff = (t.pointsFor || 0) - (t.pointsAgainst || 0);
-    lines.push(`${rank} ${teamLabel(t.name, t.players)} — ${pts} pts (${diff >= 0 ? "+" : ""}${diff})`);
-  });
+  if (mex) {
+    computeIndividualStandings(entry.teams || [], entry.matches || [], entry.seedOrder || []).forEach(
+      (r, i) => {
+        const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
+        const diff = r.gamesFor - r.gamesAgainst;
+        lines.push(`${rank} ${r.name} — ${r.gamesFor} jeux (${diff >= 0 ? "+" : ""}${diff})`);
+      }
+    );
+  } else {
+    rankTeamsInSession(entry.teams || []).forEach((t, i) => {
+      const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
+      const pts = (t.wins || 0) * 3 + (t.draws || 0);
+      const diff = (t.pointsFor || 0) - (t.pointsAgainst || 0);
+      lines.push(`${rank} ${teamLabel(t.name, t.players)} — ${pts} pts (${diff >= 0 ? "+" : ""}${diff})`);
+    });
+  }
 
   const matches = entry.matches || [];
   if (matches.length) {

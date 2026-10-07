@@ -65,6 +65,9 @@ export interface SessionState {
   waitingList?: string[];
   plannedTournamentId?: string | null;
   pairNameMap: Record<string, string>;
+  format?: TournamentFormat; // absent = « equipes »
+  seedOrder?: string[]; // Mexicano : ordre de tête de série (classement V-Champs)
+  playerSides?: Record<string, "left" | "right" | "any">; // Mexicano : côté préféré
 }
 
 // Entrée d'historique (app_state.session_history) — format v1 conservé.
@@ -73,6 +76,8 @@ export interface SessionHistoryEntry {
   teams: Team[];
   matches: Match[];
   label: string;
+  format?: TournamentFormat; // absent = « equipes » (sessions v1 comprises)
+  seedOrder?: string[]; // Mexicano : départage à égalité parfaite
 }
 
 export interface PlayerSessionScore {
@@ -91,6 +96,10 @@ export interface PlayerSessionScore {
 
 export type TournamentStatus = "open" | "locked" | "started" | "done" | "cancelled";
 
+// « equipes » : 4 paires fixes qui se rencontrent toutes (formule historique).
+// « mexicano » : paires recomposées à chaque round selon le classement du jour.
+export type TournamentFormat = "equipes" | "mexicano";
+
 export interface Tournament {
   id: string;
   date: string; // YYYY-MM-DD
@@ -100,6 +109,7 @@ export interface Tournament {
   capacity: number;
   status: TournamentStatus;
   teams: Team[] | null; // grille brouillon de composition
+  format?: TournamentFormat; // absent = « equipes »
   created_by?: string | null; // profil de l'organisateur (vide si récurrence auto)
   created_at?: string;
 }
@@ -184,6 +194,7 @@ export interface RecurrenceRule {
   theme?: string | null;
   courts: number;
   capacity: number;
+  format?: TournamentFormat | null; // tournois
   active: boolean;
   created_by?: string | null;
   created_at?: string;

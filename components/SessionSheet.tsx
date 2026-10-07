@@ -5,6 +5,7 @@ import { rankTeamsInSession } from "@/lib/scoring";
 import { formatDateLong, teamLabel } from "@/lib/format";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { updateSessionMatchScore } from "@/lib/store";
+import { computeIndividualStandings } from "@/lib/mexicano";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
 import { Badge, Btn, Modal, SectionTitle } from "./ui";
 
@@ -108,6 +109,14 @@ export function SessionSheet({
   }
 
   const ranked = useMemo(() => (entry ? rankTeamsInSession(entry.teams || []) : []), [entry]);
+  const mex = entry?.format === "mexicano";
+  const standings = useMemo(
+    () =>
+      entry && entry.format === "mexicano"
+        ? computeIndividualStandings(entry.teams || [], entry.matches || [], entry.seedOrder || [])
+        : [],
+    [entry]
+  );
   const points = useMemo(() => {
     if (!entry) return [];
     return scores
@@ -123,7 +132,10 @@ export function SessionSheet({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-extrabold text-bright">{formatDateLong(entry.date)}</h3>
-          <Badge color="gold">Niveau {entry.label || "6/7"}</Badge>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge color="gold">Niveau {entry.label || "6/7"}</Badge>
+            {mex && <Badge color="match">🔀 Mexicano</Badge>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {canShare && (
@@ -145,6 +157,40 @@ export function SessionSheet({
       </div>
 
       <SectionTitle>Classement final</SectionTitle>
+      {mex ? (
+        <div className="mb-5 overflow-hidden rounded-xl border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+                <th className="px-3 py-2">#</th>
+                <th className="px-2 py-2">Joueur</th>
+                <th className="px-2 py-2">Jeux</th>
+                <th className="px-2 py-2">V</th>
+                <th className="px-2 py-2">+/-</th>
+              </tr>
+            </thead>
+            <tbody>
+              {standings.map((r, i) => {
+                const diff = r.gamesFor - r.gamesAgainst;
+                return (
+                  <tr key={r.name} className="border-b border-line/50 last:border-0">
+                    <td className="px-3 py-2 font-extrabold text-gold">{i + 1}</td>
+                    <td className="px-2 py-2 font-bold text-body">{r.name}</td>
+                    <td className="px-2 py-2 font-extrabold">{r.gamesFor}</td>
+                    <td className="px-2 py-2 text-ok">{r.wins}</td>
+                    <td
+                      className={`px-2 py-2 font-bold ${diff > 0 ? "text-ok" : diff < 0 ? "text-bad" : "text-sub"}`}
+                    >
+                      {diff > 0 ? "+" : ""}
+                      {diff}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <div className="mb-5 overflow-hidden rounded-xl border border-line">
         <table className="w-full text-sm">
           <thead>
@@ -188,6 +234,7 @@ export function SessionSheet({
           </tbody>
         </table>
       </div>
+      )}
 
       {points.length > 0 && (
         <>

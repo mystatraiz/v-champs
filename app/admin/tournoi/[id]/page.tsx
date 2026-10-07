@@ -22,8 +22,16 @@ import { computeCombinedRanking } from "@/lib/scoring";
 import { LEVEL_LABELS } from "@/lib/levels";
 import { autoPlace, emptyTeam, normalizeName, pairKey, rebalanceTeams } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
+import { MEXICANO_PLAYERS, appendRoundTeams } from "@/lib/mexicano";
 import type { AppData } from "@/lib/store";
-import type { Profile, Registration, SessionState, Team, Tournament } from "@/lib/types";
+import type {
+  Profile,
+  Registration,
+  SessionState,
+  Team,
+  Tournament,
+  TournamentFormat,
+} from "@/lib/types";
 import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
 import { TeamComposer } from "@/components/TeamComposer";
 
@@ -132,6 +140,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   const confirmedNames = [
     ...new Set(teams.flatMap((tm) => tm.players).filter((p) => p?.trim())),
   ];
+  // Mexicano : 8 joueurs sur 2 terrains uniquement.
+  const mex = t.format === "mexicano" && t.courts === 2;
 
   // ── Placement automatique d'un joueur (côté + équilibrage) ──
   async function placeByName(name: string, profileId: string | null): Promise<boolean> {
@@ -227,6 +237,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       ``,
       `📅 *${formatDateLong(t.date)}*`,
       `⏰ *${t.time}*`,
+      mex ? `🔀 *Formule Mexicano* : partenaires différents à chaque round` : null,
       ``,
       confirmedNames.length ? `👥 *Joueurs inscrits (${confirmedNames.length}/${t.capacity}) :*` : null,
       ...confirmedNames.map((p, i) => `${emojis[i % emojis.length]} ${p}`),
@@ -246,6 +257,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
 
   async function startSession() {
     if (!appData || busy) return;
+    if (mex) return startMexicano();
     setBusy(true);
     try {
       const cleanTeams = structuredClone(teams).map((tm, i) => ({
@@ -285,6 +297,59 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     } finally {
       setBusy(false);
     }
+  }
+
+  // Mexicano : les 8 joueurs sont classés par force V-Champs (le plus fort en
+  // tête) ; le round 1 oppose 1+4 / 2+3 sur le terrain 1 et 5+8 / 6+7 sur le 2.
+  async function startMexicano() {
+    if (!appData) return;
+    setBusy(true);
+    try {
+      const names = [
+        ...new Set(teams.flatMap((tm) => tm.players).map((p) => normalizeName(p || "")).filter(Boolean)),
+      ];
+      if (names.length !== MEXICANO_PLAYERS) {
+        alert(`Il faut ${MEXICANO_PLAYERS} joueurs différents pour lancer un Mexicano.`);
+        return;
+      }
+      const seedOrder = [...names].sort((a, b) => strengthOf(b) - strengthOf(a));
+      const playerSides: Record<string, Side> = {};
+      seedOrder.forEach((n) => {
+        const reg = regs.find((r) => r.player_name.toLowerCase().trim() === n.toLowerCase().trim());
+        playerSides[n] = sideOf(n, reg?.profile_id ?? null);
+      });
+      await addKnownPlayers(seedOrder, appData.knownPlayers);
+      const base: SessionState = {
+        courts: 2,
+        teams: [],
+        matches: [],
+        matchCounter: 0,
+        roundNum: 0,
+        activeMatches: [],
+        sessionStarted: true,
+        sessionFinished: false,
+        matchPhaseStarted: true,
+        sessionArchivedAt: null,
+        warmupStart: null,
+        label: t.level,
+        pairNameMap: { ...appData.pairNames },
+        plannedTournamentId: t.id,
+        format: "mexicano",
+        seedOrder,
+        playerSides,
+      };
+      const state = appendRoundTeams(base, seedOrder);
+      await saveSessionState(state);
+      await updateTournament(t.id, { status: "started" });
+      router.push("/admin/session");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setFormat(format: TournamentFormat) {
+    await updateTournament(t.id, { format });
+    reload();
   }
 
   // `rank` : rang d'arrivée, affiché pour la liste d'attente.
@@ -328,6 +393,19 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                     {l}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sub">Formule</span>
+              <select
+                value={mex ? "mexicano" : "equipes"}
+                onChange={(e) => setFormat(e.target.value as TournamentFormat)}
+                className="bg-transparent text-xs font-extrabold text-body outline-none"
+              >
+                <option value="equipes" className="bg-surface text-body">Équipes fixes</option>
+                <option value="mexicano" disabled={t.courts !== 2} className="bg-surface text-body">
+                  🔀 Mexicano
+                </option>
               </select>
             </label>
             <Badge>{t.courts} terrain{t.courts > 1 ? "s" : ""}</Badge>
@@ -416,11 +494,24 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
 
       <div>
         <div className="mb-2.5 flex items-center justify-between">
-          <SectionTitle className="mb-0">Composition des équipes</SectionTitle>
-          <Btn size="sm" variant="secondary" disabled={filledCount < 2} onClick={rebalance}>
-            ⚖️ Rééquilibrer
-          </Btn>
+          <SectionTitle className="mb-0">
+            {mex ? `Les ${MEXICANO_PLAYERS} joueurs` : "Composition des équipes"}
+          </SectionTitle>
+          {!mex && (
+            <Btn size="sm" variant="secondary" disabled={filledCount < 2} onClick={rebalance}>
+              ⚖️ Rééquilibrer
+            </Btn>
+          )}
         </div>
+        {mex && (
+          <p className="mb-2.5 px-1 text-[11px] leading-relaxed text-mut">
+            🔀 Mexicano : placez simplement les {MEXICANO_PLAYERS} joueurs, peu importe la case. Les
+            paires sont recomposées à chaque round : le round 1 suit le classement V-Champs (1+4
+            contre 2+3, 5+8 contre 6+7), les suivants le classement du jour (jeux gagnés), en évitant de rejouer avec le même
+            partenaire. 5 rounds
+            de 15 min, classement individuel.
+          </p>
+        )}
         <TeamComposer
           teams={teams}
           knownPlayers={appData.knownPlayers}

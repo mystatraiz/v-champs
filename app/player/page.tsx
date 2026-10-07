@@ -203,6 +203,7 @@ function TournamentCard({
       badges={
         <>
           <Badge color="gold">🎾 Tournoi · niveau {t.level}</Badge>
+          {t.format === "mexicano" && <Badge color="match">🔀 Mexicano</Badge>}
           {mine && <Badge color={STATUS_UI[mine.status].color}>{statusLabel(mine, tRegs)}</Badge>}
         </>
       }

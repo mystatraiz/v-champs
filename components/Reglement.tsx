@@ -75,6 +75,29 @@ export function Reglement() {
       </div>
 
       <div>
+        <SectionTitle>🔀 Formule Mexicano</SectionTitle>
+        <Card className="p-4 text-sm leading-7 text-sub">
+          Toujours <b className="text-body">8 joueurs sur 2 terrains</b>, mais{" "}
+          <b className="text-body">sans équipe fixe</b> : les paires sont recomposées à chaque round.
+          <br />
+          <br />
+          <b className="text-body">5 rounds de 15 minutes</b> (après 6 min d&apos;échauffement). Au
+          round 1, les joueurs sont classés selon le classement V-Champs ; ensuite selon le{" "}
+          <b className="text-body">classement du jour</b>. Les 4 premiers jouent sur le terrain 1, les
+          4 suivants sur le terrain 2 : le 1ᵉʳ avec le 4ᵉ contre le 2ᵉ et le 3ᵉ (on ajuste si cela
+          reforme une paire déjà associée).
+          <br />
+          <br />
+          Classement <b className="text-body">individuel</b> : jeux gagnés, puis différence de jeux,
+          puis victoires. Un jeu vaut un jeu sur les deux terrains.
+          <br />
+          <br />
+          Points V-Champs (niveau 6/7, multipliés par le coefficient du niveau) :{" "}
+          <b className="text-body">100 · 88 · 76 · 64 · 52 · 42 · 32 · 25</b> du 1ᵉʳ au 8ᵉ.
+        </Card>
+      </div>
+
+      <div>
         <SectionTitle>⭐ Points V-Champs — barème par niveau</SectionTitle>
         <Card className="overflow-hidden">
           <table className="w-full text-sm">

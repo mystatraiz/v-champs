@@ -1,6 +1,7 @@
 // ═══ Système de classement V-Champs — port fidèle de la v1 ═══
 import type {
   CombinedRankingRow,
+  Match,
   PlayerSessionScore,
   SessionHistoryEntry,
   SessionState,
@@ -8,6 +9,7 @@ import type {
 } from "./types";
 import { getLevelMultiplier } from "./levels";
 import { buildAllPlayerStats, computeAllSideStats } from "./stats";
+import { MEXICANO_POINTS_BY_POS, computeIndividualStandings } from "./mexicano";
 
 export const BASE_POINTS_BY_POS: Record<number, number> = { 1: 100, 2: 75, 3: 50, 4: 25 };
 export const RANKING_WINDOW_MS = 180 * 24 * 60 * 60 * 1000; // 180 jours
@@ -57,12 +59,70 @@ export function rankTeamsInSession(teams: Team[]): Team[] {
   });
 }
 
-// Calcule les points V-Champs de chaque joueur pour une session terminée.
-export function computeSessionScores(
-  session: { teams: Team[]; label?: string },
+// Mexicano : classement individuel sur 8 places. Les partenaires tournent, donc
+// chacun joue en moyenne avec un partenaire « moyen » : sa paire équivaut à
+// (lui + moyenne du groupe) face à (moyenne + moyenne). L'écart pris en compte
+// par le coefficient de force est donc simplement le sien face au groupe — la
+// même échelle que la formule par équipes.
+function computeMexicanoScores(
+  session: { teams: Team[]; matches: Match[]; label?: string; seedOrder?: string[] },
   sessionId: string,
   existingScores: PlayerSessionScore[]
 ): PlayerSessionScore[] {
+  const standings = computeIndividualStandings(
+    session.teams,
+    session.matches,
+    session.seedOrder || []
+  ).filter((r) => r.played > 0);
+  if (standings.length < 4) return [];
+
+  const strength: Record<string, number> = {};
+  standings.forEach((r) => {
+    strength[r.name] = getPlayerScoreForCoeff(existingScores, r.name, sessionId);
+  });
+
+  const levelMult = getLevelMultiplier(session.label);
+  return standings.map((r, idx) => {
+    const position = idx + 1;
+    const basePoints = Math.round((MEXICANO_POINTS_BY_POS[position] || 25) * levelMult);
+    const others = standings.filter((o) => o.name !== r.name).map((o) => strength[o.name]);
+    const avgOthers = others.length ? others.reduce((a, b) => a + b, 0) / others.length : 0;
+    const myPair = strength[r.name] + avgOthers;
+    const oppPair = 2 * avgOthers;
+    const coeff = getDiffCoeff(myPair - oppPair);
+    return {
+      player_name: r.name,
+      session_id: sessionId,
+      position,
+      base_points: basePoints,
+      coefficient: coeff,
+      points_earned: Math.round(basePoints * coeff),
+      team_strength: Math.round(myPair),
+      avg_opp_strength: Math.round(oppPair),
+      created_at: sessionId,
+    };
+  });
+}
+
+// Calcule les points V-Champs de chaque joueur pour une session terminée.
+export function computeSessionScores(
+  session: {
+    teams: Team[];
+    matches?: Match[];
+    label?: string;
+    format?: string;
+    seedOrder?: string[];
+  },
+  sessionId: string,
+  existingScores: PlayerSessionScore[]
+): PlayerSessionScore[] {
+  if (session.format === "mexicano") {
+    return computeMexicanoScores(
+      { ...session, matches: session.matches || [] },
+      sessionId,
+      existingScores
+    );
+  }
   if (!session.teams || session.teams.length < 4) return [];
   const sortedTeams = rankTeamsInSession(session.teams);
 

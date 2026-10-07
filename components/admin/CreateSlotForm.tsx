@@ -15,7 +15,7 @@ import { LESSON_COURTS, LESSON_KINDS, lessonCapacity } from "@/lib/lessons";
 import { MATCH_COURTS, matchCapacity } from "@/lib/matches";
 import { LEVEL_LABELS } from "@/lib/levels";
 import { TIME_SLOTS, localDateStr } from "@/lib/format";
-import type { LessonKind } from "@/lib/types";
+import type { LessonKind, TournamentFormat } from "@/lib/types";
 import { LevelPicker } from "./MatchSlotDetail";
 import { Btn, Card, Input, Select } from "@/components/ui";
 
@@ -89,6 +89,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
   const [levels, setLevels] = useState<number[]>([]);
   const [level, setLevel] = useState("6/7"); // tournois uniquement
   const [lessonType, setLessonType] = useState<LessonKind>("phases");
+  const [format, setFormat] = useState<TournamentFormat>("equipes"); // tournois
   const [theme, setTheme] = useState("");
   const [repeat, setRepeat] = useState(false);
   const [intervalWeeks, setIntervalWeeks] = useState(1);
@@ -112,6 +113,9 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
     setCourts(kind === "tournament" ? 2 : 1);
   }, [kind]);
 
+  // Mexicano : 8 joueurs sur les 2 terrains.
+  const mex = kind === "tournament" && format === "mexicano" && courts === 2;
+
   // Le club a deux terrains : même choix pour les trois types.
   const courtOptions = kind === "lesson" ? LESSON_COURTS : MATCH_COURTS;
 
@@ -126,7 +130,17 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
     setError(null);
     try {
       if (kind === "tournament") {
-        await createTournament({ date, time, level, courts, capacity, created_by: profile?.id });
+        // Le champ format n'est envoyé que pour Mexicano : la base garde
+        // « equipes » par défaut.
+        await createTournament({
+          date,
+          time,
+          level,
+          courts,
+          capacity,
+          created_by: profile?.id,
+          ...(mex ? { format: "mexicano" as const } : {}),
+        });
         notifyNewTournament(level, date, time);
       } else if (kind === "lesson") {
         await createLesson({
@@ -160,6 +174,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
           courts,
           capacity,
           created_by: profile?.id,
+          ...(mex ? { format: "mexicano" as const } : {}),
         });
       }
       setLevels([]);
@@ -205,6 +220,26 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
           ))}
         </Select>
       </div>
+
+      {kind === "tournament" && (
+        <div>
+          {label("Formule")}
+          <Choice
+            options={["equipes", "mexicano"] as TournamentFormat[]}
+            value={format}
+            onChange={(f) => {
+              setFormat(f);
+              if (f === "mexicano") setCourts(2);
+            }}
+            render={(f) => (f === "mexicano" ? "🔀 Mexicano" : "👥 Équipes fixes")}
+          />
+          <p className="mt-1.5 text-[11px] text-mut">
+            {format === "mexicano"
+              ? "Paires recomposées à chaque round selon le classement du jour — 8 joueurs, 2 terrains."
+              : "4 paires fixes qui se rencontrent toutes."}
+          </p>
+        </div>
+      )}
 
       {kind === "lesson" && (
         <>
