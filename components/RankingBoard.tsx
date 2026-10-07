@@ -94,7 +94,7 @@ export function RankingBoard({
                 <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
                   <th className="px-3 py-2.5">#</th>
                   <th className="px-2 py-2.5">Joueur</th>
-                  <th className="px-3 py-2.5 text-right">V-Points</th>
+                  <th className="px-3 py-2.5 text-end">V-Points</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,7 +123,7 @@ export function RankingBoard({
                           {p.name}
                         </button>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-[15px] font-extrabold text-gold">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-end text-[15px] font-extrabold text-gold">
                         {p.score || "—"}
                       </td>
                     </tr>
@@ -164,7 +164,7 @@ export function RankingBoard({
                   {m.name}
                 </span>
                 <span
-                  className="min-w-9 text-right text-[13px] font-extrabold text-gold"
+                  className="min-w-9 text-end text-[13px] font-extrabold text-gold"
                   style={m.color ? { color: m.color } : undefined}
                 >
                   {m.val}

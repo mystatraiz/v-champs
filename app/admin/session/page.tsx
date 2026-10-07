@@ -730,7 +730,7 @@ export default function SessionLive() {
                       ? `Match ${m.roundNum}`
                       : `T${m.court} R${m.roundNum}`}
                   </span>
-                  <span className={`flex-1 truncate text-right ${w1 ? "font-bold text-gold" : "text-sub"}`}>
+                  <span className={`flex-1 truncate text-end ${w1 ? "font-bold text-gold" : "text-sub"}`}>
                     {t1.players.filter(Boolean).join(" / ")}
                   </span>
                   <span className="shrink-0 px-1 font-mono text-xs text-mut">{scoreStr}</span>

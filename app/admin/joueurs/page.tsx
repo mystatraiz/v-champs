@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -616,6 +617,21 @@ export default function AdminJoueurs() {
       >
         <StatsPanel />
       </CollapsibleCard>
+
+      {/* Outil en test : passera dans le menu principal une fois validé. */}
+      <Link
+        href="/admin/entrainement"
+        className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3.5 shadow-lg shadow-black/20"
+      >
+        <span className="text-xl leading-none">🎯</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-extrabold text-bright">Stats d&apos;entraînement</span>
+          <span className="block text-xs text-mut">
+            Balles touchées, gagnants, fautes · progression des joueurs
+          </span>
+        </span>
+        <span className="text-mut">›</span>
+      </Link>
 
       <CollapsibleCard
         icon="✏️"

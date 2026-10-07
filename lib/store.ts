@@ -4,6 +4,7 @@ import { computeSessionScores } from "./scoring";
 import { recomputeTeamStats } from "./session";
 import { isTestMode, nsKey } from "./test-mode";
 import { localDateStr } from "./format";
+import type { TrainingSession } from "./training";
 import type {
   Lesson,
   LessonRegistration,
@@ -1307,4 +1308,37 @@ export async function markUserNotificationRead(userId: string): Promise<void> {
     .update({ read: true })
     .eq("type", "new_user")
     .filter("payload->>user_id", "eq", userId);
+}
+
+// ─── Stats d'entraînement (outil admin) ───
+// Stockées dans app_state : pas de table dédiée, donc pas de migration.
+
+const TRAINING_KEY = "training_sessions";
+
+export async function loadTrainingSessions(): Promise<TrainingSession[]> {
+  const arr = await readJsonKey<TrainingSession>(nsKey(TRAINING_KEY));
+  return arr.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function saveTrainingSession(s: TrainingSession): Promise<void> {
+  // Relecture juste avant l'écriture : un autre admin a pu enregistrer entre-temps.
+  const arr = await readJsonKey<TrainingSession>(nsKey(TRAINING_KEY));
+  const { error } = await supabase.from("app_state").upsert({
+    key: nsKey(TRAINING_KEY),
+    value: [...arr.filter((x) => x.id !== s.id), s],
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function deleteTrainingSession(id: string): Promise<void> {
+  const arr = await readJsonKey<TrainingSession>(nsKey(TRAINING_KEY));
+  await writeJsonKey(
+    nsKey(TRAINING_KEY),
+    arr.filter((x) => x.id !== id)
+  );
+}
+
+export function newTrainingId(): string {
+  return newId();
 }

@@ -105,3 +105,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-left: auto;
   opacity: 0.55;
 }
+
+/* ─── Outil stats d'entraînement : zones de saisie tactiles ───
+   `touch-action: manipulation` supprime le zoom au double-tap de Safari iOS,
+   indispensable quand on tape plusieurs fois de suite sur la même case. */
+.tap-pad {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes tap-flash {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.tap-flash {
+  pointer-events: none;
+  animation: tap-flash 0.35s ease-out both;
+}
+
+@keyframes tap-pop {
+  from {
+    transform: scale(1.35);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.tap-pop {
+  display: inline-block;
+  animation: tap-pop 0.25s ease-out both;
+}

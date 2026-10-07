@@ -49,10 +49,10 @@ export function Bo4Board({ data, highlightPlayer }: { data: AppData; highlightPl
               <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
                 <th className="px-3 py-2.5">#</th>
                 <th className="px-2 py-2.5">Joueur</th>
-                <th className="px-2 py-2.5 text-right">Pts</th>
-                <th className="px-2 py-2.5 text-right">S</th>
-                <th className="px-2 py-2.5 text-right">🥇</th>
-                <th className="px-3 py-2.5 text-right">+/-</th>
+                <th className="px-2 py-2.5 text-end">Pts</th>
+                <th className="px-2 py-2.5 text-end">S</th>
+                <th className="px-2 py-2.5 text-end">🥇</th>
+                <th className="px-3 py-2.5 text-end">+/-</th>
               </tr>
             </thead>
             <tbody>
@@ -74,10 +74,10 @@ export function Bo4Board({ data, highlightPlayer }: { data: AppData; highlightPl
                         {r.played}
                       </div>
                     </td>
-                    <td className="px-2 py-2.5 text-right font-extrabold text-gold">{r.points}</td>
-                    <td className="px-2 py-2.5 text-right text-sub">{r.sessions}</td>
-                    <td className="px-2 py-2.5 text-right text-sub">{r.firsts}</td>
-                    <td className={`px-3 py-2.5 text-right font-bold ${tone(diff)}`}>{signed(diff)}</td>
+                    <td className="px-2 py-2.5 text-end font-extrabold text-gold">{r.points}</td>
+                    <td className="px-2 py-2.5 text-end text-sub">{r.sessions}</td>
+                    <td className="px-2 py-2.5 text-end text-sub">{r.firsts}</td>
+                    <td className={`px-3 py-2.5 text-end font-bold ${tone(diff)}`}>{signed(diff)}</td>
                   </tr>
                 );
               })}
