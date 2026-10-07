@@ -79,21 +79,32 @@ export function Reglement() {
         <Card className="p-4 text-sm leading-7 text-sub">
           Toujours <b className="text-body">8 joueurs sur 2 terrains</b>, mais{" "}
           <b className="text-body">sans équipe fixe</b> : les paires sont recomposées à chaque round.
+          5 matchs de <b className="text-body">15 minutes</b> (après 6 min d&apos;échauffement).
           <br />
           <br />
-          <b className="text-body">5 rounds de 15 minutes</b> (après 6 min d&apos;échauffement). Au
-          round 1, les joueurs sont classés selon le classement V-Champs ; ensuite selon le{" "}
+          <b className="text-body">Rounds 1 à 4 — classement.</b> Au round 1, les joueurs sont classés
+          selon le classement V-Champs ; ensuite selon le{" "}
           <b className="text-body">classement du jour</b>. Les 4 premiers jouent sur le terrain 1, les
           4 suivants sur le terrain 2 : le 1ᵉʳ avec le 4ᵉ contre le 2ᵉ et le 3ᵉ (on ajuste si cela
           reforme une paire déjà associée).
           <br />
           <br />
-          Classement <b className="text-body">individuel</b> : jeux gagnés, puis différence de jeux,
-          puis victoires. Un jeu vaut un jeu sur les deux terrains.
+          <b className="text-body">Round 5 — finales.</b> Les 4 premiers du classement jouent la{" "}
+          <b className="text-body">🏆 finale</b> sur le terrain 1, les 4 autres la{" "}
+          <b className="text-body">🥉 petite finale</b> sur le terrain 2.
+          <br />
+          <br />
+          <b className="text-body">Classement final</b> : vainqueurs de la finale 1ᵉʳ et 2ᵉ, perdants 3ᵉ
+          et 4ᵉ, vainqueurs de la petite finale 5ᵉ et 6ᵉ, perdants 7ᵉ et 8ᵉ. Au sein de chaque duo, et
+          pendant les rounds de classement, on départage aux jeux gagnés, puis à la différence de
+          jeux, puis aux victoires.
           <br />
           <br />
           Points V-Champs (niveau 6/7, multipliés par le coefficient du niveau) :{" "}
-          <b className="text-body">100 · 88 · 76 · 64 · 52 · 42 · 32 · 25</b> du 1ᵉʳ au 8ᵉ.
+          <b className="text-body">100 · 88 · 76 · 64 · 52 · 42 · 32 · 25</b> du 1ᵉʳ au 8ᵉ,{" "}
+          <b className="text-body">+20 bonus</b> pour les vainqueurs de la finale et{" "}
+          <b className="text-body">+10 bonus</b> pour ceux de la petite finale (bonus partagé en cas de
+          nul).
         </Card>
       </div>
 

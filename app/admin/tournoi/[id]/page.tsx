@@ -237,7 +237,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       ``,
       `📅 *${formatDateLong(t.date)}*`,
       `⏰ *${t.time}*`,
-      mex ? `🔀 *Formule Mexicano* : partenaires différents à chaque round` : null,
+      mex ? `🔀 *Formule Mexicano* : partenaires différents à chaque round, finale et petite finale au dernier round 🏆` : null,
       ``,
       confirmedNames.length ? `👥 *Joueurs inscrits (${confirmedNames.length}/${t.capacity}) :*` : null,
       ...confirmedNames.map((p, i) => `${emojis[i % emojis.length]} ${p}`),
@@ -506,10 +506,9 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         {mex && (
           <p className="mb-2.5 px-1 text-[11px] leading-relaxed text-mut">
             🔀 Mexicano : placez simplement les {MEXICANO_PLAYERS} joueurs, peu importe la case. Les
-            paires sont recomposées à chaque round : le round 1 suit le classement V-Champs (1+4
-            contre 2+3, 5+8 contre 6+7), les suivants le classement du jour (jeux gagnés), en évitant de rejouer avec le même
-            partenaire. 5 rounds
-            de 15 min, classement individuel.
+            paires changent à chaque round : 4 rounds de classement (le 1er selon le classement
+            V-Champs, puis selon le classement du jour), puis les finales : les 4 premiers jouent
+            la finale, les 4 autres la petite finale. Bonus de points pour les vainqueurs.
           </p>
         )}
         <TeamComposer

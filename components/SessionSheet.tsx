@@ -5,7 +5,7 @@ import { rankTeamsInSession } from "@/lib/scoring";
 import { formatDateLong, teamLabel } from "@/lib/format";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { updateSessionMatchScore } from "@/lib/store";
-import { computeIndividualStandings } from "@/lib/mexicano";
+import { computeFinalStandings, finalStageOf } from "@/lib/mexicano";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
 import { Badge, Btn, Modal, SectionTitle } from "./ui";
 
@@ -113,7 +113,7 @@ export function SessionSheet({
   const standings = useMemo(
     () =>
       entry && entry.format === "mexicano"
-        ? computeIndividualStandings(entry.teams || [], entry.matches || [], entry.seedOrder || [])
+        ? computeFinalStandings(entry.teams || [], entry.matches || [], entry.seedOrder || [])
         : [],
     [entry]
   );
@@ -175,7 +175,14 @@ export function SessionSheet({
                 return (
                   <tr key={r.name} className="border-b border-line/50 last:border-0">
                     <td className="px-3 py-2 font-extrabold text-gold">{i + 1}</td>
-                    <td className="px-2 py-2 font-bold text-body">{r.name}</td>
+                    <td className="px-2 py-2 font-bold text-body">
+                      {r.name}
+                      {r.wonFinal && (
+                        <span className="ml-1.5 text-[10px] font-extrabold text-gold">
+                          {r.stage === "finale" ? "🏆" : "🥉"}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-2 py-2 font-extrabold">{r.gamesFor}</td>
                     <td className="px-2 py-2 text-ok">{r.wins}</td>
                     <td
@@ -297,7 +304,11 @@ export function SessionSheet({
                 }`}
               >
                 <span className="w-12 shrink-0 text-[10px] font-bold text-mut">
-                  T{m.court} R{m.roundNum}
+                  {mex && finalStageOf(m)
+                    ? m.court === 1
+                      ? "Finale"
+                      : "P. finale"
+                    : `T${m.court} R${m.roundNum}`}
                 </span>
                 <span className={`flex-1 truncate text-right ${w1 ? "font-bold text-gold" : "text-sub"}`}>
                   {(t1?.players || []).filter(Boolean).join(" / ") || "?"}

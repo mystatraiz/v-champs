@@ -24,8 +24,12 @@ import { computeCombinedRanking } from "@/lib/scoring";
 import {
   MEXICANO_MATCH_DURATION,
   MEXICANO_ROUNDS,
+  FINAL_STAGE_LABEL,
+  MEXICANO_FINAL_BONUS,
+  MEXICANO_FINAL_ROUND,
   appendRoundTeams,
-  computeIndividualStandings,
+  computeFinalStandings,
+  finalStageOf,
   mexicanoMatchups,
   nextRoundOrder,
 } from "@/lib/mexicano";
@@ -86,7 +90,9 @@ function MatchCard({
     <Card className="p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-[11px] font-extrabold uppercase tracking-wider text-sub">
-          🏟 Terrain {match.court}
+          {isMexicano(state) && finalStageOf(match)
+            ? `${FINAL_STAGE_LABEL[finalStageOf(match)!]} · T${match.court}`
+            : `🏟 Terrain ${match.court}`}
         </span>
         <span
           className={`font-mono text-lg font-extrabold tabular-nums tracking-wider ${
@@ -356,8 +362,11 @@ export default function SessionLive() {
   const sorted = getSortedTeams(state);
   const mex = isMexicano(state);
   const standings = mex
-    ? computeIndividualStandings(state.teams, state.matches, state.seedOrder || [])
+    ? computeFinalStandings(state.teams, state.matches, state.seedOrder || [])
     : [];
+  // Rounds de classement terminés ou en cours : la ligne entre le 4e et le 5e
+  // sépare les futurs finalistes du reste.
+  const finalsPlayed = mex && state.roundNum >= MEXICANO_FINAL_ROUND;
 
   const playerRankTable = (
     <Card className="overflow-hidden">
@@ -374,10 +383,24 @@ export default function SessionLive() {
         <tbody>
           {standings.map((r, i) => {
             const diff = r.gamesFor - r.gamesAgainst;
+            const cut = i === 3 && !finalsPlayed;
             return (
-              <tr key={r.name} className="border-b border-line/50 last:border-0">
+              <tr
+                key={r.name}
+                className={`last:border-0 ${cut ? "border-b-2 border-gold/60" : "border-b border-line/50"}`}
+              >
                 <td className="px-3 py-2 font-extrabold text-gold">{i + 1}</td>
-                <td className="px-2 py-2 font-bold text-body">{r.name}</td>
+                <td className="px-2 py-2 font-bold text-body">
+                  {r.name}
+                  {r.wonFinal && (
+                    <span className="ml-1.5 text-[10px] font-extrabold text-gold">
+                      {r.stage === "finale" ? "🏆" : "🥉"} +{r.bonus}
+                    </span>
+                  )}
+                  {r.wonFinal === null && r.bonus > 0 && (
+                    <span className="ml-1.5 text-[10px] font-bold text-sub">nul +{r.bonus}</span>
+                  )}
+                </td>
                 <td className="px-2 py-2 font-extrabold">{r.gamesFor}</td>
                 <td className="px-2 py-2 text-ok">{r.wins}</td>
                 <td className={`px-2 py-2 font-bold ${diff > 0 ? "text-ok" : diff < 0 ? "text-bad" : "text-sub"}`}>
@@ -390,9 +413,9 @@ export default function SessionLive() {
         </tbody>
       </table>
       <p className="border-t border-line px-3.5 py-2 text-[10px] leading-4 text-mut">
-        Classement aux jeux gagnés. Au prochain round : 1+4 contre 2+3 sur le terrain 1,
-        5+8 contre 6+7 sur le terrain 2 (découpage ajusté pour éviter de rejouer avec le même
-        partenaire).
+        {finalsPlayed
+          ? `Finale sur le terrain 1 (4 premiers), petite finale sur le terrain 2. Vainqueurs de la finale 1-2, perdants 3-4, vainqueurs de la petite finale 5-6, perdants 7-8. Bonus V-Champs : +${MEXICANO_FINAL_BONUS.finale} finale, +${MEXICANO_FINAL_BONUS.petite} petite finale.`
+          : `Classement aux jeux gagnés. Rounds 1 à ${MEXICANO_FINAL_ROUND - 1} : 1+4 contre 2+3 sur le terrain 1, 5+8 contre 6+7 sur le terrain 2 (sans rejouer avec le même partenaire si possible). Au round ${MEXICANO_FINAL_ROUND}, les 4 premiers (au-dessus de la ligne) jouent la finale, les 4 autres la petite finale.`}
       </p>
     </Card>
   );
@@ -603,7 +626,16 @@ export default function SessionLive() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-extrabold text-bright">
-            Round {state.roundNum} <span className="text-mut">/ {roundsOf(state)}</span>
+            {mex && state.roundNum >= MEXICANO_FINAL_ROUND ? (
+              "🏆 Finales"
+            ) : (
+              <>
+                Round {state.roundNum}{" "}
+                <span className="text-mut">
+                  / {mex ? `${MEXICANO_FINAL_ROUND - 1} + finales` : roundsOf(state)}
+                </span>
+              </>
+            )}
           </h1>
           <div className="flex flex-wrap gap-1.5">
             <Badge color="gold">Niveau {state.label || "6/7"}</Badge>
@@ -630,7 +662,9 @@ export default function SessionLive() {
         {canValidate
           ? isLastRound
             ? "✓ Terminer la session"
-            : "✓ Valider les scores → round suivant"
+            : mex && state.roundNum === MEXICANO_FINAL_ROUND - 1
+              ? "✓ Valider les scores → finales 🏆"
+              : "✓ Valider les scores → round suivant"
           : "Saisissez tous les scores pour valider"}
       </Btn>
 
@@ -659,7 +693,13 @@ export default function SessionLive() {
                     i < finishedMatches.length - 1 ? "border-b border-line/60" : ""
                   }`}
                 >
-                  <span className="w-12 text-[10px] font-bold text-mut">T{m.court} R{m.roundNum}</span>
+                  <span className="w-12 text-[10px] font-bold text-mut">
+                    {mex && finalStageOf(m)
+                      ? m.court === 1
+                        ? "Finale"
+                        : "P. finale"
+                      : `T${m.court} R${m.roundNum}`}
+                  </span>
                   <span className={`flex-1 truncate text-right ${w1 ? "font-bold text-gold" : "text-sub"}`}>
                     {t1.players.filter(Boolean).join(" / ")}
                   </span>

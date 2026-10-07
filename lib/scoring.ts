@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import { getLevelMultiplier } from "./levels";
 import { buildAllPlayerStats, computeAllSideStats } from "./stats";
-import { MEXICANO_POINTS_BY_POS, computeIndividualStandings } from "./mexicano";
+import { MEXICANO_POINTS_BY_POS, computeFinalStandings } from "./mexicano";
 
 export const BASE_POINTS_BY_POS: Record<number, number> = { 1: 100, 2: 75, 3: 50, 4: 25 };
 export const RANKING_WINDOW_MS = 180 * 24 * 60 * 60 * 1000; // 180 jours
@@ -63,13 +63,14 @@ export function rankTeamsInSession(teams: Team[]): Team[] {
 // chacun joue en moyenne avec un partenaire « moyen » : sa paire équivaut à
 // (lui + moyenne du groupe) face à (moyenne + moyenne). L'écart pris en compte
 // par le coefficient de force est donc simplement le sien face au groupe — la
-// même échelle que la formule par équipes.
+// même échelle que la formule par équipes. Les vainqueurs des finales
+// reçoivent en plus un bonus (MEXICANO_FINAL_BONUS).
 function computeMexicanoScores(
   session: { teams: Team[]; matches: Match[]; label?: string; seedOrder?: string[] },
   sessionId: string,
   existingScores: PlayerSessionScore[]
 ): PlayerSessionScore[] {
-  const standings = computeIndividualStandings(
+  const standings = computeFinalStandings(
     session.teams,
     session.matches,
     session.seedOrder || []
@@ -84,7 +85,8 @@ function computeMexicanoScores(
   const levelMult = getLevelMultiplier(session.label);
   return standings.map((r, idx) => {
     const position = idx + 1;
-    const basePoints = Math.round((MEXICANO_POINTS_BY_POS[position] || 25) * levelMult);
+    // Bonus des finales inclus dans la base, avant le coefficient de force.
+    const basePoints = Math.round(((MEXICANO_POINTS_BY_POS[position] || 25) + r.bonus) * levelMult);
     const others = standings.filter((o) => o.name !== r.name).map((o) => strength[o.name]);
     const avgOthers = others.length ? others.reduce((a, b) => a + b, 0) / others.length : 0;
     const myPair = strength[r.name] + avgOthers;

@@ -6,7 +6,7 @@ import type {
   Team,
 } from "./types";
 import { isGenericTeamName, teamLabel } from "./format";
-import { computeIndividualStandings } from "./mexicano";
+import { computeFinalStandings } from "./mexicano";
 
 interface SessionLike {
   teams: Team[];
@@ -195,7 +195,7 @@ export function buildPlayerPalmares(
   history.forEach((session) => {
     // Mexicano : les paires changent à chaque round, le rang est individuel.
     if (session.format === "mexicano") {
-      const standings = computeIndividualStandings(
+      const standings = computeFinalStandings(
         session.teams || [],
         session.matches || [],
         session.seedOrder || []

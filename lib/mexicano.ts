@@ -6,7 +6,8 @@
 
 import type { Match, SessionState, Team } from "./types";
 
-export const MEXICANO_ROUNDS = 5;
+export const MEXICANO_ROUNDS = 5; // 4 rounds de classement + les finales
+export const MEXICANO_FINAL_ROUND = MEXICANO_ROUNDS;
 export const MEXICANO_MATCH_DURATION = 15 * 60; // secondes
 export const MEXICANO_PLAYERS = 8;
 
@@ -23,7 +24,12 @@ export const MEXICANO_POINTS_BY_POS: Record<number, number> = {
   8: 25,
 };
 
+// Bonus V-Champs (niveau 6/7, multiplié ensuite par le niveau) pour les
+// vainqueurs du dernier round. Un nul partage le bonus.
+export const MEXICANO_FINAL_BONUS = { finale: 20, petite: 10 } as const;
+
 export type Side = "left" | "right" | "any";
+export type FinalStage = "finale" | "petite";
 
 export interface PlayerStanding {
   name: string;
@@ -181,4 +187,65 @@ export function nextRoundOrder(state: SessionState): string[] {
   return computeIndividualStandings(state.teams, state.matches, state.seedOrder || []).map(
     (r) => r.name
   );
+}
+
+// Le dernier round est celui des finales : terrain 1 = finale (4 premiers du
+// classement après les rounds de classement), terrain 2 = petite finale.
+export function finalStageOf(m: Pick<Match, "roundNum" | "court">): FinalStage | null {
+  if (m.roundNum !== MEXICANO_FINAL_ROUND) return null;
+  return m.court === 1 ? "finale" : "petite";
+}
+
+export const FINAL_STAGE_LABEL: Record<FinalStage, string> = {
+  finale: "🏆 Finale",
+  petite: "🥉 Petite finale",
+};
+
+export interface FinalStanding extends PlayerStanding {
+  stage: FinalStage | null; // finale jouée par ce joueur
+  wonFinal: boolean | null; // null : nul ou pas de finale
+  bonus: number; // bonus V-Champs avant multiplicateur de niveau
+}
+
+// Classement final. Une fois les finales jouées : vainqueurs de la finale
+// 1-2, perdants 3-4, vainqueurs de la petite finale 5-6, perdants 7-8 (le
+// classement du jour départage au sein de chaque duo). Avant les finales,
+// c'est le classement du jour.
+export function computeFinalStandings(
+  teams: Team[],
+  matches: Match[],
+  seedOrder: string[] = []
+): FinalStanding[] {
+  const standings = computeIndividualStandings(teams, matches, seedOrder);
+  const finals = matches.filter((m) => m.status === "finished" && finalStageOf(m));
+  const info = new Map<string, { stage: FinalStage; won: boolean | null }>();
+  finals.forEach((m) => {
+    const stage = finalStageOf(m)!;
+    const winner = m.score1 > m.score2 ? 1 : m.score2 > m.score1 ? 2 : 0;
+    [m.team1Id, m.team2Id].forEach((id, i) => {
+      const team = teams.find((t) => t.id === id);
+      (team?.players || []).forEach((p) => {
+        if (p?.trim()) info.set(p, { stage, won: winner === 0 ? null : winner === i + 1 });
+      });
+    });
+  });
+
+  const rows: FinalStanding[] = standings.map((r) => {
+    const f = info.get(r.name);
+    const stage = f?.stage ?? null;
+    const full = stage ? MEXICANO_FINAL_BONUS[stage] : 0;
+    const bonus = !f ? 0 : f.won === true ? full : f.won === null ? Math.round(full / 2) : 0;
+    return { ...r, stage, wonFinal: f ? f.won : null, bonus };
+  });
+  if (!finals.length) return rows;
+
+  // Groupe : finale gagnée (0) / perdue (1) / petite gagnée (2) / perdue (3) ;
+  // un nul place les 4 joueurs du terrain au même niveau.
+  const group = (r: FinalStanding) => {
+    if (!r.stage) return 4;
+    const base = r.stage === "finale" ? 0 : 2;
+    return r.wonFinal === false ? base + 1 : base;
+  };
+  const rank = new Map(standings.map((r, i) => [r.name, i]));
+  return rows.sort((a, b) => group(a) - group(b) || rank.get(a.name)! - rank.get(b.name)!);
 }

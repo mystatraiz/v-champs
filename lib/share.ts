@@ -1,5 +1,5 @@
 import { rankTeamsInSession } from "./scoring";
-import { computeIndividualStandings } from "./mexicano";
+import { FINAL_STAGE_LABEL, computeFinalStandings, finalStageOf } from "./mexicano";
 import { lessonKind, lessonLevelsLabel } from "./lessons";
 import { levelsLabel } from "./levels";
 import { formatDateLong, teamLabel } from "./format";
@@ -151,11 +151,12 @@ export function formatSessionText(
     "🏆 *Classement*",
   ];
   if (mex) {
-    computeIndividualStandings(entry.teams || [], entry.matches || [], entry.seedOrder || []).forEach(
+    computeFinalStandings(entry.teams || [], entry.matches || [], entry.seedOrder || []).forEach(
       (r, i) => {
         const rank = i < 3 ? MEDALS[i] : `${i + 1}.`;
         const diff = r.gamesFor - r.gamesAgainst;
-        lines.push(`${rank} ${r.name} — ${r.gamesFor} jeux (${diff >= 0 ? "+" : ""}${diff})`);
+        const tag = r.wonFinal ? (r.stage === "finale" ? " 🏆" : " 🥉") : "";
+        lines.push(`${rank} ${r.name}${tag} — ${r.gamesFor} jeux (${diff >= 0 ? "+" : ""}${diff})`);
       }
     );
   } else {
@@ -178,7 +179,8 @@ export function formatSessionText(
         const t2 = entry.teams.find((t) => t.id === m.team2Id);
         const n1 = (t1?.players || []).filter(Boolean).join("/") || "?";
         const n2 = (t2?.players || []).filter(Boolean).join("/") || "?";
-        lines.push(`R${m.roundNum} · ${n1} ${matchScoreStr(m)} ${n2}`);
+        const stage = mex ? finalStageOf(m) : null;
+        lines.push(`${stage ? FINAL_STAGE_LABEL[stage] : `R${m.roundNum}`} · ${n1} ${matchScoreStr(m)} ${n2}`);
       });
   }
 
