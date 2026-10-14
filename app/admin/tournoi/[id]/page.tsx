@@ -24,7 +24,7 @@ import { autoPlace, emptyTeam, normalizeName, pairKey, rebalanceTeams } from "@/
 import { formatDateLong } from "@/lib/format";
 import { appendRoundTeams, mexicanoPlayers } from "@/lib/mexicano";
 import { BO4_PLAYERS, buildBo4Teams } from "@/lib/bestof4";
-import { FORMATS } from "@/lib/formats";
+import { FORMATS, modeMeta, modeOf, type FormatMode } from "@/lib/formats";
 import type { AppData } from "@/lib/store";
 import type {
   Profile,
@@ -142,14 +142,15 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   const confirmedNames = [
     ...new Set(teams.flatMap((tm) => tm.players).filter((p) => p?.trim())),
   ];
-  // Mexicano : 8 joueurs sur 2 terrains uniquement.
-  // Mexicano : 8 joueurs sur 2 terrains, ou 4 joueurs sur 1 terrain.
+  // Moteur Mexicano : 8 joueurs sur 2 terrains (mode Mexicano) ou 4 joueurs
+  // sur 1 terrain (mode Rotation).
   const mex = t.format === "mexicano" && (t.courts === 1 || t.courts === 2);
   const mexPlayers = mexicanoPlayers(t.courts);
   // Best Of 4 : 4 joueurs sur 1 terrain.
   const bo4 = t.format === "bo4" && t.courts === 1;
   const individual = mex || bo4;
-  const currentFormat: TournamentFormat = mex ? "mexicano" : bo4 ? "bo4" : "equipes";
+  const currentMode: FormatMode = mex ? modeOf("mexicano", t.courts) : bo4 ? "bo4" : "equipes";
+  const rotation = currentMode === "rotation";
 
   // ── Placement automatique d'un joueur (côté + équilibrage) ──
   async function placeByName(name: string, profileId: string | null): Promise<boolean> {
@@ -247,7 +248,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       `⏰ *${t.time}*`,
       mex
         ? t.courts === 1
-          ? `🔀 *Formule Mexicano* : 3 rounds, tu joues avec chacun des 3 autres joueurs`
+          ? `🔁 *Formule Rotation* : 3 rounds, tu joues avec chacun des 3 autres joueurs`
           : `🔀 *Formule Mexicano* : partenaires différents à chaque round, finale et petite finale au dernier round 🏆`
         : null,
       bo4 ? `🔄 *Best Of 4* : chacun joue avec chacun, à gauche ET à droite (6 matchs)` : null,
@@ -374,7 +375,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     if (!appData) return;
     const seedOrder = seededNames();
     if (seedOrder.length !== mexPlayers) {
-      alert(`Il faut ${mexPlayers} joueurs différents pour lancer ce Mexicano.`);
+      alert(`Il faut ${mexPlayers} joueurs différents pour lancer ${rotation ? "une Rotation" : "un Mexicano"}.`);
       return;
     }
     setBusy(true);
@@ -393,9 +394,11 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   }
 
   // Changer de formule peut imposer un nombre de terrains (Mexicano : 2,
-  // Best Of 4 : 1) : la grille est alors redimensionnée en gardant les joueurs.
-  async function setFormat(format: TournamentFormat) {
-    const courts = FORMATS.find((f) => f.value === format)?.courts ?? t.courts;
+  // Rotation et Best Of 4 : 1) : la grille est alors redimensionnée en gardant
+  // les joueurs.
+  async function setMode(mode: FormatMode) {
+    const { format } = modeMeta(mode);
+    const courts = modeMeta(mode).courts ?? t.courts;
     if (courts === t.courts) {
       await updateTournament(t.id, { format });
       return reload();
@@ -462,8 +465,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
             <label className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-sub">Formule</span>
               <select
-                value={currentFormat}
-                onChange={(e) => setFormat(e.target.value as TournamentFormat)}
+                value={currentMode}
+                onChange={(e) => setMode(e.target.value as FormatMode)}
                 className="bg-transparent text-xs font-extrabold text-body outline-none"
               >
                 {FORMATS.map((f) => (
@@ -574,9 +577,10 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         </div>
         {mex && (
           <p className="mb-2.5 px-1 text-[11px] leading-relaxed text-mut">
-            🔀 Mexicano : placez simplement les {mexPlayers} joueurs, peu importe la case.{" "}
-            {t.courts === 1
-              ? "Sur 1 terrain : 3 rounds de 27 min, chacun joue une fois avec chacun des 3 autres. Round 1 selon le classement V-Champs (1+4 contre 2+3), puis selon le classement du jour. Classement individuel aux jeux gagnés."
+            {rotation ? "🔁 Rotation" : "🔀 Mexicano"} : placez simplement les {mexPlayers} joueurs,
+            peu importe la case.{" "}
+            {rotation
+              ? "3 rounds de 27 min, chacun joue une fois avec chacun des 3 autres. Round 1 selon le classement V-Champs (1+4 contre 2+3), puis selon le classement du jour. Classement individuel aux jeux gagnés."
               : "Les paires changent à chaque round : 4 rounds de classement (le 1er selon le classement V-Champs, puis selon le classement du jour), puis les finales : les 4 premiers jouent la finale, les 4 autres la petite finale. Bonus de points pour les vainqueurs."}
           </p>
         )}

@@ -416,7 +416,7 @@ export default function AdminAgenda() {
                     t.time,
                     <>
                       <Badge color="gold">🎾 Tournoi · {t.level}</Badge>
-                      {formatTag(t.format) && <Badge color="match">{formatTag(t.format)}</Badge>}
+                      {formatTag(t.format, t.courts) && <Badge color="match">{formatTag(t.format, t.courts)}</Badge>}
                       {t.status === "locked" && <Badge>🔒</Badge>}
                     </>,
                     pending,

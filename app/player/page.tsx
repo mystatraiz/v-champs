@@ -204,7 +204,7 @@ function TournamentCard({
       badges={
         <>
           <Badge color="gold">🎾 Tournoi · niveau {t.level}</Badge>
-          {formatTag(t.format) && <Badge color="match">{formatTag(t.format)}</Badge>}
+          {formatTag(t.format, t.courts) && <Badge color="match">{formatTag(t.format, t.courts)}</Badge>}
           {mine && <Badge color={STATUS_UI[mine.status].color}>{statusLabel(mine, tRegs)}</Badge>}
         </>
       }

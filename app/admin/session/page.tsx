@@ -674,7 +674,7 @@ export default function SessionLive() {
           </h1>
           <div className="flex flex-wrap gap-1.5">
             <Badge color="gold">Niveau {state.label || "6/7"}</Badge>
-            {mex && <Badge color="match">🔀 Mexicano</Badge>}
+            {mex && <Badge color="match">{mexFinals ? "🔀 Mexicano" : "🔁 Rotation"}</Badge>}
             {bo4 && <Badge color="match">🔄 Best Of 4</Badge>}
           </div>
         </div>

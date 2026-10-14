@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { buildTeamStats, sessionWinnerLabel } from "@/lib/stats";
 import { formatDateShort } from "@/lib/format";
-import { formatMeta } from "@/lib/formats";
+import { historyCourts, modeMeta, modeOf } from "@/lib/formats";
 import type { AppData } from "@/lib/store";
 import type { SessionHistoryEntry } from "@/lib/types";
 import { RankingBoard } from "./RankingBoard";
@@ -131,7 +131,8 @@ export function ClassementTabs({
             <Card className="overflow-hidden">
               {[...data.history].reverse().map((s, i, arr) => {
                 const winner = sessionWinnerLabel(s);
-                const special = s.format && s.format !== "equipes" ? formatMeta(s.format) : null;
+                const mode = modeOf(s.format, historyCourts(s));
+                const special = mode !== "equipes" ? modeMeta(mode) : null;
                 const played =
                   meKey &&
                   (s.teams || []).some((t) =>

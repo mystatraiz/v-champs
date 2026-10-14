@@ -14,9 +14,9 @@ import { RECURRENCE_INTERVALS, recurrenceLabel } from "@/lib/recurrence";
 import { LESSON_COURTS, LESSON_KINDS, lessonCapacity } from "@/lib/lessons";
 import { MATCH_COURTS, matchCapacity } from "@/lib/matches";
 import { LEVEL_LABELS } from "@/lib/levels";
-import { FORMATS, formatMeta } from "@/lib/formats";
+import { FORMATS, modeMeta, type FormatMode } from "@/lib/formats";
 import { TIME_SLOTS, localDateStr } from "@/lib/format";
-import type { LessonKind, TournamentFormat } from "@/lib/types";
+import type { LessonKind } from "@/lib/types";
 import { LevelPicker } from "./MatchSlotDetail";
 import { Btn, Card, Input, Select } from "@/components/ui";
 
@@ -90,7 +90,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
   const [levels, setLevels] = useState<number[]>([]);
   const [level, setLevel] = useState("6/7"); // tournois uniquement
   const [lessonType, setLessonType] = useState<LessonKind>("phases");
-  const [format, setFormat] = useState<TournamentFormat>("equipes"); // tournois
+  const [mode, setMode] = useState<FormatMode>("equipes"); // tournois
   const [theme, setTheme] = useState("");
   const [repeat, setRepeat] = useState(false);
   const [intervalWeeks, setIntervalWeeks] = useState(1);
@@ -111,12 +111,14 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
 
   // Les tournois tournent sur 2 terrains par défaut, les leçons sur 1.
   useEffect(() => {
-    setCourts(kind === "tournament" ? (formatMeta(format).courts ?? 2) : 1);
+    setCourts(kind === "tournament" ? (modeMeta(mode).courts ?? 2) : 1);
   }, [kind]);
 
-  // Formule spéciale (Mexicano, Best Of 4) : son nombre de terrains est imposé.
-  const forcedCourts = kind === "tournament" ? formatMeta(format).courts : null;
-  const special = kind === "tournament" && format !== "equipes" ? format : null;
+  // Formule spéciale (Mexicano, Rotation, Best Of 4) : son nombre de terrains
+  // est imposé. Le format enregistré n'est envoyé que s'il diffère du défaut.
+  const forcedCourts = kind === "tournament" ? modeMeta(mode).courts : null;
+  const special =
+    kind === "tournament" && modeMeta(mode).format !== "equipes" ? modeMeta(mode).format : null;
 
   // Le club a deux terrains : même choix pour les trois types.
   const courtOptions = kind === "lesson" ? LESSON_COURTS : MATCH_COURTS;
@@ -228,15 +230,14 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
           {label("Formule")}
           <Choice
             options={FORMATS.map((f) => f.value)}
-            value={format}
-            onChange={(f) => {
-              setFormat(f);
-              setCourts(formatMeta(f).courts ?? courts);
+            value={mode}
+            onChange={(m) => {
+              setMode(m);
+              setCourts(modeMeta(m).courts ?? courts);
             }}
-            cols={3}
-            render={(f) => `${formatMeta(f).icon} ${formatMeta(f).short}`}
+            render={(m) => `${modeMeta(m).icon} ${modeMeta(m).short}`}
           />
-          <p className="mt-1.5 text-[11px] text-mut">{formatMeta(format).desc}</p>
+          <p className="mt-1.5 text-[11px] text-mut">{modeMeta(mode).desc}</p>
         </div>
       )}
 

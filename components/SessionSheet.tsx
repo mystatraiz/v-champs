@@ -6,7 +6,7 @@ import { formatDateLong, teamLabel } from "@/lib/format";
 import { formatSessionText, openWhatsApp } from "@/lib/share";
 import { updateSessionMatchScore } from "@/lib/store";
 import { computeFinalStandings, computeIndividualStandings, finalStageOf } from "@/lib/mexicano";
-import { formatTag } from "@/lib/formats";
+import { formatTag, historyCourts } from "@/lib/formats";
 import type { Match, PlayerSessionScore, SessionHistoryEntry } from "@/lib/types";
 import { Badge, Btn, Modal, SectionTitle } from "./ui";
 
@@ -137,7 +137,7 @@ export function SessionSheet({
           <h3 className="text-lg font-extrabold text-bright">{formatDateLong(entry.date)}</h3>
           <div className="flex flex-wrap gap-1.5">
             <Badge color="gold">Niveau {entry.label || "6/7"}</Badge>
-            {formatTag(entry.format) && <Badge color="match">{formatTag(entry.format)}</Badge>}
+            {formatTag(entry.format, historyCourts(entry)) && <Badge color="match">{formatTag(entry.format, historyCourts(entry))}</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2">

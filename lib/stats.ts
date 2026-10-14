@@ -209,7 +209,12 @@ export function buildPlayerPalmares(
           date: session.date,
           label: session.label || "6/7",
           position: idx + 1,
-          teamName: session.format === "mexicano" ? "Mexicano" : "Best Of 4",
+          teamName:
+            session.format === "bo4"
+              ? "Best Of 4"
+              : (session.seedOrder?.length ?? 0) === 4
+                ? "Rotation"
+                : "Mexicano",
           partner: null,
         });
       }

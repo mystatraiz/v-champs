@@ -105,15 +105,25 @@ export function Reglement() {
           <b className="text-body">+20 bonus</b> pour les vainqueurs de la finale et{" "}
           <b className="text-body">+10 bonus</b> pour ceux de la petite finale (bonus partagé en cas de
           nul).
+        </Card>
+      </div>
+
+      <div>
+        <SectionTitle>🔁 Formule Rotation</SectionTitle>
+        <Card className="p-4 text-sm leading-7 text-sub">
+          <b className="text-body">4 joueurs sur 1 terrain</b>, 6 min d&apos;échauffement puis{" "}
+          <b className="text-body">3 rounds de 27 minutes</b>. Avec 4 joueurs il n&apos;existe que 3
+          associations : <b className="text-body">chacun joue une fois avec chacun des 3 autres</b>.
           <br />
           <br />
-          <b className="text-body">Variante 1 terrain — 4 joueurs.</b> 3 rounds de{" "}
-          <b className="text-body">27 minutes</b> : avec 4 joueurs il n&apos;existe que 3
-          associations, chacun joue donc une fois avec chacun des 3 autres. Round 1 selon le
-          classement V-Champs (1+4 contre 2+3), puis selon le classement du jour parmi les
-          associations pas encore jouées. Pas de finale. Classement individuel aux jeux gagnés ;
-          points V-Champs <b className="text-body">100 · 75 · 50 · 25</b> du 1ᵉʳ au 4ᵉ (× niveau ×
-          coefficient de force).
+          Round 1 selon le classement V-Champs (1+4 contre 2+3), puis selon le classement du jour
+          parmi les associations pas encore jouées. Côté préféré respecté quand c&apos;est possible.
+          Score en jeux, pas de finale.
+          <br />
+          <br />
+          Classement <b className="text-body">individuel</b> : jeux gagnés, puis différence de jeux,
+          puis victoires. Points V-Champs <b className="text-body">100 · 75 · 50 · 25</b> du 1ᵉʳ au 4ᵉ
+          (× niveau × coefficient de force).
         </Card>
       </div>
 

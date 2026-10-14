@@ -5,7 +5,7 @@ import {
   computeIndividualStandings,
   finalStageOf,
 } from "./mexicano";
-import { formatTag } from "./formats";
+import { formatTag, historyCourts } from "./formats";
 import { lessonKind, lessonLevelsLabel } from "./lessons";
 import { levelsLabel } from "./levels";
 import { formatDateLong, teamLabel } from "./format";
@@ -151,7 +151,7 @@ export function formatSessionText(
 ): string {
   const mex = entry.format === "mexicano";
   const bo4 = entry.format === "bo4";
-  const tag = formatTag(entry.format);
+  const tag = formatTag(entry.format, historyCourts(entry));
   const lines = [
     `🎾 *Résultats — ${formatDateLong(entry.date)}*`,
     `Niveau ${entry.label || "6/7"}${tag ? ` · ${tag}` : ""}`,
