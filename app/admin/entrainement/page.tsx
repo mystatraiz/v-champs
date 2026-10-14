@@ -32,7 +32,7 @@ import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
 import { TrainingSummary } from "@/components/admin/TrainingSummary";
 import { LiveTracker } from "@/components/admin/TrainingLive";
 import { ScoringSetup, type MatchRules } from "@/components/admin/ScoringSetup";
-import { scoreFromEvents, scoreText } from "@/lib/padel-score";
+import { isTiebreakFormat, scoreFromEvents, scoreText } from "@/lib/padel-score";
 import { CourtPicker, Sheet } from "@/components/admin/CourtPicker";
 import { Btn, Card, EmptyState, Loader, Modal, SectionTitle } from "@/components/ui";
 
@@ -512,7 +512,9 @@ export default function TrainingTool() {
             onSelect={(i) => setPrelaunch({ ...prelaunch, firstServer: i })}
           />
           <p className="mt-2 text-[11px] text-mut">
-            Le serveur de l&apos;autre équipe sera demandé à la fin du 1er jeu.
+            {isTiebreakFormat(rules.format)
+              ? "Tie-break : il sert le 1er point, puis chacun sert 2 points à tour de rôle. Le serveur de l'autre équipe sera demandé après le 1er point."
+              : "Le serveur de l'autre équipe sera demandé à la fin du 1er jeu."}
           </p>
           <div className="mt-4 flex gap-2">
             <Btn variant="ghost" onClick={() => setPrelaunch({ ...prelaunch, step: "placement" })}>

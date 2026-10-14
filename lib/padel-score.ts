@@ -7,8 +7,9 @@
 
 export type DeuceRule = "advantage" | "golden" | "star";
 // set6 : 1 set de 6 jeux · pro9 : 1 set de 9 jeux · bo3 : 2 sets gagnants
-// (3e set complet) · bo3stb : 2 sets gagnants, 3e set en super tie-break à 10.
-export type SetFormat = "set6" | "pro9" | "bo3" | "bo3stb";
+// (3e set complet) · bo3stb : 2 sets gagnants, 3e set en super tie-break à 10
+// · tb7 / tb10 : un tie-break seul, en 7 ou en 10 points.
+export type SetFormat = "set6" | "pro9" | "bo3" | "bo3stb" | "tb7" | "tb10";
 
 export interface ScoreSettings {
   firstServer: number; // serveur du 1er jeu
@@ -30,7 +31,12 @@ export const SET_FORMATS: { value: SetFormat; label: string; desc: string }[] = 
   { value: "pro9", label: "1 set de 9 jeux", desc: "Tie-break à 8-8" },
   { value: "bo3", label: "2 sets gagnants", desc: "Sets de 6 jeux, 3e set complet" },
   { value: "bo3stb", label: "2 sets + super TB", desc: "3e set : super tie-break à 10" },
+  { value: "tb7", label: "Tie-break", desc: "Points seuls, 7 points (2 d'écart)" },
+  { value: "tb10", label: "Super tie-break", desc: "Points seuls, 10 points (2 d'écart)" },
 ];
+
+// Formats joués uniquement en points de tie-break.
+export const isTiebreakFormat = (f: SetFormat) => f === "tb7" || f === "tb10";
 
 // Ordre de service : serveur du jeu 1, du jeu 2, puis leurs partenaires. Il
 // se poursuit d'un set à l'autre.
@@ -44,7 +50,7 @@ export const teamOf = (p: number) => (p < 2 ? 0 : 1);
 export interface SetScore {
   games: [number, number];
   tiebreak: [number, number] | null; // score du tie-break (ou du super tie-break)
-  superTiebreak: boolean; // set joué en super tie-break
+  tiebreakOnly: boolean; // set remplacé par un tie-break seul (affiché [a-b])
 }
 
 export interface ScoreState {
@@ -53,7 +59,8 @@ export interface ScoreState {
   games: [number, number]; // jeux du set en cours
   points: [number, number]; // points du jeu en cours (ou du tie-break)
   tiebreak: boolean; // tie-break (ou super tie-break) en cours
-  superTiebreak: boolean;
+  superTiebreak: boolean; // tie-break en 10 points
+  tiebreakOnly: boolean; // ce tie-break remplace un set (super TB du 3e set, format tie-break)
   server: number; // joueur au service pour le prochain point
   finished: boolean;
   winner: 0 | 1 | null; // équipe gagnante (0 = équipe 1)
@@ -71,13 +78,16 @@ const gameTarget = (f: SetFormat) => (f === "pro9" ? 9 : 6);
 const tiebreakAt = (f: SetFormat) => (f === "pro9" ? 8 : 6);
 
 export function initialScore(s: ScoreSettings): ScoreState {
+  const tbOnly = isTiebreakFormat(s.format);
   return {
     sets: [0, 0],
     setScores: [],
     games: [0, 0],
     points: [0, 0],
-    tiebreak: false,
-    superTiebreak: false,
+    // Format tie-break : on joue directement les points.
+    tiebreak: tbOnly,
+    superTiebreak: s.format === "tb10",
+    tiebreakOnly: tbOnly,
     server: s.firstServer,
     finished: false,
     winner: null,
@@ -105,12 +115,13 @@ export function applyPoint(s: ScoreSettings, st: ScoreState, t: 0 | 1): ScoreSta
 
   // Fin d'un set gagné par `t` : match terminé ou set suivant.
   const winSet = (tb: [number, number] | null) => {
-    n.setScores.push({ games: [...n.games] as [number, number], tiebreak: tb, superTiebreak: st.superTiebreak });
+    n.setScores.push({ games: [...n.games] as [number, number], tiebreak: tb, tiebreakOnly: st.tiebreakOnly });
     n.sets[t]++;
     n.games = [0, 0];
     n.points = [0, 0];
     n.tiebreak = false;
     n.superTiebreak = false;
+    n.tiebreakOnly = false;
     if (n.sets[t] >= formatSets(s.format)) {
       n.finished = true;
       n.winner = t;
@@ -120,6 +131,7 @@ export function applyPoint(s: ScoreSettings, st: ScoreState, t: 0 | 1): ScoreSta
     if (s.format === "bo3stb" && n.sets[0] === 1 && n.sets[1] === 1) {
       n.tiebreak = true;
       n.superTiebreak = true;
+      n.tiebreakOnly = true;
     }
   };
 
@@ -147,8 +159,9 @@ export function applyPoint(s: ScoreSettings, st: ScoreState, t: 0 | 1): ScoreSta
     const target = st.superTiebreak ? 10 : 7;
     if (n.points[t] >= target && n.points[t] - n.points[o] >= 2) {
       const tb = [...n.points] as [number, number];
-      if (st.superTiebreak) {
-        // Le super tie-break remplace le 3e set : il compte comme un jeu 1-0.
+      if (st.tiebreakOnly) {
+        // Tie-break qui remplace un set (super TB du 3e set ou format tie-break) :
+        // il compte comme un jeu 1-0.
         n.gamesPlayed++;
         n.server = order[n.gamesPlayed % 4];
         n.games[t] = 1;
@@ -208,7 +221,7 @@ export function scoreStatus(st: ScoreState, s: ScoreSettings): string | null {
 // Un set en texte : « 6-4 », « 7-6 (7-4) », super tie-break « [10-7] ».
 export function setText(set: SetScore, first: 0 | 1 = 0): string {
   const [a, b] = first === 0 ? ([0, 1] as const) : ([1, 0] as const);
-  if (set.superTiebreak && set.tiebreak) return `[${set.tiebreak[a]}-${set.tiebreak[b]}]`;
+  if (set.tiebreakOnly && set.tiebreak) return `[${set.tiebreak[a]}-${set.tiebreak[b]}]`;
   const g = `${set.games[a]}-${set.games[b]}`;
   return set.tiebreak ? `${g} (${set.tiebreak[a]}-${set.tiebreak[b]})` : g;
 }
@@ -219,11 +232,11 @@ export function scoreText(st: ScoreState, first: 0 | 1 = 0): string {
   const [a, b] = first === 0 ? ([0, 1] as const) : ([1, 0] as const);
   const done = st.setScores.map((set) => setText(set, first));
   if (st.finished) return done.join(" ");
-  const current = st.superTiebreak
+  const current = st.tiebreakOnly
     ? `[${st.points[a]}-${st.points[b]}]`
     : `${st.games[a]}-${st.games[b]}`;
   const pts =
-    st.superTiebreak
+    st.tiebreakOnly
       ? ""
       : st.tiebreak
         ? `TB ${st.points[a]}-${st.points[b]}`

@@ -9,7 +9,7 @@ import {
   type TrainingLive,
 } from "@/lib/training";
 import { formatClock } from "@/lib/format";
-import { pointLabel, scoreFromEvents, scoreStatus, teamOf } from "@/lib/padel-score";
+import { isTiebreakFormat, pointLabel, scoreFromEvents, scoreStatus, teamOf } from "@/lib/padel-score";
 import { COURT_ORDER, COURT_ORDER_FLIPPED, CourtPicker, Sheet } from "./CourtPicker";
 
 // Garde l'écran allumé pendant la saisie (Safari iOS 16.4+, Chrome).
@@ -78,17 +78,24 @@ export function LiveTracker({
   const sideChanges = live.sideChanges !== false;
   const changeDue =
     sideChanges && !!score && !score.finished && (score.endChanges % 2 === 1) !== !!live.flipped;
-  // Serveur de l'autre équipe : demandé une seule fois, à la fin du 1er jeu.
+  // Serveur de l'autre équipe : demandé une seule fois, à la fin du 1er jeu
+  // (au format tie-break : après le 1er point, il sert les points 2 et 3).
+  const tbFormat = !!live.scoring && isTiebreakFormat(live.scoring.format);
   const needSecond =
-    !!score && !!live.scoring && live.scoring.secondServer == null && score.gamesPlayed >= 1 && !score.finished;
+    !!score &&
+    !!live.scoring &&
+    live.scoring.secondServer == null &&
+    (tbFormat ? score.pointsPlayed >= 1 : score.gamesPlayed >= 1) &&
+    !score.finished;
   const otherTeam = live.scoring ? 1 - teamOf(live.scoring.firstServer) : 1;
   const [serveSheet, setServeSheet] = useState(false);
   const [pickSecond, setPickSecond] = useState<number | null>(null);
   const [settings, setSettings] = useState(false);
-  // Sans changement de côté, la question arrive dès la fin du 1er jeu.
+  // Sans changement de côté (ou en tie-break, où l'on ne change qu'à 6 points),
+  // la question arrive tout de suite.
   useEffect(() => {
-    if (needSecond && !sideChanges) setServeSheet(true);
-  }, [needSecond, sideChanges]);
+    if (needSecond && (!sideChanges || tbFormat)) setServeSheet(true);
+  }, [needSecond, sideChanges, tbFormat]);
 
   // Vue de l'observateur, derrière le terrain : l'équipe du bas lui tourne le
   // dos (sa gauche est à gauche), l'équipe du haut lui fait face (sa gauche
@@ -168,13 +175,13 @@ export function LiveTracker({
                   {/* Sets terminés en petit, puis jeux et points du set en cours */}
                   {score.setScores.map((set, k) => (
                     <span key={k} className="w-5 text-center text-xs font-bold tabular-nums text-mut">
-                      {set.superTiebreak && set.tiebreak ? set.tiebreak[t] : set.games[t]}
+                      {set.tiebreakOnly && set.tiebreak ? set.tiebreak[t] : set.games[t]}
                     </span>
                   ))}
                   {!score.finished && (
                     <>
                       <span className="w-6 text-center text-base font-extrabold tabular-nums text-bright">
-                        {score.superTiebreak ? "" : score.games[t]}
+                        {score.tiebreakOnly ? "" : score.games[t]}
                       </span>
                       <span className="w-9 text-center text-base font-extrabold tabular-nums text-gold">
                         {pointLabel(score, t as 0 | 1)}
@@ -297,7 +304,9 @@ export function LiveTracker({
         <Sheet>
           <h3 className="text-lg font-extrabold text-bright">Qui sert pour l&apos;équipe {otherTeam + 1} ?</h3>
           <p className="mb-3 text-xs text-mut">
-            Touche le joueur qui sert ce jeu. Ensuite le service tourne tout seul.
+            {tbFormat
+              ? "Touche le joueur qui sert les 2 prochains points. Ensuite le service tourne tout seul, 2 points chacun."
+              : "Touche le joueur qui sert ce jeu. Ensuite le service tourne tout seul."}
           </p>
           <CourtPicker
             names={live.players}

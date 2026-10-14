@@ -1,6 +1,6 @@
 "use client";
 
-import { DEUCE_RULES, SET_FORMATS, type DeuceRule, type SetFormat } from "@/lib/padel-score";
+import { DEUCE_RULES, SET_FORMATS, isTiebreakFormat, type DeuceRule, type SetFormat } from "@/lib/padel-score";
 import { Card, SectionTitle } from "@/components/ui";
 
 const chip = (active: boolean) =>
@@ -47,6 +47,8 @@ export function ScoringSetup({
             Faute directe = point pour l&apos;équipe adverse · point gagnant = point pour l&apos;équipe
             du joueur. Le serveur se choisit au lancement du match.
           </p>
+          {/* Pas de 40-40 en tie-break : la règle ne sert qu'aux jeux. */}
+          {!isTiebreakFormat(value.format) && (
           <div>
             <div className="mb-1.5 text-[11px] font-bold text-sub">À 40-40</div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -58,6 +60,7 @@ export function ScoringSetup({
             </div>
             <p className="mt-1.5 text-[10px] text-mut">{DEUCE_RULES.find((r) => r.value === value.deuce)?.desc}</p>
           </div>
+          )}
           <div>
             <div className="mb-1.5 text-[11px] font-bold text-sub">Format</div>
             <div className="grid grid-cols-2 gap-1.5">

@@ -358,7 +358,7 @@ export function TrainingSummary({ session }: { session: TrainingSession }) {
                       key={k}
                       className={`w-8 text-center text-lg font-extrabold tabular-nums ${wonSet ? "text-bright" : "text-mut"}`}
                     >
-                      {set.superTiebreak && set.tiebreak ? (
+                      {set.tiebreakOnly && set.tiebreak ? (
                         <span className="text-sm">[{set.tiebreak[t]}]</span>
                       ) : (
                         <>
@@ -374,9 +374,9 @@ export function TrainingSummary({ session }: { session: TrainingSession }) {
                 {!score.finished && (
                   <>
                     <span className="w-8 text-center text-lg font-extrabold tabular-nums text-bright">
-                      {score.superTiebreak ? <span className="text-sm">[{score.points[t]}]</span> : score.games[t]}
+                      {score.tiebreakOnly ? <span className="text-sm">[{score.points[t]}]</span> : score.games[t]}
                     </span>
-                    {!score.superTiebreak && (
+                    {!score.tiebreakOnly && (
                       <span className="w-8 text-end text-sm font-bold tabular-nums text-gold">
                         {pointLabel(score, t)}
                       </span>
