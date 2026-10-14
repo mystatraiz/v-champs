@@ -11,6 +11,22 @@ export type TrainingEventKind = "touch" | "winner" | "error";
 export interface TrainingEvent {
   p: number; // index du joueur (0..3)
   k: TrainingEventKind;
+  // Gagnant ou faute saisi juste après la frappe du même joueur : c'est la
+  // même balle, elle n'est comptée qu'une fois (dans le gagnant / la faute).
+  fromTouch?: boolean;
+}
+
+// Déroulé d'un point : le service n'est pas noté, chaque frappe est tapée
+// (à commencer par le retour du receveur), et le point se termine par une
+// faute directe ou un point gagnant. Si la dernière frappe tapée est celle du
+// joueur qui fait la faute ou le gagnant, elle est reprise par cet événement.
+export function endOfPointEvent(
+  events: TrainingEvent[],
+  p: number,
+  k: Exclude<TrainingEventKind, "touch">
+): TrainingEvent {
+  const last = events[events.length - 1];
+  return last && last.k === "touch" && last.p === p ? { p, k, fromTouch: true } : { p, k };
 }
 
 export type Quad = [number, number, number, number];
@@ -56,8 +72,12 @@ export function countEvents(events: TrainingEvent[]) {
   events.forEach((e) => {
     if (e.p < 0 || e.p > 3) return;
     if (e.k === "touch") touches[e.p]++;
-    else if (e.k === "winner") winners[e.p]++;
-    else errors[e.p]++;
+    else {
+      if (e.k === "winner") winners[e.p]++;
+      else errors[e.p]++;
+      // La frappe déjà tapée devient le gagnant / la faute : pas de double compte.
+      if (e.fromTouch) touches[e.p]--;
+    }
   });
   return { touches, winners, errors };
 }

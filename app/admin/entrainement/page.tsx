@@ -15,6 +15,7 @@ import {
   PLAYER_SLOTS,
   allTrainingPlayers,
   countEvents,
+  endOfPointEvent,
   formatTrainingText,
   pct,
   playerTrainingHistory,
@@ -274,7 +275,9 @@ export default function TrainingTool() {
         live={live}
         onEvent={(p, k) => {
           const cur = liveRef.current;
-          if (cur) updateLive({ ...cur, events: [...cur.events, { p, k }] });
+          if (!cur) return;
+          const event = k === "touch" ? { p, k } : endOfPointEvent(cur.events, p, k);
+          updateLive({ ...cur, events: [...cur.events, event] });
         }}
         onUndo={() => {
           const cur = liveRef.current;
@@ -365,9 +368,10 @@ export default function TrainingTool() {
             {ready ? "▶ Commencer la saisie" : "Renseigne 4 joueurs différents"}
           </Btn>
           <p className="px-1 text-[11px] leading-5 text-mut">
-            Pendant le match : un tap sur la case d&apos;un joueur = une balle touchée (hors
-            service). Rouge = faute directe, vert = point gagnant : ils comptent aussi comme une balle
-            touchée. L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
+            Pendant le match : le service n&apos;est pas noté ; tape chaque frappe, à commencer par
+            le retour du receveur. Le point se termine par une faute directe (rouge) ou un point
+            gagnant (vert) : si tu viens de taper la frappe de ce joueur, elle n&apos;est pas comptée
+            deux fois (sinon le gagnant / la faute compte comme sa balle). L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
             affichée en miroir (son joueur de gauche à droite). Au changement de côté, le bouton 🔄 Côtés fait pivoter les places : le joueur en haut à
             gauche passe en bas à droite. L&apos;écran reste allumé et le match en cours est conservé
             si l&apos;appli se ferme.
