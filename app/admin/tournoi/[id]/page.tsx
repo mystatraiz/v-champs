@@ -22,7 +22,7 @@ import { computeCombinedRanking } from "@/lib/scoring";
 import { LEVEL_LABELS } from "@/lib/levels";
 import { autoPlace, emptyTeam, normalizeName, pairKey, rebalanceTeams } from "@/lib/session";
 import { formatDateLong } from "@/lib/format";
-import { MEXICANO_PLAYERS, appendRoundTeams } from "@/lib/mexicano";
+import { appendRoundTeams, mexicanoPlayers } from "@/lib/mexicano";
 import { BO4_PLAYERS, buildBo4Teams } from "@/lib/bestof4";
 import { FORMATS } from "@/lib/formats";
 import type { AppData } from "@/lib/store";
@@ -143,7 +143,9 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     ...new Set(teams.flatMap((tm) => tm.players).filter((p) => p?.trim())),
   ];
   // Mexicano : 8 joueurs sur 2 terrains uniquement.
-  const mex = t.format === "mexicano" && t.courts === 2;
+  // Mexicano : 8 joueurs sur 2 terrains, ou 4 joueurs sur 1 terrain.
+  const mex = t.format === "mexicano" && (t.courts === 1 || t.courts === 2);
+  const mexPlayers = mexicanoPlayers(t.courts);
   // Best Of 4 : 4 joueurs sur 1 terrain.
   const bo4 = t.format === "bo4" && t.courts === 1;
   const individual = mex || bo4;
@@ -243,7 +245,11 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
       ``,
       `📅 *${formatDateLong(t.date)}*`,
       `⏰ *${t.time}*`,
-      mex ? `🔀 *Formule Mexicano* : partenaires différents à chaque round, finale et petite finale au dernier round 🏆` : null,
+      mex
+        ? t.courts === 1
+          ? `🔀 *Formule Mexicano* : 3 rounds, tu joues avec chacun des 3 autres joueurs`
+          : `🔀 *Formule Mexicano* : partenaires différents à chaque round, finale et petite finale au dernier round 🏆`
+        : null,
       bo4 ? `🔄 *Best Of 4* : chacun joue avec chacun, à gauche ET à droite (6 matchs)` : null,
       ``,
       confirmedNames.length ? `👥 *Joueurs inscrits (${confirmedNames.length}/${t.capacity}) :*` : null,
@@ -367,8 +373,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   async function startMexicano() {
     if (!appData) return;
     const seedOrder = seededNames();
-    if (seedOrder.length !== MEXICANO_PLAYERS) {
-      alert(`Il faut ${MEXICANO_PLAYERS} joueurs différents pour lancer un Mexicano.`);
+    if (seedOrder.length !== mexPlayers) {
+      alert(`Il faut ${mexPlayers} joueurs différents pour lancer ce Mexicano.`);
       return;
     }
     setBusy(true);
@@ -379,7 +385,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         playerSides[n] = sideOf(n, reg?.profile_id ?? null);
       });
       await launch(
-        appendRoundTeams({ ...baseState(2), format: "mexicano", seedOrder, playerSides }, seedOrder)
+        appendRoundTeams({ ...baseState(t.courts), format: "mexicano", seedOrder, playerSides }, seedOrder)
       );
     } finally {
       setBusy(false);
@@ -555,7 +561,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         <div className="mb-2.5 flex items-center justify-between">
           <SectionTitle className="mb-0">
             {mex
-              ? `Les ${MEXICANO_PLAYERS} joueurs`
+              ? `Les ${mexPlayers} joueurs`
               : bo4
                 ? `Les ${BO4_PLAYERS} joueurs`
                 : "Composition des équipes"}
@@ -568,10 +574,10 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
         </div>
         {mex && (
           <p className="mb-2.5 px-1 text-[11px] leading-relaxed text-mut">
-            🔀 Mexicano : placez simplement les {MEXICANO_PLAYERS} joueurs, peu importe la case. Les
-            paires changent à chaque round : 4 rounds de classement (le 1er selon le classement
-            V-Champs, puis selon le classement du jour), puis les finales : les 4 premiers jouent
-            la finale, les 4 autres la petite finale. Bonus de points pour les vainqueurs.
+            🔀 Mexicano : placez simplement les {mexPlayers} joueurs, peu importe la case.{" "}
+            {t.courts === 1
+              ? "Sur 1 terrain : 3 rounds de 27 min, chacun joue une fois avec chacun des 3 autres. Round 1 selon le classement V-Champs (1+4 contre 2+3), puis selon le classement du jour. Classement individuel aux jeux gagnés."
+              : "Les paires changent à chaque round : 4 rounds de classement (le 1er selon le classement V-Champs, puis selon le classement du jour), puis les finales : les 4 premiers jouent la finale, les 4 autres la petite finale. Bonus de points pour les vainqueurs."}
           </p>
         )}
         {bo4 && (

@@ -22,8 +22,8 @@ export const FORMATS: {
     icon: "🔀",
     label: "Mexicano",
     short: "Mexicano",
-    courts: 2,
-    desc: "8 joueurs, 2 terrains : paires recomposées à chaque round, puis finale et petite finale.",
+    courts: null, // 2 terrains (8 joueurs) ou 1 terrain (4 joueurs)
+    desc: "Paires recomposées à chaque round. 2 terrains : 8 joueurs, 4 rounds puis finale et petite finale. 1 terrain : 4 joueurs, 3 rounds, chacun avec chacun.",
   },
   {
     value: "bo4",

@@ -231,7 +231,7 @@ export function CreateSlotForm({ onCreated }: { onCreated: () => void }) {
             value={format}
             onChange={(f) => {
               setFormat(f);
-              setCourts(formatMeta(f).courts ?? 2);
+              setCourts(formatMeta(f).courts ?? courts);
             }}
             cols={3}
             render={(f) => `${formatMeta(f).icon} ${formatMeta(f).short}`}

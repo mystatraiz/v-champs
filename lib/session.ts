@@ -117,9 +117,9 @@ export function launchRound(state: SessionState, matchups: Matchup[]): SessionSt
   const s = structuredClone(state);
   s.roundNum++;
   s.activeMatches = [];
-  // Sur un terrain, la formule historique se joue en sets ; le Best Of 4, chronométré,
-  // se joue en jeux.
-  const useSets = s.courts === 1 && s.format !== "bo4";
+  // Sur un terrain, la formule historique se joue en sets ; le Mexicano et le
+  // Best Of 4, chronométrés, se jouent en jeux.
+  const useSets = s.courts === 1 && (!s.format || s.format === "equipes");
   matchups.forEach((m) => {
     const match: Match = {
       id: s.matchCounter++,

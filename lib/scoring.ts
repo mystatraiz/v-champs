@@ -9,7 +9,11 @@ import type {
 } from "./types";
 import { getLevelMultiplier } from "./levels";
 import { buildAllPlayerStats, computeAllSideStats } from "./stats";
-import { MEXICANO_POINTS_BY_POS, computeFinalStandings } from "./mexicano";
+import {
+  MEXICANO_POINTS_BY_POS,
+  MEXICANO_SOLO_POINTS_BY_POS,
+  computeFinalStandings,
+} from "./mexicano";
 
 export const BASE_POINTS_BY_POS: Record<number, number> = { 1: 100, 2: 75, 3: 50, 4: 25 };
 export const RANKING_WINDOW_MS = 180 * 24 * 60 * 60 * 1000; // 180 jours
@@ -86,7 +90,8 @@ function computeMexicanoScores(
   return standings.map((r, idx) => {
     const position = idx + 1;
     // Bonus des finales inclus dans la base, avant le coefficient de force.
-    const basePoints = Math.round(((MEXICANO_POINTS_BY_POS[position] || 25) + r.bonus) * levelMult);
+    const table = standings.length <= 4 ? MEXICANO_SOLO_POINTS_BY_POS : MEXICANO_POINTS_BY_POS;
+    const basePoints = Math.round(((table[position] || 25) + r.bonus) * levelMult);
     const others = standings.filter((o) => o.name !== r.name).map((o) => strength[o.name]);
     const avgOthers = others.length ? others.reduce((a, b) => a + b, 0) / others.length : 0;
     const myPair = strength[r.name] + avgOthers;

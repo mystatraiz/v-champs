@@ -1,5 +1,6 @@
 // ═══ Mexicano : paires recomposées à chaque round selon le classement ═══
-// 8 joueurs, 2 terrains. Pas de paires fixes : le classement est individuel
+// 8 joueurs sur 2 terrains (4 rounds + finales) ou 4 joueurs sur 1 terrain
+// (3 rounds : les 3 associations possibles). Pas de paires fixes : le classement est individuel
 // (jeux gagnés). Round 1 tiré du classement V-Champs, rounds suivants du
 // classement du jour. Sur chaque terrain, le 1er du groupe joue avec le 4e
 // contre le 2e et le 3e, ce qui équilibre les deux paires.
@@ -10,6 +11,19 @@ export const MEXICANO_ROUNDS = 5; // 4 rounds de classement + les finales
 export const MEXICANO_FINAL_ROUND = MEXICANO_ROUNDS;
 export const MEXICANO_MATCH_DURATION = 15 * 60; // secondes
 export const MEXICANO_PLAYERS = 8;
+
+// Variante 1 terrain : 4 joueurs, 3 rounds de 27 min (6 min d'échauffement
+// + 3 × 27 = 1h27). Avec 4 joueurs il n'existe que 3 associations : la règle
+// anti-répétition les fait toutes jouer, chacun joue avec chacun.
+export const MEXICANO_SOLO_ROUNDS = 3;
+export const MEXICANO_SOLO_MATCH_DURATION = 27 * 60;
+
+export const mexicanoRounds = (courts: number) => (courts === 1 ? MEXICANO_SOLO_ROUNDS : MEXICANO_ROUNDS);
+export const mexicanoMatchDuration = (courts: number) =>
+  courts === 1 ? MEXICANO_SOLO_MATCH_DURATION : MEXICANO_MATCH_DURATION;
+export const mexicanoPlayers = (courts: number) => (courts === 1 ? 4 : MEXICANO_PLAYERS);
+// Finale et petite finale : seulement sur 2 terrains.
+export const mexicanoHasFinals = (courts: number) => courts === 2;
 
 // Barème V-Champs sur 8 places individuelles : même amplitude que les
 // 4 places par équipe de la formule classique (100 → 25).
@@ -23,6 +37,9 @@ export const MEXICANO_POINTS_BY_POS: Record<number, number> = {
   7: 32,
   8: 25,
 };
+
+// Barème sur 4 places (variante 1 terrain) : celui de la formule classique.
+export const MEXICANO_SOLO_POINTS_BY_POS: Record<number, number> = { 1: 100, 2: 75, 3: 50, 4: 25 };
 
 // Bonus V-Champs (niveau 6/7, multiplié ensuite par le niveau) pour les
 // vainqueurs du dernier round. Un nul partage le bonus.
@@ -123,8 +140,8 @@ const GROUP_SPLITS: [number, number, number, number][] = [
   [0, 1, 2, 3],
 ];
 
-// Les 4 paires d'un round à partir d'un ordre de 8 joueurs : terrain 1 =
-// joueurs 1 à 4, terrain 2 = joueurs 5 à 8. Dans chaque groupe, on garde
+// Les paires d'un round à partir de l'ordre des joueurs, par groupes de 4 :
+// terrain 1 = joueurs 1 à 4, terrain 2 = joueurs 5 à 8 (s'il y en a). Dans chaque groupe, on garde
 // 1+4 contre 2+3 sauf si cela reforme une paire déjà associée ce jour-là :
 // on passe alors à 1+3 contre 2+4, puis à 1+2 contre 3+4.
 export function roundPairs(
@@ -134,7 +151,7 @@ export function roundPairs(
 ): [string, string][] {
   const o = order.slice(0, MEXICANO_PLAYERS);
   const pairs: [string, string][] = [];
-  [o.slice(0, 4), o.slice(4, 8)].forEach((g) => {
+  [o.slice(0, 4), o.slice(4, 8)].filter((g) => g.length === 4).forEach((g) => {
     const repeats = ([a, b, c, d]: number[]) =>
       Number(pastPartners.has(partnerKey(g[a], g[b]))) +
       Number(pastPartners.has(partnerKey(g[c], g[d])));
@@ -173,13 +190,17 @@ export function appendRoundTeams(state: SessionState, order: string[]): SessionS
   return s;
 }
 
-// Affiches du round : les 4 dernières paires ajoutées, deux par terrain.
+// Affiches du round : les dernières paires ajoutées, deux par terrain.
 export function mexicanoMatchups(state: SessionState) {
   const n = state.teams.length;
-  return [
-    { t1: n - 4, t2: n - 3, played: 0, court: 1, servingTeam: (Math.random() < 0.5 ? 1 : 2) as 1 | 2 },
-    { t1: n - 2, t2: n - 1, played: 0, court: 2, servingTeam: (Math.random() < 0.5 ? 1 : 2) as 1 | 2 },
-  ];
+  const courts = state.courts === 1 ? 1 : 2;
+  return Array.from({ length: courts }, (_, c) => ({
+    t1: n - 2 * (courts - c),
+    t2: n - 2 * (courts - c) + 1,
+    played: 0,
+    court: c + 1,
+    servingTeam: (Math.random() < 0.5 ? 1 : 2) as 1 | 2,
+  }));
 }
 
 // Ordre du prochain round : le classement du jour.

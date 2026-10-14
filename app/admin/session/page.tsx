@@ -22,8 +22,9 @@ import {
 } from "@/lib/session";
 import { computeCombinedRanking } from "@/lib/scoring";
 import {
-  MEXICANO_MATCH_DURATION,
-  MEXICANO_ROUNDS,
+  mexicanoHasFinals,
+  mexicanoMatchDuration,
+  mexicanoRounds,
   FINAL_STAGE_LABEL,
   MEXICANO_FINAL_BONUS,
   MEXICANO_FINAL_ROUND,
@@ -47,9 +48,13 @@ import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
 const isMexicano = (s: SessionState | null | undefined) => s?.format === "mexicano";
 const isBo4 = (s: SessionState | null | undefined) => s?.format === "bo4";
 const roundsOf = (s: SessionState) =>
-  isMexicano(s) ? MEXICANO_ROUNDS : isBo4(s) ? BO4_ROUNDS : MAX_ROUNDS;
+  isMexicano(s) ? mexicanoRounds(s.courts) : isBo4(s) ? BO4_ROUNDS : MAX_ROUNDS;
 const durationOf = (s: SessionState) =>
-  isMexicano(s) ? MEXICANO_MATCH_DURATION : isBo4(s) ? BO4_MATCH_DURATION : MATCH_DURATION;
+  isMexicano(s)
+    ? mexicanoMatchDuration(s.courts)
+    : isBo4(s)
+      ? BO4_MATCH_DURATION
+      : MATCH_DURATION;
 // Affiches du prochain round : en Mexicano, les 4 dernières paires ajoutées ;
 // en Best Of 4, le match suivant du programme fixe.
 const matchupsOf = (s: SessionState): Matchup[] =>
@@ -383,7 +388,10 @@ export default function SessionLive() {
       : [];
   // Rounds de classement terminés ou en cours : la ligne entre le 4e et le 5e
   // sépare les futurs finalistes du reste.
-  const finalsPlayed = mex && state.roundNum >= MEXICANO_FINAL_ROUND;
+  // Mexicano sur 1 terrain : pas de finales, 3 rounds qui épuisent les 3
+  // associations possibles.
+  const mexFinals = mex && mexicanoHasFinals(state.courts);
+  const finalsPlayed = mexFinals && state.roundNum >= MEXICANO_FINAL_ROUND;
 
   const playerRankTable = (
     <Card className="overflow-hidden">
@@ -400,7 +408,7 @@ export default function SessionLive() {
         <tbody>
           {standings.map((r, i) => {
             const diff = r.gamesFor - r.gamesAgainst;
-            const cut = mex && i === 3 && !finalsPlayed;
+            const cut = mexFinals && i === 3 && !finalsPlayed;
             return (
               <tr
                 key={r.name}
@@ -432,6 +440,8 @@ export default function SessionLive() {
       <p className="border-t border-line px-3.5 py-2 text-[10px] leading-4 text-mut">
         {bo4
           ? `Classement aux jeux gagnés (chacun joue 6 matchs : 3 à gauche, 3 à droite). Classement Best Of 4 : ${BO4_POINTS_BY_POS[1]} · ${BO4_POINTS_BY_POS[2]} · ${BO4_POINTS_BY_POS[3]} · ${BO4_POINTS_BY_POS[4]} pts — pas de points V-Champs.`
+          : mex && !mexFinals
+          ? `Classement aux jeux gagnés. 3 rounds : chacun joue une fois avec chacun des 3 autres. Round 1 selon le classement V-Champs (1+4 contre 2+3), puis selon le classement du jour parmi les associations pas encore jouées.`
           : finalsPlayed
           ? `Finale sur le terrain 1 (4 premiers), petite finale sur le terrain 2. Vainqueurs de la finale 1-2, perdants 3-4, vainqueurs de la petite finale 5-6, perdants 7-8. Bonus V-Champs : +${MEXICANO_FINAL_BONUS.finale} finale, +${MEXICANO_FINAL_BONUS.petite} petite finale.`
           : `Classement aux jeux gagnés. Rounds 1 à ${MEXICANO_FINAL_ROUND - 1} : 1+4 contre 2+3 sur le terrain 1, 5+8 contre 6+7 sur le terrain 2 (sans rejouer avec le même partenaire si possible). Au round ${MEXICANO_FINAL_ROUND}, les 4 premiers (au-dessus de la ligne) jouent la finale, les 4 autres la petite finale.`}
@@ -647,7 +657,7 @@ export default function SessionLive() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-extrabold text-bright">
-            {mex && state.roundNum >= MEXICANO_FINAL_ROUND ? (
+            {mexFinals && state.roundNum >= MEXICANO_FINAL_ROUND ? (
               "🏆 Finales"
             ) : bo4 ? (
               <>
@@ -657,7 +667,7 @@ export default function SessionLive() {
               <>
                 Round {state.roundNum}{" "}
                 <span className="text-mut">
-                  / {mex ? `${MEXICANO_FINAL_ROUND - 1} + finales` : roundsOf(state)}
+                  / {mexFinals ? `${MEXICANO_FINAL_ROUND - 1} + finales` : roundsOf(state)}
                 </span>
               </>
             )}
@@ -688,7 +698,7 @@ export default function SessionLive() {
         {canValidate
           ? isLastRound
             ? "✓ Terminer la session"
-            : mex && state.roundNum === MEXICANO_FINAL_ROUND - 1
+            : mexFinals && state.roundNum === MEXICANO_FINAL_ROUND - 1
               ? "✓ Valider les scores → finales 🏆"
               : bo4
               ? "✓ Valider le score → match suivant"
