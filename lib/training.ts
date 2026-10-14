@@ -15,6 +15,11 @@ export interface TrainingEvent {
   // Gagnant ou faute saisi juste après la frappe du même joueur : c'est la
   // même balle, elle n'est comptée qu'une fois (dans le gagnant / la faute).
   fromTouch?: boolean;
+  // Gagnant ou faute saisi juste après une frappe tapée sur le PARTENAIRE :
+  // deux partenaires ne frappent jamais l'un après l'autre, cette frappe était
+  // donc une erreur de saisie. Elle est remplacée par le gagnant / la faute
+  // (index du partenaire dont la frappe est retirée). Annuler la rétablit.
+  replaces?: number;
 }
 
 // Déroulé d'un point : le service n'est pas noté, chaque frappe est tapée
@@ -27,7 +32,9 @@ export function endOfPointEvent(
   k: Exclude<TrainingEventKind, "touch">
 ): TrainingEvent {
   const last = events[events.length - 1];
-  return last && last.k === "touch" && last.p === p ? { p, k, fromTouch: true } : { p, k };
+  if (last && last.k === "touch" && last.p === p) return { p, k, fromTouch: true };
+  if (last && last.k === "touch" && last.p === (p ^ 1)) return { p, k, replaces: last.p };
+  return { p, k };
 }
 
 export type Quad = [number, number, number, number];
@@ -86,6 +93,8 @@ export function countEvents(events: TrainingEvent[]) {
       else errors[e.p]++;
       // La frappe déjà tapée devient le gagnant / la faute : pas de double compte.
       if (e.fromTouch) touches[e.p]--;
+      // Frappe tapée par erreur sur le partenaire : retirée.
+      if (e.replaces != null) touches[e.replaces]--;
     }
   });
   return { touches, winners, errors };
@@ -173,6 +182,7 @@ export function analyzeTraining(events: TrainingEvent[]): TrainingDetails {
       hitters.push(e.p);
       return;
     }
+    if (e.replaces != null) hitters.pop(); // frappe du partenaire saisie par erreur
     if (!e.fromTouch) hitters.push(e.p);
     for (let i = 0; i < hitters.length - 1; i++) {
       const [a, b] = [hitters[i], hitters[i + 1]];

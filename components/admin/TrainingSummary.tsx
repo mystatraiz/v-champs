@@ -350,16 +350,38 @@ export function TrainingSummary({ session }: { session: TrainingSession }) {
                 <span className={`min-w-0 flex-1 truncate text-sm ${won ? "font-extrabold text-bright" : "font-bold text-sub"}`}>
                   {session.players[t * 2]} / {session.players[t * 2 + 1]}
                 </span>
-                <span className="text-xl font-extrabold tabular-nums text-bright">
-                  {score.games[t]}
-                  {score.tiebreakScore && (
-                    <sup className="ml-0.5 text-[11px] font-bold text-mut">{score.tiebreakScore[t]}</sup>
-                  )}
-                </span>
+                {/* Un chiffre par set ; le tie-break en exposant, le super tie-break entre crochets */}
+                {score.setScores.map((set, k) => {
+                  const wonSet = set.games[t] > set.games[1 - t] || (set.tiebreak && set.tiebreak[t] > set.tiebreak[1 - t]);
+                  return (
+                    <span
+                      key={k}
+                      className={`w-8 text-center text-lg font-extrabold tabular-nums ${wonSet ? "text-bright" : "text-mut"}`}
+                    >
+                      {set.superTiebreak && set.tiebreak ? (
+                        <span className="text-sm">[{set.tiebreak[t]}]</span>
+                      ) : (
+                        <>
+                          {set.games[t]}
+                          {set.tiebreak && (
+                            <sup className="ml-0.5 text-[10px] font-bold text-mut">{set.tiebreak[t]}</sup>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  );
+                })}
                 {!score.finished && (
-                  <span className="w-8 text-end text-sm font-bold tabular-nums text-gold">
-                    {score.tiebreak ? score.points[t] : pointLabel(score, t)}
-                  </span>
+                  <>
+                    <span className="w-8 text-center text-lg font-extrabold tabular-nums text-bright">
+                      {score.superTiebreak ? <span className="text-sm">[{score.points[t]}]</span> : score.games[t]}
+                    </span>
+                    {!score.superTiebreak && (
+                      <span className="w-8 text-end text-sm font-bold tabular-nums text-gold">
+                        {pointLabel(score, t)}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             );

@@ -142,12 +142,22 @@ export function LiveTracker({
                   <span className={`min-w-0 flex-1 truncate text-[12px] ${won ? "font-extrabold text-gold" : "font-bold text-sub"}`}>
                     {live.players[t * 2]} / {live.players[t * 2 + 1]}
                   </span>
-                  <span className="w-6 text-center text-base font-extrabold tabular-nums text-bright">
-                    {score.games[t]}
-                  </span>
-                  <span className="w-9 text-center text-base font-extrabold tabular-nums text-gold">
-                    {score.finished ? "" : pointLabel(score, t as 0 | 1)}
-                  </span>
+                  {/* Sets terminés en petit, puis jeux et points du set en cours */}
+                  {score.setScores.map((set, k) => (
+                    <span key={k} className="w-5 text-center text-xs font-bold tabular-nums text-mut">
+                      {set.superTiebreak && set.tiebreak ? set.tiebreak[t] : set.games[t]}
+                    </span>
+                  ))}
+                  {!score.finished && (
+                    <>
+                      <span className="w-6 text-center text-base font-extrabold tabular-nums text-bright">
+                        {score.superTiebreak ? "" : score.games[t]}
+                      </span>
+                      <span className="w-9 text-center text-base font-extrabold tabular-nums text-gold">
+                        {pointLabel(score, t as 0 | 1)}
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -245,7 +255,11 @@ export function LiveTracker({
         disabled={!last}
         className="tap-pad cursor-pointer rounded-xl border border-line2 bg-card py-3 text-sm font-bold text-body disabled:opacity-40"
       >
-        {last ? `↶ Annuler : ${KIND_LABEL[last.k]} ${live.players[last.p]}` : "↶ Annuler"}
+        {last
+          ? `↶ Annuler : ${KIND_LABEL[last.k]} ${live.players[last.p]}${
+              last.replaces != null ? ` (frappe ${live.players[last.replaces]} corrigée)` : ""
+            }`
+          : "↶ Annuler"}
       </button>
     </div>
   );
