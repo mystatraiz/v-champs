@@ -8,8 +8,10 @@
 export type DeuceRule = "advantage" | "golden" | "star";
 // set6 : 1 set de 6 jeux · pro9 : 1 set de 9 jeux · bo3 : 2 sets gagnants
 // (3e set complet) · bo3stb : 2 sets gagnants, 3e set en super tie-break à 10
-// · tb7 / tb10 : un tie-break seul, en 7 ou en 10 points.
-export type SetFormat = "set6" | "pro9" | "bo3" | "bo3stb" | "tb7" | "tb10";
+// · points : entraînement en points continus, servis comme en tie-break,
+// sans fin (le coach arrête). tb7 / tb10 : anciens tie-breaks à 7 / 10
+// points, gardés pour relire les matchs déjà enregistrés.
+export type SetFormat = "set6" | "pro9" | "bo3" | "bo3stb" | "points" | "tb7" | "tb10";
 
 export interface ScoreSettings {
   firstServer: number; // serveur du 1er jeu
@@ -31,12 +33,11 @@ export const SET_FORMATS: { value: SetFormat; label: string; desc: string }[] = 
   { value: "pro9", label: "1 set de 9 jeux", desc: "Tie-break à 8-8" },
   { value: "bo3", label: "2 sets gagnants", desc: "Sets de 6 jeux, 3e set complet" },
   { value: "bo3stb", label: "2 sets + super TB", desc: "3e set : super tie-break à 10" },
-  { value: "tb7", label: "Tie-break", desc: "Points seuls, 7 points (2 d'écart)" },
-  { value: "tb10", label: "Super tie-break", desc: "Points seuls, 10 points (2 d'écart)" },
+  { value: "points", label: "Points en continu", desc: "Service comme en tie-break, sans fin" },
 ];
 
 // Formats joués uniquement en points de tie-break.
-export const isTiebreakFormat = (f: SetFormat) => f === "tb7" || f === "tb10";
+export const isTiebreakFormat = (f: SetFormat) => f === "points" || f === "tb7" || f === "tb10";
 
 // Ordre de service : serveur du jeu 1, du jeu 2, puis leurs partenaires. Il
 // se poursuit d'un set à l'autre.
@@ -157,7 +158,8 @@ export function applyPoint(s: ScoreSettings, st: ScoreState, t: 0 | 1): ScoreSta
     const total = n.points[0] + n.points[1];
     if (total % 6 === 0) n.endChanges++;
     const target = st.superTiebreak ? 10 : 7;
-    if (n.points[t] >= target && n.points[t] - n.points[o] >= 2) {
+    // Points en continu : pas de fin, on joue jusqu'à l'arrêt du coach.
+    if (s.format !== "points" && n.points[t] >= target && n.points[t] - n.points[o] >= 2) {
       const tb = [...n.points] as [number, number];
       if (st.tiebreakOnly) {
         // Tie-break qui remplace un set (super TB du 3e set ou format tie-break) :
@@ -207,6 +209,7 @@ export function pointLabel(st: ScoreState, t: 0 | 1): string {
 // Ligne d'état sous le score : égalité, avantage, point décisif…
 export function scoreStatus(st: ScoreState, s: ScoreSettings): string | null {
   if (st.finished) return null;
+  if (s.format === "points") return "Points";
   if (st.superTiebreak) return "Super tie-break";
   if (st.tiebreak) return "Tie-break";
   const [a, b] = st.points;

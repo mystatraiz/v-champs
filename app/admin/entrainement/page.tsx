@@ -513,7 +513,7 @@ export default function TrainingTool() {
           />
           <p className="mt-2 text-[11px] text-mut">
             {isTiebreakFormat(rules.format)
-              ? "Tie-break : il sert le 1er point, puis chacun sert 2 points à tour de rôle. Le serveur de l'autre équipe sera demandé après le 1er point."
+              ? "Points en continu : il sert le 1er point, puis chacun sert 2 points à tour de rôle. Le serveur de l'autre équipe sera demandé après le 1er point."
               : "Le serveur de l'autre équipe sera demandé à la fin du 1er jeu."}
           </p>
           <div className="mt-4 flex gap-2">
