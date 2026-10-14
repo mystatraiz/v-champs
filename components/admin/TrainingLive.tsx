@@ -9,6 +9,7 @@ import {
   type TrainingLive,
 } from "@/lib/training";
 import { formatClock } from "@/lib/format";
+import { pointLabel, scoreFromEvents, scoreStatus } from "@/lib/padel-score";
 
 // Garde l'écran allumé pendant la saisie (Safari iOS 16.4+, Chrome).
 function useWakeLock(active: boolean) {
@@ -65,6 +66,11 @@ export function LiveTracker({
   const balls = [0, 1, 2, 3].map((i) => touches[i] + winners[i] + errors[i]);
   const last = live.events[live.events.length - 1];
   const elapsed = Math.max(0, (now - new Date(live.startedAt).getTime()) / 1000);
+  const score = live.scoring ? scoreFromEvents(live.scoring, live.events) : null;
+  const status = score && live.scoring ? scoreStatus(score, live.scoring) : null;
+  // Changement de côté attendu (après chaque jeu impair, tous les 6 points en
+  // tie-break) mais pas encore fait à l'écran.
+  const changeDue = !!score && !score.finished && (score.endChanges % 2 === 1) !== !!live.flipped;
 
   // Vue de l'observateur, derrière le terrain : l'équipe du bas lui tourne le
   // dos (sa gauche est à gauche), l'équipe du haut lui fait face (sa gauche
@@ -104,18 +110,55 @@ export function LiveTracker({
           onClick={onFlip}
           title="Changement de côté : fait pivoter les places de 180°"
           className={`tap-pad cursor-pointer rounded-lg border px-3 py-2 text-xs font-extrabold ${
-            live.flipped ? "border-gold bg-gold/15 text-gold" : "border-line2 text-sub"
+            changeDue
+              ? "pulse-soft border-gold bg-gold text-ink"
+              : live.flipped
+                ? "border-gold bg-gold/15 text-gold"
+                : "border-line2 text-sub"
           }`}
         >
-          🔄 Côtés
+          {changeDue ? "🔄 Changez !" : "🔄 Côtés"}
         </button>
         <button
           onClick={onFinish}
-          className="tap-pad cursor-pointer rounded-lg bg-gold px-3 py-2 text-xs font-extrabold text-ink"
+          className={`tap-pad cursor-pointer rounded-lg bg-gold px-3 py-2 text-xs font-extrabold text-ink ${
+            score?.finished ? "pulse-soft" : ""
+          }`}
         >
           ✓ Terminer
         </button>
       </div>
+
+      {/* Tableau de score : même ordre que l'écran (équipe du haut en premier) */}
+      {score && (
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-card px-2.5 py-1">
+          <div className="min-w-0 flex-1">
+            {(live.flipped ? [1, 0] : [0, 1]).map((t) => {
+              const serving = !score.finished && Math.floor(score.server / 2) === t;
+              const won = score.finished && score.winner === t;
+              return (
+                <div key={t} className="flex items-center gap-2 leading-6">
+                  <span className="w-4 shrink-0 text-center text-xs">{won ? "🏆" : serving ? "🎾" : ""}</span>
+                  <span className={`min-w-0 flex-1 truncate text-[12px] ${won ? "font-extrabold text-gold" : "font-bold text-sub"}`}>
+                    {live.players[t * 2]} / {live.players[t * 2 + 1]}
+                  </span>
+                  <span className="w-6 text-center text-base font-extrabold tabular-nums text-bright">
+                    {score.games[t]}
+                  </span>
+                  <span className="w-9 text-center text-base font-extrabold tabular-nums text-gold">
+                    {score.finished ? "" : pointLabel(score, t as 0 | 1)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {(status || score.finished) && (
+            <div className="w-16 shrink-0 text-center text-[10px] font-extrabold uppercase leading-tight text-gold">
+              {score.finished ? "Match terminé" : status}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Les 4 joueurs */}
       <div className="grid grid-cols-2 gap-1.5">
@@ -128,7 +171,14 @@ export function LiveTracker({
             <div className="text-[9px] font-extrabold uppercase tracking-wider text-sub">
               Équipe {PLAYER_SLOTS[i].team} · {PLAYER_SLOTS[i].side === "G" ? "Gauche" : "Droite"}
             </div>
-            <div className="truncate text-sm font-extrabold text-bright">{live.players[i]}</div>
+            <div className="flex items-center gap-1">
+              <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-bright">
+                {live.players[i]}
+              </span>
+              {score && !score.finished && score.server === i && (
+                <span className="shrink-0 text-xs" title="Au service">🎾</span>
+              )}
+            </div>
           </div>
         ))}
       </div>

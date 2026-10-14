@@ -92,7 +92,7 @@ export function PlayerAutocomplete({
                 onChange(n);
                 setFocused(false);
               }}
-              className="block w-full cursor-pointer border-b border-line px-3 py-2.5 text-left text-sm text-body last:border-0 hover:bg-card2"
+              className="block w-full cursor-pointer border-b border-line px-3 py-2.5 text-start text-sm text-body last:border-0 hover:bg-card2"
             >
               {n}
             </button>

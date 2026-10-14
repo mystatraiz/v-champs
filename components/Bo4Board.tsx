@@ -46,7 +46,7 @@ export function Bo4Board({ data, highlightPlayer }: { data: AppData; highlightPl
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+              <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
                 <th className="px-3 py-2.5">#</th>
                 <th className="px-2 py-2.5">Joueur</th>
                 <th className="px-2 py-2.5 text-end">Pts</th>

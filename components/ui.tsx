@@ -96,7 +96,7 @@ export function CollapsibleCard({
     <div className={`overflow-hidden rounded-xl border ${border} bg-card shadow-lg shadow-black/20`}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-start"
       >
         <span className="text-xl leading-none">{icon}</span>
         <span className="min-w-0 flex-1">

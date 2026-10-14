@@ -11,6 +11,7 @@ import {
   type TrainingDetails,
   type TrainingSession,
 } from "@/lib/training";
+import { DEUCE_RULES, SET_FORMATS, pointLabel, scoreFromEvents } from "@/lib/padel-score";
 
 const GOOD = "#34c273"; // --color-ok
 const BAD = "#e5533f"; // --color-bad
@@ -328,6 +329,8 @@ export function TrainingSummary({ session }: { session: TrainingSession }) {
     Math.round((new Date(session.endedAt).getTime() - new Date(session.date).getTime()) / 60000)
   );
 
+  const score = session.scoring ? scoreFromEvents(session.scoring, session.events || []) : null;
+
   const tile = (label: string, value: string) => (
     <div className="rounded-lg bg-card2 px-2 py-2 text-center">
       <div className="text-base font-extrabold text-bright">{value}</div>
@@ -337,6 +340,38 @@ export function TrainingSummary({ session }: { session: TrainingSession }) {
 
   return (
     <div className="space-y-4">
+      {score && session.scoring && (
+        <div className="rounded-xl border border-gold/40 bg-gold/5 px-3 py-2.5">
+          {([0, 1] as const).map((t) => {
+            const won = score.finished && score.winner === t;
+            return (
+              <div key={t} className="flex items-center gap-2 leading-7">
+                <span className="w-5 text-center">{won ? "🏆" : ""}</span>
+                <span className={`min-w-0 flex-1 truncate text-sm ${won ? "font-extrabold text-bright" : "font-bold text-sub"}`}>
+                  {session.players[t * 2]} / {session.players[t * 2 + 1]}
+                </span>
+                <span className="text-xl font-extrabold tabular-nums text-bright">
+                  {score.games[t]}
+                  {score.tiebreakScore && (
+                    <sup className="ml-0.5 text-[11px] font-bold text-mut">{score.tiebreakScore[t]}</sup>
+                  )}
+                </span>
+                {!score.finished && (
+                  <span className="w-8 text-end text-sm font-bold tabular-nums text-gold">
+                    {score.tiebreak ? score.points[t] : pointLabel(score, t)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          <div className="mt-1 border-t border-line/60 pt-1.5 text-[10px] text-mut">
+            {score.finished ? "Match terminé" : "Score à l'arrêt"} ·{" "}
+            {SET_FORMATS.find((f) => f.value === session.scoring!.format)?.label} ·{" "}
+            {DEUCE_RULES.find((r) => r.value === session.scoring!.deuce)?.label}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-1.5">
         {tile("Durée", `${minutes} min`)}
         {tile("Balles", String(total))}

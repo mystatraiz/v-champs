@@ -91,7 +91,7 @@ export function RankingBoard({
           <div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+                <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
                   <th className="px-3 py-2.5">#</th>
                   <th className="px-2 py-2.5">Joueur</th>
                   <th className="px-3 py-2.5 text-end">V-Points</th>
@@ -118,7 +118,7 @@ export function RankingBoard({
                       <td className="w-full px-2 py-2.5">
                         <button
                           onClick={() => setOpenPlayer(p.name)}
-                          className="cursor-pointer text-left font-semibold text-body underline-offset-2 hover:text-gold hover:underline"
+                          className="cursor-pointer text-start font-semibold text-body underline-offset-2 hover:text-gold hover:underline"
                         >
                           {p.name}
                         </button>

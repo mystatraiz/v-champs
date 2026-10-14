@@ -302,7 +302,7 @@ export default function AdminAgenda() {
     const ready = filled >= capacity;
     return (
       <div className="flex items-center gap-3 p-3.5">
-        <button onClick={onClick} className="min-w-0 flex-1 cursor-pointer text-left">
+        <button onClick={onClick} className="min-w-0 flex-1 cursor-pointer text-start">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-base font-extrabold text-gold">{time}</span>
             {badges}

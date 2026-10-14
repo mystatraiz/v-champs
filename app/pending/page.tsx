@@ -47,7 +47,7 @@ export default function PendingPage() {
         </Card>
 
         {profile && (
-          <div className="mt-4 text-left">
+          <div className="mt-4 text-start">
             <NotifToggle
               role="player"
               profileId={profile.id}

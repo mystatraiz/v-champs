@@ -397,7 +397,7 @@ export default function SessionLive() {
     <Card className="overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+          <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
             <th className="px-3 py-2">#</th>
             <th className="px-2 py-2">Joueur</th>
             <th className="px-2 py-2">Jeux</th>
@@ -454,7 +454,7 @@ export default function SessionLive() {
     <Card className="overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+          <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
             <th className="px-3 py-2">#</th>
             <th className="px-2 py-2">Équipe</th>
             <th className="px-2 py-2">Pts</th>

@@ -72,7 +72,7 @@ export function ClassementTabs({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+                    <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
                       <th className="px-3 py-2.5">#</th>
                       <th className="px-2 py-2.5">Équipe</th>
                       <th className="px-2 py-2.5">M</th>
@@ -142,7 +142,7 @@ export function ClassementTabs({
                   <button
                     key={s.date}
                     onClick={() => setOpenSession(s)}
-                    className={`flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-card2 ${
+                    className={`flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-start text-sm transition-colors hover:bg-card2 ${
                       i < arr.length - 1 ? "border-b border-line/60" : ""
                     } ${played ? "bg-gold/5" : ""}`}
                   >

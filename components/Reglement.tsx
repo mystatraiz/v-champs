@@ -154,7 +154,7 @@ export function Reglement() {
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+              <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
                 <th className={cellCls}>Niveau</th>
                 <th className={cellCls}>Coeff.</th>
                 <th className={cellCls}>1er</th>
@@ -197,7 +197,7 @@ export function Reglement() {
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line text-left text-[10px] font-bold uppercase tracking-wider text-mut">
+              <tr className="border-b border-line text-start text-[10px] font-bold uppercase tracking-wider text-mut">
                 <th className={cellCls}>Écart de force</th>
                 <th className={cellCls}>Coefficient</th>
               </tr>

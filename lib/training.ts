@@ -5,6 +5,7 @@
 // ou une faute directe est aussi une balle touchée.
 
 import { formatDateLong } from "./format";
+import { scoreFromEvents, scoreText, type ScoreSettings } from "./padel-score";
 
 export type TrainingEventKind = "touch" | "winner" | "error";
 
@@ -42,6 +43,7 @@ export interface TrainingSession {
   // Détail tap par tap (matchs saisis depuis l'ajout du suivi point par point) :
   // points, échanges, ligne / diagonale et courbes en dépendent.
   events?: TrainingEvent[];
+  scoring?: ScoreSettings | null;
   created_by?: string | null;
 }
 
@@ -53,6 +55,8 @@ export interface TrainingLive {
   // Changement de côté : l'affichage pivote de 180° (le joueur en haut à
   // gauche passe en bas à droite) pour coller à ce que voit l'observateur.
   flipped?: boolean;
+  // Score du match (null : stats seules, sans score).
+  scoring?: ScoreSettings | null;
 }
 
 export const PLAYER_SLOTS = [
@@ -289,6 +293,17 @@ export function formatTrainingText(s: TrainingSession): string {
         )
       );
   });
+  if (s.scoring) {
+    const st = scoreFromEvents(s.scoring, s.events || []);
+    const team = (t: 0 | 1) => `${s.players[t * 2]} / ${s.players[t * 2 + 1]}`;
+    lines.splice(
+      2,
+      0,
+      st.finished && st.winner != null
+        ? `🏆 *${team(st.winner)}* gagnent ${scoreText(st, st.winner)}`
+        : `🎾 Score à l'arrêt : ${scoreText(st)} (équipe 1 - équipe 2)`
+    );
+  }
   if (s.events?.length) {
     const d = analyzeTraining(s.events);
     lines.splice(

@@ -86,7 +86,7 @@ export function TeamComposer({
             {suggestions.map((s) => (
               <button
                 key={s}
-                className="block w-full cursor-pointer px-3.5 py-2 text-left text-sm hover:bg-card2"
+                className="block w-full cursor-pointer px-3.5 py-2 text-start text-sm hover:bg-card2"
                 onClick={() => {
                   onAddPlayer(s);
                   setNewName("");

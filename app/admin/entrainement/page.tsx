@@ -31,6 +31,8 @@ import { normalizeName } from "@/lib/session";
 import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
 import { TrainingSummary } from "@/components/admin/TrainingSummary";
 import { LiveTracker } from "@/components/admin/TrainingLive";
+import { ScoringSetup } from "@/components/admin/ScoringSetup";
+import { scoreFromEvents, scoreText, teamOf, type ScoreSettings } from "@/lib/padel-score";
 import { Btn, Card, EmptyState, Loader, Modal, SectionTitle } from "@/components/ui";
 
 const LIVE_KEY = "vchamps_training_live";
@@ -172,6 +174,14 @@ export default function TrainingTool() {
   const [tab, setTab] = useState<"match" | "historique" | "progression">("match");
   const [sessions, setSessions] = useState<TrainingSession[] | null>(null);
   const [names, setNames] = useState<Names>(["", "", "", ""]);
+  // Score : serveurs des deux premiers jeux, règle à 40-40, format du set.
+  const [withScore, setWithScore] = useState(true);
+  const [scoring, setScoring] = useState<ScoreSettings>({
+    firstServer: 0,
+    secondServer: 2,
+    deuce: "advantage",
+    format: "set6",
+  });
   const [live, setLive] = useState<TrainingLive | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);
   const [saving, setSaving] = useState(false);
@@ -225,6 +235,12 @@ export default function TrainingTool() {
 
   function swapSides(team: 1 | 2) {
     const a = team === 1 ? 0 : 2;
+    // Le serveur choisi suit son joueur quand on échange gauche et droite.
+    setScoring((sc) => ({
+      ...sc,
+      firstServer: teamOf(sc.firstServer) === team - 1 ? sc.firstServer ^ 1 : sc.firstServer,
+      secondServer: teamOf(sc.secondServer) === team - 1 ? sc.secondServer ^ 1 : sc.secondServer,
+    }));
     setNames((prev) => {
       const next = [...prev] as Names;
       [next[a], next[a + 1]] = [next[a + 1], next[a]];
@@ -234,7 +250,12 @@ export default function TrainingTool() {
 
   function start() {
     if (!ready) return;
-    updateLive({ startedAt: new Date().toISOString(), players: cleanNames, events: [] });
+    updateLive({
+      startedAt: new Date().toISOString(),
+      players: cleanNames,
+      events: [],
+      scoring: withScore ? scoring : null,
+    });
   }
 
   async function finish() {
@@ -255,6 +276,7 @@ export default function TrainingTool() {
         players: cur.players,
         ...counts,
         events: cur.events,
+        scoring: cur.scoring ?? null,
         created_by: profile?.id ?? null,
       };
       await saveTrainingSession(session);
@@ -365,6 +387,13 @@ export default function TrainingTool() {
               </Card>
             );
           })}
+          <ScoringSetup
+            names={cleanNames}
+            enabled={withScore}
+            onEnabled={setWithScore}
+            value={scoring}
+            onChange={setScoring}
+          />
           <Btn size="lg" disabled={!ready} onClick={start}>
             {ready ? "▶ Commencer la saisie" : "Renseigne 4 joueurs différents"}
           </Btn>
@@ -372,7 +401,9 @@ export default function TrainingTool() {
             Pendant le match : le service n&apos;est pas noté ; tape chaque frappe, à commencer par
             le retour du receveur. Le point se termine par une faute directe (rouge) ou un point
             gagnant (vert) : si tu viens de taper la frappe de ce joueur, elle n&apos;est pas comptée
-            deux fois (sinon le gagnant / la faute compte comme sa balle). L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
+            deux fois (sinon le gagnant / la faute compte comme sa balle). Si le score est activé,
+            il avance tout seul (gagnant = point pour l&apos;équipe, faute = point adverse), le 🎾
+            indique le serveur et le bouton 🔄 clignote quand il faut changer de côté. L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
             affichée en miroir (son joueur de gauche à droite). Au changement de côté, le bouton 🔄 Côtés fait pivoter les places : le joueur en haut à
             gauche passe en bas à droite. L&apos;écran reste allumé et le match en cours est conservé
             si l&apos;appli se ferme.
@@ -391,7 +422,7 @@ export default function TrainingTool() {
               <button
                 key={s.id}
                 onClick={() => setShown(s)}
-                className={`flex w-full cursor-pointer items-center gap-3 px-3.5 py-3 text-left text-sm hover:bg-card2 ${
+                className={`flex w-full cursor-pointer items-center gap-3 px-3.5 py-3 text-start text-sm hover:bg-card2 ${
                   i < sessions.length - 1 ? "border-b border-line/60" : ""
                 }`}
               >
@@ -404,6 +435,11 @@ export default function TrainingTool() {
                     vs {s.players[2]} / {s.players[3]}
                   </span>
                 </span>
+                {s.scoring && (
+                  <span className="shrink-0 text-xs font-extrabold tabular-nums text-gold">
+                    {scoreText(scoreFromEvents(s.scoring, s.events || []))}
+                  </span>
+                )}
                 <span className="shrink-0 text-mut">›</span>
               </button>
             ))}
