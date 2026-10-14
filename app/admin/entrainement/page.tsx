@@ -254,6 +254,7 @@ export default function TrainingTool() {
         endedAt: new Date().toISOString(),
         players: cur.players,
         ...counts,
+        events: cur.events,
         created_by: profile?.id ?? null,
       };
       await saveTrainingSession(session);

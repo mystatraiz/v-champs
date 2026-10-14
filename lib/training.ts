@@ -39,6 +39,9 @@ export interface TrainingSession {
   touches: Quad; // balles en jeu hors gagnants et fautes
   winners: Quad;
   errors: Quad;
+  // Détail tap par tap (matchs saisis depuis l'ajout du suivi point par point) :
+  // points, échanges, ligne / diagonale et courbes en dépendent.
+  events?: TrainingEvent[];
   created_by?: string | null;
 }
 
@@ -59,9 +62,11 @@ export const PLAYER_SLOTS = [
   { team: 2, side: "D" },
 ] as const;
 
-// Une couleur par joueur, reprise dans tous les blocs (ni rouge ni vert,
-// réservés aux fautes et aux gagnants).
-export const PLAYER_COLORS = ["#4f8ef7", "#a78bfa", "#f5b942", "#f472b6"];
+// Une couleur par joueur, reprise dans tous les blocs et les graphiques (ni
+// rouge ni vert, réservés aux fautes et aux gagnants). Palette validée sur le
+// fond sombre de l'appli : distincte deux à deux, y compris en vision
+// daltonienne, car les 4 courbes se croisent.
+export const PLAYER_COLORS = ["#2c6fd1", "#22a2c2", "#c98500", "#d55181"];
 
 export const zeroQuad = (): Quad => [0, 0, 0, 0];
 
@@ -134,6 +139,59 @@ export function computeTrainingStats(s: Pick<TrainingSession, "players" | "touch
 
 export const pct = (x: number) => `${Math.round(x * 100)} %`;
 export const signed = (n: number) => `${n > 0 ? "+" : ""}${n}`;
+
+// ─── Analyse point par point ───
+// Un point = les frappes tapées puis une faute directe ou un point gagnant.
+// Direction d'une frappe, déduite du joueur qui la reprend : deux joueurs du
+// même côté (gauche-gauche, droite-droite) se font face en diagonale ; un
+// gauche et un droit adverses sont dans le même couloir, en ligne droite. La
+// dernière frappe d'un point n'est pas reprise : sa direction est inconnue.
+
+export interface TrainingDetails {
+  points: number;
+  avgRally: number; // balles par point (service exclu)
+  maxRally: number;
+  line: Quad; // frappes en ligne droite
+  diag: Quad; // frappes en diagonale
+  curve: Quad[]; // +/- cumulé de chaque joueur, avant le 1er point puis après chaque point
+}
+
+export function analyzeTraining(events: TrainingEvent[]): TrainingDetails {
+  const line = zeroQuad();
+  const diag = zeroQuad();
+  const curve: Quad[] = [zeroQuad()];
+  const rallies: number[] = [];
+  let hitters: number[] = [];
+
+  events.forEach((e) => {
+    if (e.p < 0 || e.p > 3) return;
+    if (e.k === "touch") {
+      hitters.push(e.p);
+      return;
+    }
+    if (!e.fromTouch) hitters.push(e.p);
+    for (let i = 0; i < hitters.length - 1; i++) {
+      const [a, b] = [hitters[i], hitters[i + 1]];
+      if (PLAYER_SLOTS[a].team === PLAYER_SLOTS[b].team) continue; // saisie incohérente
+      if (PLAYER_SLOTS[a].side === PLAYER_SLOTS[b].side) diag[a]++;
+      else line[a]++;
+    }
+    rallies.push(hitters.length);
+    hitters = [];
+    const next = [...curve[curve.length - 1]] as Quad;
+    next[e.p] += e.k === "winner" ? 1 : -1;
+    curve.push(next);
+  });
+
+  return {
+    points: rallies.length,
+    avgRally: rallies.length ? rallies.reduce((a, b) => a + b, 0) / rallies.length : 0,
+    maxRally: rallies.length ? Math.max(...rallies) : 0,
+    line,
+    diag,
+    curve,
+  };
+}
 
 // ─── Progression d'un joueur ───
 
@@ -231,6 +289,16 @@ export function formatTrainingText(s: TrainingSession): string {
         )
       );
   });
+  if (s.events?.length) {
+    const d = analyzeTraining(s.events);
+    lines.splice(
+      2,
+      0,
+      `🎾 ${d.points} points · échange moyen ${d.avgRally.toFixed(1)} frappes · plus long ${d.maxRally}`
+    );
+    lines.push("", "*Ligne droite / diagonale*");
+    players.forEach((p, i) => lines.push(`• ${p.name} — ${d.line[i]} ligne · ${d.diag[i]} diagonale`));
+  }
   lines.push("", "✅ point gagnant · ❌ faute directe · net = gagnants − fautes");
   return lines.join("\n");
 }
