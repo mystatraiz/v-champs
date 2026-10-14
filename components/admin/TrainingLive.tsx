@@ -9,7 +9,8 @@ import {
   type TrainingLive,
 } from "@/lib/training";
 import { formatClock } from "@/lib/format";
-import { pointLabel, scoreFromEvents, scoreStatus } from "@/lib/padel-score";
+import { pointLabel, scoreFromEvents, scoreStatus, teamOf } from "@/lib/padel-score";
+import { COURT_ORDER, COURT_ORDER_FLIPPED, CourtPicker, Sheet } from "./CourtPicker";
 
 // Garde l'écran allumé pendant la saisie (Safari iOS 16.4+, Chrome).
 function useWakeLock(active: boolean) {
@@ -47,6 +48,8 @@ export function LiveTracker({
   onFinish,
   onAbort,
   onFlip,
+  onSecondServer,
+  onSideChanges,
 }: {
   live: TrainingLive;
   onEvent: (p: number, k: TrainingEventKind) => void;
@@ -54,6 +57,8 @@ export function LiveTracker({
   onFinish: () => void;
   onAbort: () => void;
   onFlip: () => void;
+  onSecondServer: (p: number) => void;
+  onSideChanges: (v: boolean) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -70,14 +75,27 @@ export function LiveTracker({
   const status = score && live.scoring ? scoreStatus(score, live.scoring) : null;
   // Changement de côté attendu (après chaque jeu impair, tous les 6 points en
   // tie-break) mais pas encore fait à l'écran.
-  const changeDue = !!score && !score.finished && (score.endChanges % 2 === 1) !== !!live.flipped;
+  const sideChanges = live.sideChanges !== false;
+  const changeDue =
+    sideChanges && !!score && !score.finished && (score.endChanges % 2 === 1) !== !!live.flipped;
+  // Serveur de l'autre équipe : demandé une seule fois, à la fin du 1er jeu.
+  const needSecond =
+    !!score && !!live.scoring && live.scoring.secondServer == null && score.gamesPlayed >= 1 && !score.finished;
+  const otherTeam = live.scoring ? 1 - teamOf(live.scoring.firstServer) : 1;
+  const [serveSheet, setServeSheet] = useState(false);
+  const [pickSecond, setPickSecond] = useState<number | null>(null);
+  const [settings, setSettings] = useState(false);
+  // Sans changement de côté, la question arrive dès la fin du 1er jeu.
+  useEffect(() => {
+    if (needSecond && !sideChanges) setServeSheet(true);
+  }, [needSecond, sideChanges]);
 
   // Vue de l'observateur, derrière le terrain : l'équipe du bas lui tourne le
   // dos (sa gauche est à gauche), l'équipe du haut lui fait face (sa gauche
   // est à droite). Les trois blocs suivent cette disposition. Au changement
   // de côté, tout pivote de 180° : l'équipe 2 passe en haut, en miroir.
   // Index joueurs : 0 = éq. 1 gauche, 1 = éq. 1 droite, 2 = éq. 2 gauche, 3 = éq. 2 droite.
-  const order = live.flipped ? [3, 2, 0, 1] : [1, 0, 2, 3];
+  const order = live.flipped ? COURT_ORDER_FLIPPED : COURT_ORDER;
   const grid = (render: (i: number) => React.ReactNode) => (
     <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5">
       {order.map((i) => (
@@ -98,16 +116,21 @@ export function LiveTracker({
     >
       <div className="flex items-center gap-2">
         <button
-          onClick={onAbort}
+          onClick={() => setSettings(true)}
+          title="Réglages du match"
           className="tap-pad cursor-pointer rounded-lg border border-line2 px-3 py-2 text-xs font-bold text-sub"
         >
-          ✕
+          ⚙️
         </button>
         <div className="flex-1 text-center font-mono text-lg font-extrabold tabular-nums text-sub">
           ⏱ {formatClock(elapsed)}
         </div>
         <button
-          onClick={onFlip}
+          onClick={() => {
+            onFlip();
+            // Fin du 1er jeu : au changement de côté, on demande qui sert en face.
+            if (needSecond) setServeSheet(true);
+          }}
           title="Changement de côté : fait pivoter les places de 180°"
           className={`tap-pad cursor-pointer rounded-lg border px-3 py-2 text-xs font-extrabold ${
             changeDue
@@ -162,7 +185,15 @@ export function LiveTracker({
               );
             })}
           </div>
-          {(status || score.finished) && (
+          {needSecond && (
+            <button
+              onClick={() => setServeSheet(true)}
+              className="tap-pad pulse-soft shrink-0 cursor-pointer rounded-lg bg-gold px-2 py-1 text-[10px] font-extrabold text-ink"
+            >
+              🎾 Qui sert ?
+            </button>
+          )}
+          {!needSecond && (status || score.finished) && (
             <div className="w-16 shrink-0 text-center text-[10px] font-extrabold uppercase leading-tight text-gold">
               {score.finished ? "Match terminé" : status}
             </div>
@@ -185,7 +216,7 @@ export function LiveTracker({
               <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-bright">
                 {live.players[i]}
               </span>
-              {score && !score.finished && score.server === i && (
+              {score && !score.finished && !needSecond && score.server === i && (
                 <span className="shrink-0 text-xs" title="Au service">🎾</span>
               )}
             </div>
@@ -261,6 +292,69 @@ export function LiveTracker({
             }`
           : "↶ Annuler"}
       </button>
+
+      {serveSheet && needSecond && (
+        <Sheet>
+          <h3 className="text-lg font-extrabold text-bright">Qui sert pour l&apos;équipe {otherTeam + 1} ?</h3>
+          <p className="mb-3 text-xs text-mut">
+            Touche le joueur qui sert ce jeu. Ensuite le service tourne tout seul.
+          </p>
+          <CourtPicker
+            names={live.players}
+            mode="select"
+            flipped={!!live.flipped}
+            allowed={[otherTeam * 2, otherTeam * 2 + 1]}
+            selected={pickSecond}
+            onSelect={setPickSecond}
+          />
+          <button
+            disabled={pickSecond == null}
+            onClick={() => {
+              if (pickSecond == null) return;
+              onSecondServer(pickSecond);
+              setServeSheet(false);
+            }}
+            className="tap-pad mt-4 w-full cursor-pointer rounded-xl bg-gold py-3 text-sm font-extrabold text-ink disabled:opacity-40"
+          >
+            OK
+          </button>
+        </Sheet>
+      )}
+
+      {settings && (
+        <Sheet>
+          <h3 className="mb-3 text-lg font-extrabold text-bright">Réglages du match</h3>
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-line2 px-3 py-3">
+            <span>
+              <span className="block text-sm font-bold text-body">🔄 Changements de côté</span>
+              <span className="block text-[11px] text-mut">
+                Rappel après chaque jeu impair (et tous les 6 points en tie-break)
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={sideChanges}
+              onChange={(e) => onSideChanges(e.target.checked)}
+              className="h-5 w-5 shrink-0 cursor-pointer accent-[var(--color-gold)]"
+            />
+          </label>
+          <button
+            onClick={() => setSettings(false)}
+            className="tap-pad mt-4 w-full cursor-pointer rounded-xl bg-gold py-3 text-sm font-extrabold text-ink"
+          >
+            OK
+          </button>
+          <button
+            onClick={() => {
+              setSettings(false);
+              onAbort();
+            }}
+            className="tap-pad mt-2 w-full cursor-pointer rounded-xl border border-bad/50 py-2.5 text-sm font-bold text-bad"
+          >
+            Abandonner le match
+          </button>
+        </Sheet>
+      )}
     </div>
   );
 }

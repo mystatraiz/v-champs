@@ -64,6 +64,8 @@ export interface TrainingLive {
   flipped?: boolean;
   // Score du match (null : stats seules, sans score).
   scoring?: ScoreSettings | null;
+  // Rappel des changements de côté (désactivable en plein match).
+  sideChanges?: boolean;
 }
 
 export const PLAYER_SLOTS = [

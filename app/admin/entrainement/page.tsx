@@ -31,8 +31,9 @@ import { normalizeName } from "@/lib/session";
 import { PlayerAutocomplete } from "@/components/PlayerAutocomplete";
 import { TrainingSummary } from "@/components/admin/TrainingSummary";
 import { LiveTracker } from "@/components/admin/TrainingLive";
-import { ScoringSetup } from "@/components/admin/ScoringSetup";
-import { scoreFromEvents, scoreText, teamOf, type ScoreSettings } from "@/lib/padel-score";
+import { ScoringSetup, type MatchRules } from "@/components/admin/ScoringSetup";
+import { scoreFromEvents, scoreText } from "@/lib/padel-score";
+import { CourtPicker, Sheet } from "@/components/admin/CourtPicker";
 import { Btn, Card, EmptyState, Loader, Modal, SectionTitle } from "@/components/ui";
 
 const LIVE_KEY = "vchamps_training_live";
@@ -174,14 +175,16 @@ export default function TrainingTool() {
   const [tab, setTab] = useState<"match" | "historique" | "progression">("match");
   const [sessions, setSessions] = useState<TrainingSession[] | null>(null);
   const [names, setNames] = useState<Names>(["", "", "", ""]);
-  // Score : serveurs des deux premiers jeux, règle à 40-40, format du set.
+  // Règles du match (les serveurs se choisissent au lancement).
   const [withScore, setWithScore] = useState(true);
-  const [scoring, setScoring] = useState<ScoreSettings>({
-    firstServer: 0,
-    secondServer: 2,
-    deuce: "advantage",
-    format: "set6",
-  });
+  const [rules, setRules] = useState<MatchRules>({ deuce: "advantage", format: "set6" });
+  const [sideChanges, setSideChanges] = useState(true);
+  // Lancement en deux fenêtres : placement des joueurs, puis serveur du 1er jeu.
+  const [prelaunch, setPrelaunch] = useState<{
+    step: "placement" | "serve";
+    names: Names;
+    firstServer: number | null;
+  } | null>(null);
   const [live, setLive] = useState<TrainingLive | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);
   const [saving, setSaving] = useState(false);
@@ -235,12 +238,6 @@ export default function TrainingTool() {
 
   function swapSides(team: 1 | 2) {
     const a = team === 1 ? 0 : 2;
-    // Le serveur choisi suit son joueur quand on échange gauche et droite.
-    setScoring((sc) => ({
-      ...sc,
-      firstServer: teamOf(sc.firstServer) === team - 1 ? sc.firstServer ^ 1 : sc.firstServer,
-      secondServer: teamOf(sc.secondServer) === team - 1 ? sc.secondServer ^ 1 : sc.secondServer,
-    }));
     setNames((prev) => {
       const next = [...prev] as Names;
       [next[a], next[a + 1]] = [next[a + 1], next[a]];
@@ -250,11 +247,22 @@ export default function TrainingTool() {
 
   function start() {
     if (!ready) return;
+    setPrelaunch({ step: "placement", names: cleanNames, firstServer: null });
+  }
+
+  // Le match démarre une fois les places et le premier serveur validés.
+  function launch(players: Names, firstServer: number | null) {
+    setNames(players);
+    setPrelaunch(null);
     updateLive({
       startedAt: new Date().toISOString(),
-      players: cleanNames,
+      players,
       events: [],
-      scoring: withScore ? scoring : null,
+      scoring:
+        withScore && firstServer != null
+          ? { firstServer, secondServer: null, deuce: rules.deuce, format: rules.format }
+          : null,
+      sideChanges,
     });
   }
 
@@ -313,6 +321,14 @@ export default function TrainingTool() {
         onFlip={() => {
           const cur = liveRef.current;
           if (cur) updateLive({ ...cur, flipped: !cur.flipped });
+        }}
+        onSecondServer={(p) => {
+          const cur = liveRef.current;
+          if (cur?.scoring) updateLive({ ...cur, scoring: { ...cur.scoring, secondServer: p } });
+        }}
+        onSideChanges={(v) => {
+          const cur = liveRef.current;
+          if (cur) updateLive({ ...cur, sideChanges: v });
         }}
       />
     );
@@ -388,22 +404,25 @@ export default function TrainingTool() {
             );
           })}
           <ScoringSetup
-            names={cleanNames}
             enabled={withScore}
             onEnabled={setWithScore}
-            value={scoring}
-            onChange={setScoring}
+            value={rules}
+            onChange={setRules}
+            sideChanges={sideChanges}
+            onSideChanges={setSideChanges}
           />
           <Btn size="lg" disabled={!ready} onClick={start}>
-            {ready ? "▶ Commencer la saisie" : "Renseigne 4 joueurs différents"}
+            {ready ? "▶ Lancer le match" : "Renseigne 4 joueurs différents"}
           </Btn>
           <p className="px-1 text-[11px] leading-5 text-mut">
             Pendant le match : le service n&apos;est pas noté ; tape chaque frappe, à commencer par
             le retour du receveur. Le point se termine par une faute directe (rouge) ou un point
             gagnant (vert) : si tu viens de taper la frappe de ce joueur, elle n&apos;est pas comptée
             deux fois (sinon le gagnant / la faute compte comme sa balle). Si le score est activé,
-            il avance tout seul (gagnant = point pour l&apos;équipe, faute = point adverse), le 🎾
-            indique le serveur et le bouton 🔄 clignote quand il faut changer de côté. L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
+            il avance tout seul (gagnant = point pour l&apos;équipe, faute = point adverse). Au
+            lancement : placement des joueurs puis serveur du 1er jeu ; le serveur adverse est
+            demandé à la fin du 1er jeu, ensuite le service tourne tout seul. Le 🎾 indique le
+            serveur et le bouton 🔄 clignote quand il faut changer de côté (désactivable dans ⚙️). L&apos;écran est vu de derrière le terrain : l&apos;équipe d&apos;en face est
             affichée en miroir (son joueur de gauche à droite). Au changement de côté, le bouton 🔄 Côtés fait pivoter les places : le joueur en haut à
             gauche passe en bas à droite. L&apos;écran reste allumé et le match en cours est conservé
             si l&apos;appli se ferme.
@@ -447,6 +466,68 @@ export default function TrainingTool() {
         ))}
 
       {tab === "progression" && <Progression sessions={sessions} />}
+
+      {prelaunch?.step === "placement" && (
+        <Sheet>
+          <h3 className="text-lg font-extrabold text-bright">Placement des joueurs</h3>
+          <p className="mb-3 text-xs text-mut">
+            Vu de derrière le terrain. Glisse un nom sur une autre carte pour échanger leurs places
+            (ou touche une carte puis l&apos;autre).
+          </p>
+          <CourtPicker
+            names={prelaunch.names}
+            mode="swap"
+            onSwap={(a, b) => {
+              const next = [...prelaunch.names] as Names;
+              [next[a], next[b]] = [next[b], next[a]];
+              setPrelaunch({ ...prelaunch, names: next });
+            }}
+          />
+          <div className="mt-4 flex gap-2">
+            <Btn variant="ghost" onClick={() => setPrelaunch(null)}>
+              Retour
+            </Btn>
+            <Btn
+              className="flex-1"
+              onClick={() =>
+                withScore
+                  ? setPrelaunch({ ...prelaunch, step: "serve" })
+                  : launch(prelaunch.names, null)
+              }
+            >
+              OK
+            </Btn>
+          </div>
+        </Sheet>
+      )}
+
+      {prelaunch?.step === "serve" && (
+        <Sheet>
+          <h3 className="text-lg font-extrabold text-bright">Qui sert en premier ?</h3>
+          <p className="mb-3 text-xs text-mut">Touche le joueur qui sert le 1er jeu.</p>
+          <CourtPicker
+            names={prelaunch.names}
+            mode="select"
+            selected={prelaunch.firstServer}
+            onSelect={(i) => setPrelaunch({ ...prelaunch, firstServer: i })}
+          />
+          <p className="mt-2 text-[11px] text-mut">
+            Le serveur de l&apos;autre équipe sera demandé à la fin du 1er jeu.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <Btn variant="ghost" onClick={() => setPrelaunch({ ...prelaunch, step: "placement" })}>
+              Retour
+            </Btn>
+            <Btn
+              className="flex-1"
+              disabled={prelaunch.firstServer == null}
+              onClick={() => launch(prelaunch.names, prelaunch.firstServer)}
+            >
+              OK, on joue !
+            </Btn>
+          </div>
+        </Sheet>
+      )}
 
       <Modal open={!!shown} onClose={() => setShown(null)}>
         {shown && (

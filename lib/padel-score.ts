@@ -12,7 +12,9 @@ export type SetFormat = "set6" | "pro9" | "bo3" | "bo3stb";
 
 export interface ScoreSettings {
   firstServer: number; // serveur du 1er jeu
-  secondServer: number; // serveur du 2e jeu (équipe adverse)
+  // Serveur du 2e jeu (équipe adverse) : choisi à la fin du 1er jeu, null
+  // avant ; on suppose alors le joueur de gauche de l'équipe adverse.
+  secondServer: number | null;
   deuce: DeuceRule;
   format: SetFormat;
 }
@@ -33,7 +35,8 @@ export const SET_FORMATS: { value: SetFormat; label: string; desc: string }[] = 
 // Ordre de service : serveur du jeu 1, du jeu 2, puis leurs partenaires. Il
 // se poursuit d'un set à l'autre.
 export function serveOrder(s: ScoreSettings): number[] {
-  return [s.firstServer, s.secondServer, s.firstServer ^ 1, s.secondServer ^ 1];
+  const second = s.secondServer ?? (s.firstServer < 2 ? 2 : 0);
+  return [s.firstServer, second, s.firstServer ^ 1, second ^ 1];
 }
 
 export const teamOf = (p: number) => (p < 2 ? 0 : 1);
