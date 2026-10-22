@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PlayerActions } from "@/components/admin/PlayerActions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -398,6 +399,7 @@ export default function AdminJoueurs() {
 
   const pending = profiles.filter((p) => p.role === "pending");
   const others = profiles.filter((p) => p.role !== "pending");
+  const blocked = profiles.filter((p) => p.blocked);
   // Sans niveau, un compte validé voit tous les créneaux : à traiter en priorité.
   const noLevel = others.filter((p) => p.level == null);
   // Noms déjà pris : joueurs connus + comptes déjà liés (pour éviter les
@@ -541,6 +543,7 @@ export default function AdminJoueurs() {
                         {ROLE_LABEL[p.role]}
                       </Badge>
                       {p.linked_player_name && <Badge color="ok">→ {p.linked_player_name}</Badge>}
+                      {p.blocked && <Badge color="bad">🚫 Bloqué</Badge>}
                       {savedId === p.id && <span className="text-[11px] font-bold text-ok">✓ Enregistré</span>}
                     </div>
                   </div>
@@ -591,11 +594,41 @@ export default function AdminJoueurs() {
                   </Select>
                 </div>
 
-                <div className="mt-2">
+                <div className="mt-2 space-y-2">
+                  <PlayerActions p={p} onChanged={reload} />
                   <Btn size="sm" variant="ghost" disabled={resetting === p.id} onClick={() => resetPwd(p)}>
                     🔑 {resetting === p.id ? "Réinitialisation…" : "Réinitialiser le mot de passe"}
                   </Btn>
                 </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        icon="🚫"
+        title="Joueurs bloqués"
+        subtitle={
+          blocked.length
+            ? `${blocked.length} compte${blocked.length > 1 ? "s" : ""} ne peu${blocked.length > 1 ? "vent" : "t"} plus s'inscrire`
+            : "Bloquer depuis « Joueurs & comptes »"
+        }
+      >
+        {!blocked.length ? (
+          <EmptyState>
+            Aucun joueur bloqué. Pour bloquer quelqu&apos;un : « Joueurs & comptes », recherche son nom,
+            puis 🚫 Bloquer.
+          </EmptyState>
+        ) : (
+          <div className="space-y-2.5">
+            {blocked.map((p) => (
+              <Card key={p.id} className="p-3.5" tone="flat">
+                <div className="mb-2 text-sm font-bold text-bright">
+                  {p.first_name} «{p.nickname}» {p.last_name.toUpperCase()}
+                  {p.linked_player_name && <span className="ml-1.5 text-xs text-mut">→ {p.linked_player_name}</span>}
+                </div>
+                <PlayerActions p={p} onChanged={reload} />
               </Card>
             ))}
           </div>

@@ -6,7 +6,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { formatTag } from "@/lib/formats";
-import { getTournament, listRegistrations, requestRegistration } from "@/lib/store";
+import {
+  BLOCKED_MESSAGE,
+  getTournament,
+  listRegistrations,
+  registrationErrorMessage,
+  requestRegistration,
+} from "@/lib/store";
 import { notifyAdmins } from "@/lib/push";
 import { formatDateLong, uniquePlayerIdentity } from "@/lib/format";
 import type { Registration, Tournament } from "@/lib/types";
@@ -67,6 +73,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
 
   async function submitGuest() {
     if (!tournament) return;
+    if (profile?.blocked) return setError(BLOCKED_MESSAGE);
     if (!name.trim()) return setError("Saisis ton prénom.");
     if (!lastName.trim()) return setError("Saisis ton nom (au moins la 1re lettre).");
     // Identité unique : allongée automatiquement en cas d'homonyme (Alex C. → Alex Ca.).
@@ -77,7 +84,7 @@ export default function JoinPage({ params }: { params: Promise<{ id: string }> }
       notifyAdmins("registration", identity); // push aux admins (non bloquant)
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur lors de l'inscription");
+      setError(registrationErrorMessage(e));
     } finally {
       setBusy(false);
     }

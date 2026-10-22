@@ -231,6 +231,33 @@ export async function adminResetPassword(userId: string): Promise<string> {
   return j.password as string;
 }
 
+// Message affiché à un compte bloqué qui tente de s'inscrire.
+export const BLOCKED_MESSAGE =
+  "Ton compte ne permet plus de t'inscrire. Contacte un organisateur du club.";
+
+// Erreur d'inscription lisible : la base refuse les comptes bloqués (RLS).
+export function registrationErrorMessage(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e || "Erreur");
+  return /row-level security/i.test(msg) ? BLOCKED_MESSAGE : msg;
+}
+
+// Numéro de téléphone d'un joueur (admins uniquement, lu côté serveur).
+export async function adminGetPhone(userId: string): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Session expirée — reconnecte-toi.");
+  const res = await fetch("/api/admin/contact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ userId }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || "Numéro introuvable.");
+  return j.phone as string;
+}
+
 // ─── Fusion / correction d'un nom de joueur ───
 // Corrige un nom mal saisi (ex. « fredv ») vers le bon (ex. « Fred V ») dans
 // TOUTES les données : historique des sessions, points V-Champs, joueurs connus,

@@ -14,6 +14,8 @@ export interface Profile {
   role: Role;
   linked_player_name: string | null;
   level: number | null; // 4..8 — attribué par l'admin
+  blocked?: boolean; // bloqué par un admin : ne peut plus s'inscrire
+  blocked_reason?: string | null;
   created_at?: string;
 }
 

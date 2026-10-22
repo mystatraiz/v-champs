@@ -285,3 +285,54 @@ cross join lateral jsonb_array_elements(coalesce(elem->'joinList','[]'::jsonb)) 
 where s.key = 'planned_tournaments'
   and (elem->>'date')::date >= current_date
 on conflict (tournament_id, lower(trim(player_name))) do nothing;
+
+-- ── 11. Blocage d'un joueur & protection des champs gérés par l'admin ─────
+-- Un joueur bloqué (absences répétées sans prévenir…) ne peut plus s'inscrire
+-- aux tournois, leçons et matchs. Seul un admin peut bloquer / débloquer.
+alter table public.profiles add column if not exists blocked boolean not null default false;
+alter table public.profiles add column if not exists blocked_reason text;
+
+-- Chacun peut modifier sa propre fiche (prénom, côté…) mais pas les champs
+-- gérés par l'admin : rôle, niveau, joueur lié, blocage. Sans ce garde-fou,
+-- un joueur pourrait se débloquer ou se donner le rôle admin via l'API.
+create or replace function public.protect_profile_admin_fields()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_admin() or coalesce(auth.role(), '') = 'service_role' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.role := 'pending';
+    new.level := null;
+    new.linked_player_name := null;
+    new.blocked := false;
+    new.blocked_reason := null;
+  else
+    new.role := old.role;
+    new.level := old.level;
+    new.linked_player_name := old.linked_player_name;
+    new.blocked := old.blocked;
+    new.blocked_reason := old.blocked_reason;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists profiles_protect_admin_fields on public.profiles;
+create trigger profiles_protect_admin_fields
+  before insert or update on public.profiles
+  for each row execute function public.protect_profile_admin_fields();
+
+-- Inscriptions refusées en base pour un compte bloqué (politiques
+-- « restrictives » : elles s'ajoutent aux autres au lieu de les élargir).
+drop policy if exists "registrations_not_blocked" on public.registrations;
+create policy "registrations_not_blocked" on public.registrations
+  as restrictive for insert to authenticated
+  with check (not exists (select 1 from public.profiles p where p.id = auth.uid() and p.blocked));
+drop policy if exists "lesson_regs_not_blocked" on public.lesson_registrations;
+create policy "lesson_regs_not_blocked" on public.lesson_registrations
+  as restrictive for insert to authenticated
+  with check (not exists (select 1 from public.profiles p where p.id = auth.uid() and p.blocked));
+drop policy if exists "match_regs_not_blocked" on public.match_slot_registrations;
+create policy "match_regs_not_blocked" on public.match_slot_registrations
+  as restrictive for insert to authenticated
+  with check (not exists (select 1 from public.profiles p where p.id = auth.uid() and p.blocked));

@@ -17,6 +17,8 @@ import {
   requestMatchSlotRegistration,
   requestRegistration,
   deleteMatchSlotRegistration,
+  BLOCKED_MESSAGE,
+  registrationErrorMessage,
 } from "@/lib/store";
 import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
 import { labelIncludesPlayer, levelsIncludePlayer, levelsLabel } from "@/lib/levels";
@@ -475,12 +477,13 @@ export default function PlayerAgenda() {
     try {
       if (mine) await deleteMatchSlotRegistration(mine.id);
       else {
+        if (profile.blocked) throw new Error(BLOCKED_MESSAGE);
         await requestMatchSlotRegistration(m.id, myName, profile.id);
         notifyAdmins("registration", myName); // push aux admins (non bloquant)
       }
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setError(registrationErrorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -492,12 +495,13 @@ export default function PlayerAgenda() {
     try {
       if (mine) await deleteLessonRegistration(mine.id);
       else {
+        if (profile.blocked) throw new Error(BLOCKED_MESSAGE);
         await requestLessonRegistration(l.id, myName, profile.id);
         notifyAdmins("registration", myName); // push aux admins (non bloquant)
       }
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setError(registrationErrorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -518,12 +522,13 @@ export default function PlayerAgenda() {
         notifyWithdrawal(myName, t.date, t.time);
         if (wasApproved) notifySpotFreed(t.id, t.date);
       } else {
+        if (profile.blocked) throw new Error(BLOCKED_MESSAGE);
         await requestRegistration(t.id, myName, profile.id);
         notifyAdmins("registration", myName); // push aux admins (non bloquant)
       }
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setError(registrationErrorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -610,8 +615,14 @@ export default function PlayerAgenda() {
 
       {error && (
         <Card tone="danger" className="p-3 text-xs text-bad">
-          {error} — si les tables v2 n&apos;existent pas encore, exécutez le script{" "}
-          <code>supabase/migration.sql</code>.
+          {error === BLOCKED_MESSAGE ? (
+            error
+          ) : (
+            <>
+              {error} — si les tables v2 n&apos;existent pas encore, exécutez le script{" "}
+              <code>supabase/migration.sql</code>.
+            </>
+          )}
         </Card>
       )}
     </div>
