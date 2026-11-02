@@ -554,6 +554,9 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                 r,
                 <>
                   <OfferButton
+                    kind="tournament"
+                    registrationId={r.id}
+                    playerName={r.player_name}
                     profileId={r.profile_id}
                     message={() =>
                       offerMessage({

@@ -271,6 +271,9 @@ export function LessonDetail({
         slotId={lesson.id}
         renderOffer={(r) => (
           <OfferButton
+            kind="lesson"
+            registrationId={r.id}
+            playerName={r.player_name}
             profileId={r.profile_id ?? null}
             message={() =>
               offerMessage({

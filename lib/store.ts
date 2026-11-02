@@ -624,6 +624,36 @@ export async function removeFromTournamentGrid(
   if (touched) await updateTournament(tournamentId, { teams });
 }
 
+// ─── Rattachement d'une inscription au compte du joueur ───
+// Un joueur ajouté à la main par un admin est retrouvé par son nom de joueur
+// lié (« Camille B. ») : on rattache l'inscription à son compte si un seul
+// compte correspond, ce qui donne accès à son numéro et l'affiche dans son appli.
+
+export async function findProfileIdByPlayerName(name: string): Promise<string | null> {
+  const n = name.trim();
+  if (!n || isTestMode()) return null;
+  // ilike sans joker : comparaison exacte insensible à la casse.
+  const pattern = n.replace(/[\\%_]/g, (c) => "\\" + c);
+  const { data } = await supabase.from("profiles").select("id").ilike("linked_player_name", pattern).limit(2);
+  return data && data.length === 1 ? (data[0].id as string) : null;
+}
+
+const REG_TABLE: Record<SlotKind, string> = {
+  tournament: "registrations",
+  lesson: "lesson_registrations",
+  match: "match_slot_registrations",
+};
+
+export async function linkRegistrationProfile(
+  kind: SlotKind,
+  registrationId: string,
+  profileId: string
+): Promise<void> {
+  if (isTestMode()) return;
+  const { error } = await supabase.from(REG_TABLE[kind]).update({ profile_id: profileId }).eq("id", registrationId);
+  if (error) throw error;
+}
+
 // ─── Journal des désistements ───
 // Écriture non bloquante : un retrait ne doit jamais échouer à cause du journal.
 
@@ -749,7 +779,7 @@ export async function addApprovedPlayer(
   }
   const { error } = await supabase.from("registrations").insert({
     tournament_id: tournamentId,
-    profile_id: null,
+    profile_id: await findProfileIdByPlayerName(trimmed),
     player_name: trimmed,
     status,
     is_guest: false,
@@ -982,7 +1012,7 @@ export async function addApprovedLessonPlayer(lessonId: string, name: string): P
   }
   const { error } = await supabase.from("lesson_registrations").insert({
     lesson_id: lessonId,
-    profile_id: null,
+    profile_id: await findProfileIdByPlayerName(trimmed),
     player_name: trimmed,
     status: "approved",
     is_guest: false,
@@ -1198,7 +1228,7 @@ export async function addApprovedMatchSlotPlayer(
   }
   const { error } = await supabase.from("match_slot_registrations").insert({
     match_slot_id: matchSlotId,
-    profile_id: null,
+    profile_id: await findProfileIdByPlayerName(trimmed),
     player_name: trimmed,
     status: "approved",
     is_guest: false,

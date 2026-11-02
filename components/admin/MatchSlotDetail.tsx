@@ -241,6 +241,9 @@ export function MatchSlotDetail({
         slotId={slot.id}
         renderOffer={(r) => (
           <OfferButton
+            kind="match"
+            registrationId={r.id}
+            playerName={r.player_name}
             profileId={r.profile_id ?? null}
             message={() =>
               offerMessage({
