@@ -117,6 +117,10 @@ export const notifySpotFreed = (tournamentId: string, date: string) =>
 export const notifyWithdrawal = (name: string, date: string, time: string) =>
   post({ type: "withdrawal", name, date, time });
 
+// Place libérée prise par un joueur de la liste d'attente (lien WhatsApp) → admins.
+export const notifySpotTaken = (name: string, kind: string, date: string, time: string) =>
+  post({ type: "spot-taken", name, kind, date, time });
+
 // Tournoi complet → admins.
 export const notifyTournamentFull = (date: string, time: string) =>
   post({ type: "tournament-full", date, time });

@@ -13,6 +13,7 @@ export interface SlotRegistration {
   player_name: string;
   status: RegistrationStatus;
   is_guest: boolean;
+  profile_id?: string | null;
 }
 
 // Gestion des inscriptions d'un créneau : demandes à valider, joueurs confirmés,
@@ -28,6 +29,7 @@ export function RegistrationManager({
   onAdd,
   slotKind,
   slotId,
+  renderOffer,
 }: {
   regs: SlotRegistration[];
   capacity: number;
@@ -38,6 +40,7 @@ export function RegistrationManager({
   onAdd: (name: string) => void;
   slotKind: SlotKind;
   slotId: string;
+  renderOffer?: (r: SlotRegistration) => React.ReactNode; // « Proposer la place » (liste d'attente)
 }) {
   const [manual, setManual] = useState("");
   // Journal des retraits, rechargé à chaque changement des inscriptions.
@@ -135,6 +138,7 @@ export function RegistrationManager({
                   {i + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm text-sub">{r.player_name}</span>
+                {renderOffer?.(r)}
                 <Btn
                   size="sm"
                   variant="secondary"

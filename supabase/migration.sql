@@ -360,3 +360,88 @@ drop policy if exists "withdrawals_select" on public.withdrawals;
 create policy "withdrawals_select" on public.withdrawals for select to authenticated using (true);
 drop policy if exists "withdrawals_insert" on public.withdrawals;
 create policy "withdrawals_insert" on public.withdrawals for insert to authenticated with check (true);
+
+-- ── 13. Place libérée : lien envoyé à un joueur en liste d'attente ────────
+-- Le joueur ouvre le lien et prend la place s'il en reste une. Tout se fait
+-- ici, en une seule opération qui verrouille le créneau : si deux joueurs
+-- cliquent en même temps, un seul obtient la place. Réponses : 'ok',
+-- 'taken' (plus de place), 'already' (déjà confirmé), 'closed' (créneau
+-- terminé ou annulé), 'invalid' (lien plus valable).
+create or replace function public.claim_waitlist_spot(p_kind text, p_reg uuid)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  v_slot uuid; v_status text; v_name text; v_profile uuid;
+  v_capacity int; v_slot_status text; v_date date; v_teams jsonb;
+  v_taken int; v_side int; v_n int; v_placed boolean := false;
+begin
+  if p_kind = 'tournament' then
+    select tournament_id, status, player_name, profile_id into v_slot, v_status, v_name, v_profile
+      from registrations where id = p_reg;
+    if not found then return 'invalid'; end if;
+    select capacity, status, date, coalesce(teams, '[]'::jsonb) into v_capacity, v_slot_status, v_date, v_teams
+      from tournaments where id = v_slot for update;
+  elsif p_kind = 'lesson' then
+    select lesson_id, status, player_name, profile_id into v_slot, v_status, v_name, v_profile
+      from lesson_registrations where id = p_reg;
+    if not found then return 'invalid'; end if;
+    select capacity, status, date into v_capacity, v_slot_status, v_date
+      from lessons where id = v_slot for update;
+  elsif p_kind = 'match' then
+    select match_slot_id, status, player_name, profile_id into v_slot, v_status, v_name, v_profile
+      from match_slot_registrations where id = p_reg;
+    if not found then return 'invalid'; end if;
+    select capacity, status, date into v_capacity, v_slot_status, v_date
+      from match_slots where id = v_slot for update;
+  else
+    return 'invalid';
+  end if;
+
+  if v_status = 'approved' then return 'already'; end if;
+  if v_status <> 'waitlist' then return 'invalid'; end if;
+  if v_slot_status in ('cancelled', 'done', 'started') or v_date < current_date then return 'closed'; end if;
+
+  -- Places déjà prises (pour un tournoi : confirmés + joueurs de la grille).
+  if p_kind = 'tournament' then
+    select count(*) into v_taken from (
+      select lower(trim(player_name)) as n from registrations
+        where tournament_id = v_slot and status = 'approved'
+      union
+      select lower(trim(p)) from jsonb_array_elements(v_teams) t,
+        jsonb_array_elements_text(coalesce(t->'players', '[]'::jsonb)) p
+        where trim(p) <> ''
+    ) x;
+  elsif p_kind = 'lesson' then
+    select count(*) into v_taken from lesson_registrations where lesson_id = v_slot and status = 'approved';
+  else
+    select count(*) into v_taken from match_slot_registrations where match_slot_id = v_slot and status = 'approved';
+  end if;
+  if v_taken >= v_capacity then return 'taken'; end if;
+
+  if p_kind = 'tournament' then
+    update registrations set status = 'approved' where id = p_reg;
+    -- Placement dans la grille : côté préféré si possible, sinon 1re place libre.
+    select case preferred_side when 'right' then 1 else 0 end into v_side from profiles where id = v_profile;
+    v_side := coalesce(v_side, 0);
+    v_n := jsonb_array_length(v_teams);
+    for pass in 0..1 loop
+      exit when v_placed;
+      for i in 0..v_n - 1 loop
+        for k in 0..1 loop
+          continue when pass = 0 and k <> v_side;
+          if coalesce(trim(v_teams->i->'players'->>k), '') = '' then
+            v_teams := jsonb_set(v_teams, array[i::text, 'players', k::text], to_jsonb(v_name));
+            v_placed := true;
+            exit;
+          end if;
+        end loop;
+        exit when v_placed;
+      end loop;
+    end loop;
+    if v_placed then update tournaments set teams = v_teams where id = v_slot; end if;
+  elsif p_kind = 'lesson' then
+    update lesson_registrations set status = 'approved' where id = p_reg;
+  else
+    update match_slot_registrations set status = 'approved' where id = p_reg;
+  end if;
+  return 'ok';
+end $$;

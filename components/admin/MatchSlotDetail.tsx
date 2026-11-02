@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { OfferButton } from "@/components/OfferButton";
+import { offerMessage, offerUrl } from "@/lib/offer";
 import {
   addApprovedMatchSlotPlayer,
   deleteMatchSlotRegistration,
@@ -237,6 +239,20 @@ export function MatchSlotDetail({
         }
         slotKind="match"
         slotId={slot.id}
+        renderOffer={(r) => (
+          <OfferButton
+            profileId={r.profile_id ?? null}
+            message={() =>
+              offerMessage({
+                kind: "match",
+                playerName: r.player_name,
+                date: slot.date,
+                time: slot.time,
+                url: offerUrl("match", r.id),
+              })
+            }
+          />
+        )}
         onAdd={(name: string) => act(() => addApprovedMatchSlotPlayer(slot.id, name))}
       />
     </div>

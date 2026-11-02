@@ -174,6 +174,18 @@ export async function POST(req: Request) {
     );
   }
 
+  // ── Place libérée prise via le lien WhatsApp → admins ──
+  if (body.type === "spot-taken") {
+    const noun = body.kind === "lesson" ? "la leçon" : body.kind === "match" ? "le match" : "le tournoi";
+    return j(
+      await sendToSubs(db, subs, admins, {
+        title: "Place reprise ✅",
+        body: `${(body.name || "Un joueur").slice(0, 40)} a pris la place libérée pour ${noun} du ${frDate(body.date)}${body.time ? ` (${body.time})` : ""}.`,
+        url: "/admin",
+      })
+    );
+  }
+
   // ── Désistement → admins ──
   if (body.type === "withdrawal") {
     return j(

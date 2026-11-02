@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { OfferButton } from "@/components/OfferButton";
+import { offerMessage, offerUrl } from "@/lib/offer";
 import {
   addApprovedLessonPlayer,
   deleteLessonRegistration,
@@ -267,6 +269,20 @@ export function LessonDetail({
         }
         slotKind="lesson"
         slotId={lesson.id}
+        renderOffer={(r) => (
+          <OfferButton
+            profileId={r.profile_id ?? null}
+            message={() =>
+              offerMessage({
+                kind: "lesson",
+                playerName: r.player_name,
+                date: lesson.date,
+                time: lesson.time,
+                url: offerUrl("lesson", r.id),
+              })
+            }
+          />
+        )}
         onAdd={(name: string) => act(() => addApprovedLessonPlayer(lesson.id, name))}
       />
     </div>

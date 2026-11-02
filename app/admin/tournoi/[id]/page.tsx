@@ -41,6 +41,8 @@ import type {
 import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
 import { TeamComposer } from "@/components/TeamComposer";
 import { WithdrawalList } from "@/components/WithdrawalList";
+import { OfferButton } from "@/components/OfferButton";
+import { offerMessage, offerUrl } from "@/lib/offer";
 
 type Side = "left" | "right" | "any";
 
@@ -551,6 +553,19 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
               regRow(
                 r,
                 <>
+                  <OfferButton
+                    profileId={r.profile_id}
+                    message={() =>
+                      offerMessage({
+                        kind: "tournament",
+                        playerName: r.player_name,
+                        date: t.date,
+                        time: t.time,
+                        detail: `niveau ${t.level}`,
+                        url: offerUrl("tournament", r.id),
+                      })
+                    }
+                  />
                   <Btn
                     size="sm"
                     variant="secondary"
@@ -586,7 +601,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
           </Card>
           <p className="mt-1.5 px-1 text-[11px] text-mut">
             Numérotés par ordre d&apos;arrivée : le n°1 est le premier à faire monter si une place
-            se libère.
+            se libère. 📲 Proposer envoie au joueur, sur WhatsApp, un lien pour prendre la place
+            lui-même (premier arrivé, premier servi).
           </p>
         </div>
       )}
