@@ -18,6 +18,7 @@ import {
   requestRegistration,
   deleteMatchSlotRegistration,
   BLOCKED_MESSAGE,
+  logWithdrawal,
   registrationErrorMessage,
 } from "@/lib/store";
 import { notifyAdmins, notifySpotFreed, notifyWithdrawal } from "@/lib/push";
@@ -475,7 +476,18 @@ export default function PlayerAgenda() {
     if (!profile) return;
     setBusy(m.id);
     try {
-      if (mine) await deleteMatchSlotRegistration(mine.id);
+      if (mine) {
+        await deleteMatchSlotRegistration(mine.id);
+        await logWithdrawal({
+          kind: "match",
+          slot_id: m.id,
+          player_name: mine.player_name,
+          profile_id: profile.id,
+          by_admin: false,
+          by_name: null,
+          was_status: mine.status,
+        });
+      }
       else {
         if (profile.blocked) throw new Error(BLOCKED_MESSAGE);
         await requestMatchSlotRegistration(m.id, myName, profile.id);
@@ -493,7 +505,18 @@ export default function PlayerAgenda() {
     if (!profile) return;
     setBusy(l.id);
     try {
-      if (mine) await deleteLessonRegistration(mine.id);
+      if (mine) {
+        await deleteLessonRegistration(mine.id);
+        await logWithdrawal({
+          kind: "lesson",
+          slot_id: l.id,
+          player_name: mine.player_name,
+          profile_id: profile.id,
+          by_admin: false,
+          by_name: null,
+          was_status: mine.status,
+        });
+      }
       else {
         if (profile.blocked) throw new Error(BLOCKED_MESSAGE);
         await requestLessonRegistration(l.id, myName, profile.id);
@@ -517,6 +540,15 @@ export default function PlayerAgenda() {
         // Le joueur avait pu être placé dans la grille : l'en retirer aussi,
         // sinon l'organisateur continue de le voir inscrit.
         await removeFromTournamentGrid(t.id, mine.player_name);
+        await logWithdrawal({
+          kind: "tournament",
+          slot_id: t.id,
+          player_name: mine.player_name,
+          profile_id: profile.id,
+          by_admin: false,
+          by_name: null,
+          was_status: mine.status,
+        });
         // Désistement : prévient les admins, et si une place confirmée se libère,
         // prévient les joueurs en liste d'attente.
         notifyWithdrawal(myName, t.date, t.time);

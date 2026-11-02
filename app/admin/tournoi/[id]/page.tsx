@@ -16,7 +16,10 @@ import {
   saveSessionState,
   setRegistrationStatus,
   updateTournament,
+  listWithdrawals,
+  logWithdrawal,
 } from "@/lib/store";
+import { useAuth } from "@/lib/auth-context";
 import { notifyPlayer, notifyTournamentFull } from "@/lib/push";
 import { computeCombinedRanking } from "@/lib/scoring";
 import { LEVEL_LABELS } from "@/lib/levels";
@@ -33,9 +36,11 @@ import type {
   Team,
   Tournament,
   TournamentFormat,
+  Withdrawal,
 } from "@/lib/types";
 import { Badge, Btn, Card, Loader, SectionTitle } from "@/components/ui";
 import { TeamComposer } from "@/components/TeamComposer";
+import { WithdrawalList } from "@/components/WithdrawalList";
 
 type Side = "left" | "right" | "any";
 
@@ -48,17 +53,22 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   const [appData, setAppData] = useState<AppData | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [busy, setBusy] = useState(false);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const { profile: me } = useAuth();
+  const adminName = me ? me.nickname || me.first_name : null;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
-    const [t, rs, app, profs] = await Promise.all([
+    const [t, rs, app, profs, wd] = await Promise.all([
       getTournament(id),
       listRegistrations(id),
       loadAppData(),
       listProfiles().catch(() => [] as Profile[]),
+      listWithdrawals("tournament", id),
     ]);
     setTournament(t);
     setRegs(rs);
+    setWithdrawals(wd);
     setAppData(app);
     setProfiles(profs);
     if (t) {
@@ -213,6 +223,8 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   }
 
   async function removePlayer(name: string) {
+    if (!confirm(`Retirer ${name} de la partie ?\n\nIl ne repasse pas en liste d'attente ; le retrait est noté dans « Désistements ».`))
+      return;
     const key = name.toLowerCase().trim();
     const next = teams.map((tm) => ({
       ...tm,
@@ -220,10 +232,20 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     }));
     setTeams(next);
     await updateTournament(t.id, { teams: next });
-    // Sorti de la grille → remis en liste d'attente. Sans inscription
-    // correspondante (joueur désisté), on n'en recrée pas une fantôme.
+    // Sorti de la grille → sorti de la partie : il ne repasse PAS en liste
+    // d'attente (on risquerait de le remettre par erreur). Le retrait est
+    // consigné dans le journal des désistements.
     const reg = regs.find((r) => r.player_name.toLowerCase().trim() === key);
-    if (reg) await setRegistrationStatus(reg.id, "waitlist");
+    if (reg) await deleteRegistration(reg.id);
+    await logWithdrawal({
+      kind: "tournament",
+      slot_id: t.id,
+      player_name: name,
+      profile_id: reg?.profile_id ?? null,
+      by_admin: true,
+      by_name: adminName,
+      was_status: reg?.status ?? "approved",
+    });
     reload();
   }
 
@@ -543,6 +565,15 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
                     onClick={async () => {
                       await deleteRegistration(r.id);
                       await removeFromTournamentGrid(t.id, r.player_name);
+                      await logWithdrawal({
+                        kind: "tournament",
+                        slot_id: t.id,
+                        player_name: r.player_name,
+                        profile_id: r.profile_id,
+                        by_admin: true,
+                        by_name: adminName,
+                        was_status: r.status,
+                      });
                       reload();
                     }}
                   >
@@ -598,6 +629,7 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
           onAddPlayer={addPlayer}
           onRemovePlayer={removePlayer}
         />
+        <WithdrawalList items={withdrawals} />
       </div>
 
       <div className="space-y-2.5 pt-1">

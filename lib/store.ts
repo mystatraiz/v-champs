@@ -18,6 +18,8 @@ import type {
   SessionHistoryEntry,
   SessionState,
   Tournament,
+  SlotKind,
+  Withdrawal,
 } from "./types";
 
 // ─── Helpers app_state (stockage JSON générique) ───
@@ -620,6 +622,47 @@ export async function removeFromTournamentGrid(
     }) as [string, string],
   }));
   if (touched) await updateTournament(tournamentId, { teams });
+}
+
+// ─── Journal des désistements ───
+// Écriture non bloquante : un retrait ne doit jamais échouer à cause du journal.
+
+const TEST_WITHDRAWALS = "test_withdrawals";
+
+export async function logWithdrawal(w: Omit<Withdrawal, "id" | "created_at">): Promise<void> {
+  try {
+    if (isTestMode()) {
+      const arr = await readJsonKey<Withdrawal>(TEST_WITHDRAWALS);
+      await writeJsonKey(TEST_WITHDRAWALS, [
+        ...arr,
+        { ...w, id: newId(), created_at: new Date().toISOString() },
+      ]);
+      return;
+    }
+    await supabase.from("withdrawals").insert(w);
+  } catch {
+    /* journal indisponible : sans conséquence sur le retrait */
+  }
+}
+
+export async function listWithdrawals(kind: SlotKind, slotId: string): Promise<Withdrawal[]> {
+  try {
+    if (isTestMode()) {
+      const arr = await readJsonKey<Withdrawal>(TEST_WITHDRAWALS);
+      return arr
+        .filter((w) => w.kind === kind && w.slot_id === slotId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    const { data } = await supabase
+      .from("withdrawals")
+      .select("*")
+      .eq("kind", kind)
+      .eq("slot_id", slotId)
+      .order("created_at", { ascending: false });
+    return (data as Withdrawal[]) || [];
+  } catch {
+    return [];
+  }
 }
 
 // ─── Inscriptions ───

@@ -338,3 +338,25 @@ drop policy if exists "match_regs_not_blocked" on public.match_slot_registration
 create policy "match_regs_not_blocked" on public.match_slot_registrations
   as restrictive for insert to authenticated
   with check (not exists (select 1 from public.profiles p where p.id = auth.uid() and p.blocked));
+
+-- ── 12. Journal des désistements ──────────────────────────────────────────
+-- Un joueur retiré d'un créneau (par lui-même ou par un admin) sort de la
+-- liste au lieu de repasser en liste d'attente ; le retrait est consigné ici
+-- pour garder la trace de qui l'a retiré et quand.
+create table if not exists public.withdrawals (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null check (kind in ('tournament', 'lesson', 'match')),
+  slot_id     uuid not null,
+  player_name text not null,
+  profile_id  uuid references public.profiles(id) on delete set null,
+  by_admin    boolean not null default false,
+  by_name     text,
+  was_status  text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists withdrawals_slot_idx on public.withdrawals (kind, slot_id);
+alter table public.withdrawals enable row level security;
+drop policy if exists "withdrawals_select" on public.withdrawals;
+create policy "withdrawals_select" on public.withdrawals for select to authenticated using (true);
+drop policy if exists "withdrawals_insert" on public.withdrawals;
+create policy "withdrawals_insert" on public.withdrawals for insert to authenticated with check (true);

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   addApprovedMatchSlotPlayer,
   deleteMatchSlotRegistration,
+  logWithdrawal,
   setMatchSlotRegistrationStatus,
   updateMatchSlot,
 } from "@/lib/store";
@@ -58,6 +60,7 @@ export function MatchSlotDetail({
   onChange: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const { profile: me } = useAuth();
   const [editing, setEditing] = useState(false);
 
   const approved = regs.filter((r) => r.status === "approved");
@@ -215,7 +218,25 @@ export function MatchSlotDetail({
         onSetStatus={(id: string, status: RegistrationStatus) =>
           act(() => setMatchSlotRegistrationStatus(id, status))
         }
-        onRemove={(id: string) => act(() => deleteMatchSlotRegistration(id))}
+        onRemove={(id: string) =>
+          act(async () => {
+            const r = regs.find((x) => x.id === id);
+            await deleteMatchSlotRegistration(id);
+            // Retiré = sorti du créneau (pas remis en liste d'attente), noté au journal.
+            if (r)
+              await logWithdrawal({
+                kind: "match",
+                slot_id: slot.id,
+                player_name: r.player_name,
+                profile_id: r.profile_id,
+                by_admin: true,
+                by_name: me ? me.nickname || me.first_name : null,
+                was_status: r.status,
+              });
+          })
+        }
+        slotKind="match"
+        slotId={slot.id}
         onAdd={(name: string) => act(() => addApprovedMatchSlotPlayer(slot.id, name))}
       />
     </div>

@@ -120,6 +120,21 @@ export interface Tournament {
 
 export type RegistrationStatus = "pending" | "approved" | "declined" | "waitlist";
 
+// Retrait d'un joueur d'un créneau (désistement ou retrait par un admin) :
+// consigné à part, le joueur ne repasse pas en liste d'attente.
+export type SlotKind = "tournament" | "lesson" | "match";
+export interface Withdrawal {
+  id: string;
+  kind: SlotKind;
+  slot_id: string;
+  player_name: string;
+  profile_id: string | null;
+  by_admin: boolean;
+  by_name: string | null;
+  was_status: RegistrationStatus | null;
+  created_at: string;
+}
+
 export interface Registration {
   id: string;
   tournament_id: string;

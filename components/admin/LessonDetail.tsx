@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   addApprovedLessonPlayer,
   deleteLessonRegistration,
+  logWithdrawal,
   setLessonRegistrationStatus,
   updateLesson,
 } from "@/lib/store";
@@ -27,6 +29,7 @@ export function LessonDetail({
   onChange: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const { profile: me } = useAuth();
   const [editing, setEditing] = useState(false);
   const [theme, setTheme] = useState(lesson.theme ?? "");
 
@@ -245,7 +248,25 @@ export function LessonDetail({
         onSetStatus={(id: string, status: RegistrationStatus) =>
           act(() => setLessonRegistrationStatus(id, status))
         }
-        onRemove={(id: string) => act(() => deleteLessonRegistration(id))}
+        onRemove={(id: string) =>
+          act(async () => {
+            const r = regs.find((x) => x.id === id);
+            await deleteLessonRegistration(id);
+            // Retiré = sorti du créneau (pas remis en liste d'attente), noté au journal.
+            if (r)
+              await logWithdrawal({
+                kind: "lesson",
+                slot_id: lesson.id,
+                player_name: r.player_name,
+                profile_id: r.profile_id,
+                by_admin: true,
+                by_name: me ? me.nickname || me.first_name : null,
+                was_status: r.status,
+              });
+          })
+        }
+        slotKind="lesson"
+        slotId={lesson.id}
         onAdd={(name: string) => act(() => addApprovedLessonPlayer(lesson.id, name))}
       />
     </div>

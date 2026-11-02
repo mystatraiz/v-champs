@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import type { RegistrationStatus } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { listWithdrawals } from "@/lib/store";
+import type { RegistrationStatus, SlotKind, Withdrawal } from "@/lib/types";
+import { WithdrawalList } from "./WithdrawalList";
 import { PlayerAutocomplete } from "./PlayerAutocomplete";
 import { Btn } from "./ui";
 
@@ -24,6 +26,8 @@ export function RegistrationManager({
   onSetStatus,
   onRemove,
   onAdd,
+  slotKind,
+  slotId,
 }: {
   regs: SlotRegistration[];
   capacity: number;
@@ -32,8 +36,15 @@ export function RegistrationManager({
   onSetStatus: (id: string, status: RegistrationStatus) => void;
   onRemove: (id: string) => void;
   onAdd: (name: string) => void;
+  slotKind: SlotKind;
+  slotId: string;
 }) {
   const [manual, setManual] = useState("");
+  // Journal des retraits, rechargé à chaque changement des inscriptions.
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  useEffect(() => {
+    listWithdrawals(slotKind, slotId).then(setWithdrawals);
+  }, [slotKind, slotId, regs]);
 
   const pending = regs.filter((r) => r.status === "pending");
   const approved = regs.filter((r) => r.status === "approved");
@@ -96,7 +107,16 @@ export function RegistrationManager({
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-body">
                   ✓ {r.player_name}
                 </span>
-                <Btn size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(r.id)}>
+                <Btn
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() =>
+                    confirm(
+                      `Retirer ${r.player_name} ?\n\nIl ne repasse pas en liste d'attente ; le retrait est noté dans « Désistements ».`
+                    ) && onRemove(r.id)
+                  }
+                >
                   ✕
                 </Btn>
               </div>
@@ -145,6 +165,7 @@ export function RegistrationManager({
           + Ajouter
         </Btn>
       </div>
+      <WithdrawalList items={withdrawals} />
     </>
   );
 }
