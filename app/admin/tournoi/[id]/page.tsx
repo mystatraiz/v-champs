@@ -46,6 +46,18 @@ import { offerMessage, offerUrl } from "@/lib/offer";
 
 type Side = "left" | "right" | "any";
 
+// Grille d'un tournoi (vide si pas encore composée).
+function gridOf(t: Tournament): Team[] {
+  return t.teams?.length
+    ? (t.teams as Team[])
+    : Array.from({ length: t.courts * 2 }, (_, i) => emptyTeam(i));
+}
+
+// Empreinte des joueurs de la grille, place par place.
+function gridKey(teams: Team[]): string {
+  return teams.map((tm) => (tm.players || []).map((p) => (p || "").toLowerCase().trim()).join("|")).join("/");
+}
+
 export default function TournamentDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -59,6 +71,11 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   const { profile: me } = useAuth();
   const adminName = me ? me.nickname || me.first_name : null;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Joueurs de la grille tels qu'ils sont en base au dernier chargement ou à
+  // notre dernière écriture : sert à détecter qu'un autre admin (ou un joueur
+  // qui prend une place libérée) a modifié la grille entre-temps.
+  const serverGrid = useRef("");
+  const pendingGrid = useRef<Team[] | null>(null); // modification pas encore enregistrée
 
   const reload = useCallback(async () => {
     const [t, rs, app, profs, wd] = await Promise.all([
@@ -74,12 +91,50 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     setAppData(app);
     setProfiles(profs);
     if (t) {
-      const base = t.teams?.length
-        ? (t.teams as Team[])
-        : Array.from({ length: t.courts * 2 }, (_, i) => emptyTeam(i));
+      const base = gridOf(t);
+      serverGrid.current = gridKey(base);
       setTeams(structuredClone(base));
     }
   }, [id]);
+
+  // Grille à jour lue en base (jamais la copie en mémoire, qui peut dater).
+  // Une modification encore en attente d'enregistrement passe d'abord, sauf
+  // si la grille a changé ailleurs entre-temps (elle serait alors écrasée).
+  const freshGrid = useCallback(async (): Promise<Team[]> => {
+    const ft = await getTournament(id);
+    let current = ft ? gridOf(ft) : [];
+    if (pendingGrid.current) {
+      const next = pendingGrid.current;
+      pendingGrid.current = null;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (gridKey(current) === serverGrid.current) {
+        await updateTournament(id, { teams: next });
+        serverGrid.current = gridKey(next);
+        current = next;
+      }
+    }
+    return current;
+  }, [id]);
+
+  // Écrit la grille seulement si personne ne l'a modifiée depuis notre
+  // chargement ; sinon recharge la page au lieu d'écraser (un joueur ajouté
+  // entre-temps aurait disparu de la grille tout en restant confirmé).
+  const guardedWrite = useCallback(
+    async (next: Team[]): Promise<boolean> => {
+      const current = await freshGrid();
+      if (gridKey(current) !== serverGrid.current) {
+        alert(
+          "La grille vient d'être modifiée ailleurs (autre admin ou joueur) : elle a été rechargée. Refais ta modification."
+        );
+        await reload();
+        return false;
+      }
+      await updateTournament(id, { teams: next });
+      serverGrid.current = gridKey(next);
+      return true;
+    },
+    [id, freshGrid, reload]
+  );
 
   useEffect(() => {
     reload();
@@ -89,11 +144,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     (next: Team[]) => {
       setTeams(next);
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      pendingGrid.current = next;
       saveTimer.current = setTimeout(() => {
-        updateTournament(id, { teams: next }).catch(() => {});
+        pendingGrid.current = null;
+        guardedWrite(next).catch(() => {});
       }, 600);
     },
-    [id]
+    [guardedWrite]
   );
 
   // Force V-Champs (classement) par nom, pour l'équilibrage.
@@ -154,6 +211,12 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
   const confirmedNames = [
     ...new Set(teams.flatMap((tm) => tm.players).filter((p) => p?.trim())),
   ];
+  // Confirmés absents de la grille : ils se croient inscrits mais ne jouent
+  // pas (et le compteur dépasse la capacité). À placer ou à remettre en attente.
+  const gridLow = new Set(confirmedNames.map((n) => n.toLowerCase().trim()));
+  const orphans = regs.filter(
+    (r) => r.status === "approved" && !gridLow.has(r.player_name.toLowerCase().trim())
+  );
   // Moteur Mexicano : 8 joueurs sur 2 terrains (mode Mexicano) ou 4 joueurs
   // sur 1 terrain (mode Rotation).
   const mex = t.format === "mexicano" && (t.courts === 1 || t.courts === 2);
@@ -166,14 +229,17 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
 
   // ── Placement automatique d'un joueur (côté + équilibrage) ──
   async function placeByName(name: string, profileId: string | null): Promise<boolean> {
+    // Placement calculé sur la grille à jour, pas sur la copie de la page.
+    const current = await freshGrid();
     const { teams: next, placed } = autoPlace(
-      teams,
+      current,
       { name, side: sideOf(name, profileId), strength: strengthOf(name) },
       strengthOf
     );
     if (placed) {
       setTeams(next);
       await updateTournament(t.id, { teams: next });
+      serverGrid.current = gridKey(next);
     }
     return placed;
   }
@@ -228,12 +294,13 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
     if (!confirm(`Retirer ${name} de la partie ?\n\nIl ne repasse pas en liste d'attente ; le retrait est noté dans « Désistements ».`))
       return;
     const key = name.toLowerCase().trim();
-    const next = teams.map((tm) => ({
+    const next = (await freshGrid()).map((tm) => ({
       ...tm,
       players: tm.players.map((p) => (p?.toLowerCase().trim() === key ? "" : p)) as [string, string],
     }));
     setTeams(next);
     await updateTournament(t.id, { teams: next });
+    serverGrid.current = gridKey(next);
     // Sorti de la grille → sorti de la partie : il ne repasse PAS en liste
     // d'attente (on risquerait de le remettre par erreur). Le retrait est
     // consigné dans le journal des désistements.
@@ -295,6 +362,11 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
 
   async function startSession() {
     if (!appData || busy) return;
+    // Lancement sur une grille périmée : on recharge plutôt que de lancer.
+    if (gridKey(await freshGrid()) !== serverGrid.current) {
+      alert("La grille a été modifiée ailleurs : elle a été rechargée. Vérifie-la puis relance.");
+      return reload();
+    }
     if (mex) return startMexicano();
     if (bo4) return startBo4();
     setBusy(true);
@@ -514,6 +586,66 @@ export default function TournamentDetail({ params }: { params: Promise<{ id: str
           📲
         </button>
       </div>
+
+      {orphans.length > 0 && (
+        <Card tone="danger" className="space-y-2.5 p-3.5">
+          <div className="text-sm font-extrabold text-bad">
+            ⚠️ Confirmé{orphans.length > 1 ? "s" : ""} mais absent{orphans.length > 1 ? "s" : ""} de la grille
+          </div>
+          <p className="text-[11px] leading-4 text-sub">
+            {orphans.length > 1 ? "Ces joueurs se voient" : "Ce joueur se voit"} inscrit
+            {orphans.length > 1 ? "s" : ""} dans l&apos;appli mais ne
+            {orphans.length > 1 ? " sont" : " figure"} pas dans les équipes.{" "}
+            {gridFull
+              ? "La grille est complète : retire quelqu'un de la grille, ou passe ce joueur en liste d'attente."
+              : "Place-le dans la grille ou passe-le en liste d'attente."}
+          </p>
+          {orphans.map((r) => (
+            <div key={r.id} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-bold text-body">
+                {r.player_name}
+                <span className="ml-1.5 text-[10px] font-normal text-mut">
+                  inscrit le{" "}
+                  {new Date(r.created_at).toLocaleString("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </span>
+              <Btn
+                size="sm"
+                variant="success"
+                disabled={busy || gridFull}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    if (!(await placeByName(r.player_name, r.profile_id)))
+                      alert("Plus de place libre dans la grille.");
+                    await reload();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Placer
+              </Btn>
+              <Btn
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={async () => {
+                  await setRegistrationStatus(r.id, "waitlist");
+                  reload();
+                }}
+              >
+                → Attente
+              </Btn>
+            </div>
+          ))}
+        </Card>
+      )}
 
       {pending.length > 0 && (
         <div>

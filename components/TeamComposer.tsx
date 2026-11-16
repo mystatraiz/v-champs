@@ -165,7 +165,7 @@ export function TeamComposer({
                           e.stopPropagation();
                           onRemovePlayer(team.players[pi]);
                         }}
-                        title="Retirer (→ liste d'attente)"
+                        title="Retirer de la partie"
                         className="absolute right-1 top-1 cursor-pointer rounded px-1 text-xs text-mut hover:text-bad"
                       >
                         ✕
